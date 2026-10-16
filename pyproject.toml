@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6", "openai>=1.40"]
+dev = ["pytest>=8", "ruff>=0.6", "openai>=1.40", "fpdf2>=2.7"]
 
 [project.scripts]
 contract-assistant = "contract_assistant.cli:main"
