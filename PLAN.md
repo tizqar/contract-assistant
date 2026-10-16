@@ -178,6 +178,45 @@ same windows):
 The UI shows a progress bar over 41 types; the result is cached by content hash, so a
 re-upload of the same file costs nothing.
 
+**Measured with the app's extractor** (seed-3407 weights, M4, MPS fp32, 2026-10-16;
+`contract-assistant extract --demo`; windows counted with the Governing Law question):
+
+| document | chars | windows | extract | per 1,000 chars |
+|---|---|---|---|---|
+| `short_supply_agreement.txt` | 20,693 | 6 | 35.8 s | 1.73 s |
+| `medium_sponsorship_agreement.txt` | 49,518 | 12 | 75.1 s | 1.52 s |
+| `long_outsourcing_agreement.txt` | 101,639 | 31 | 184.1 s | 1.81 s |
+
+Against the thesis test predictions of the same run (Kaggle T4, fp16), on the three demo
+contracts:
+
+- **Parity.** On CPU fp32 the app reproduces the harness exactly on the two parity
+  contracts (`tests/test_parity_finetuned.py`, texts identical, confidences within 1e-5).
+- **Top-1.** The top-1 text is the same for 122 of 123 contract–type pairs. The one change
+  is Parties in the long contract, a near-tie of two candidates (0.0846 vs 0.0840).
+- **Lower ranks.** 19, 16 and 15 types per contract differ in the n-best: adjacent ranks
+  swap, or one candidate at the tail is replaced.
+- **Confidences.** The median gap between the two runs is ~1e-6. Only 2 of ~2,450 shared
+  candidates differ by more than 5e-3: 7.8e-3 (short, Competitive Restriction Exception)
+  and 1.1e-2 (long, Exclusivity).
+- **Offsets.** 48, 46 and 66 candidates have a different `start`. The imported caches
+  used `text.find`, which picks the first copy of a repeated passage; the extractor's
+  offsets are the spans the model actually scored.
+
+**M1 acceptance** (`tests/test_demo_acceptance.py`): the top candidate matches CUAD gold
+for 14 of 19 present types (short), 18 of 18 (medium) and 15 of 19 (long), on both the
+imported and the extracted caches. Plan 01 asked for 15 of 19 on the short contract; the
+model does not reach it. The five misses are:
+
+- Change Of Control and Irrevocable Or Perpetual License: a wrong top-1; for Change Of
+  Control a matching span is ranked second.
+- Effective Date: the top-1 is the agreement date.
+- IP Ownership Assignment: no candidate matches.
+- Parties: the top-1 is `the Customer` and the gold is `'the Customer'`, which CUAD's
+  rule does not match.
+
+The floors in the test are these measured counts.
+
 ### 2.3 Pages (`pdf.py`)
 
 `page_starts[i]` = cumulative character offset where page *i* begins in the extracted
