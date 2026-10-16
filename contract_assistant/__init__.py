@@ -1,1 +1,1 @@
-"""Local contract assistant: extract once, answer many, cite verbatim. See PLAN.md."""
+"""Contract assistant: clause extraction with verbatim citations."""

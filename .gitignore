@@ -8,3 +8,5 @@ cache/
 models/
 .env
 .DS_Store
+CLAUDE.md
+.claude/

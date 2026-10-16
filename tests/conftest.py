@@ -14,6 +14,6 @@ def clause_types() -> dict:
 
 @pytest.fixture(scope="session")
 def parity_contracts() -> dict:
-    """{title: context} for the two CUAD test contracts the parity fixture was made on."""
+    """Contract texts of the parity fixture, keyed by CUAD title."""
     data = json.loads((FIXTURES / "parity_contracts.json").read_text())["data"]
     return {a["title"]: a["paragraphs"][0]["context"] for a in data}
