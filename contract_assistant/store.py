@@ -149,15 +149,19 @@ class Store:
         write_cache(cache, path)
         return path
 
-    def load(self, doc_id: str, settings: Settings) -> DocumentCache | None:
-        """Return the cache for doc_id from cache_dir or demo_dir, or None."""
+    def find(self, doc_id: str) -> Path | None:
+        """Return the path of the cache for doc_id in cache_dir or demo_dir, or None."""
         path = self.cache_dir / f"{doc_id.removeprefix(DOC_ID_PREFIX)}.json"
         if path.is_file():
-            return read_cache(path, settings)
-        for entry in _scan(self.demo_dir):
-            if entry.doc_id == doc_id:
-                return read_cache(entry.path, settings)
-        return None
+            return path
+        return next((e.path for e in _scan(self.demo_dir) if e.doc_id == doc_id), None)
+
+    def load(self, doc_id: str, settings: Settings) -> DocumentCache | None:
+        """Return the cache for doc_id from cache_dir or demo_dir, or None."""
+        path = self.find(doc_id)
+        if path is None:
+            return None
+        return read_cache(path, settings)
 
     def load_path(self, path: Path, settings: Settings) -> DocumentCache:
         """Read a cache from an explicit file."""

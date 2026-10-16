@@ -76,6 +76,13 @@ def test_load_finds_cache_in_demo_dir(store, settings):
     assert store.load(cache.doc_id, settings) == cache
 
 
+def test_find_returns_demo_path_and_none_for_unknown_id(store, settings):
+    cache = make_cache(TEXT, settings, CLAUSES)
+    write_cache(cache, store.demo_dir / "sample.json")
+    assert store.find(cache.doc_id) == store.demo_dir / "sample.json"
+    assert store.find("sha256:" + "0" * 64) is None
+
+
 def test_missing_id_returns_none(store, settings):
     assert store.load("sha256:" + "0" * 64, settings) is None
 
