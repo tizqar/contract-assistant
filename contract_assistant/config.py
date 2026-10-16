@@ -14,10 +14,19 @@ def _env(name: str, default: str | None = None) -> str | None:
     return value if value else default
 
 
+def _path(name: str, default: str) -> Path:
+    return ROOT / (_env(name, default) or default)
+
+
 @dataclass(frozen=True)
 class Settings:
-    extractor_model_id: str = field(
-        default_factory=lambda: _env("EXTRACTOR_MODEL_ID", "models/ettin-150m-cuad-seed3407")
+    extractor_name: str = field(
+        default_factory=lambda: _env(
+            "EXTRACTOR_NAME", "ettin-encoder-150m_w1024_s256_multi_neg1_seed3407_e3v"
+        )
+    )
+    extractor_path: Path = field(
+        default_factory=lambda: _path("EXTRACTOR_MODEL_ID", "models/ettin-150m-cuad-seed3407")
     )
     device: str = field(default_factory=lambda: _env("EXTRACTOR_DEVICE", "auto"))
     batch_size: int = field(default_factory=lambda: int(_env("EXTRACTOR_BATCH_SIZE", "16")))
@@ -41,16 +50,15 @@ class Settings:
     llm_timeout_s: float = 10.0
 
     answer_style: str = field(default_factory=lambda: _env("ANSWER_STYLE", "template"))
-    cache_dir: Path = field(default_factory=lambda: Path(_env("CACHE_DIR", "cache")))
-    diplomski_dir: Path = field(
-        default_factory=lambda: Path(_env("DIPLOMSKI_DIR", "../diplomski"))
-    )
+    cache_dir: Path = field(default_factory=lambda: _path("CACHE_DIR", "cache"))
+    demo_cache_dir: Path = ROOT / "demo" / "cache"
+    diplomski_dir: Path = field(default_factory=lambda: _path("DIPLOMSKI_DIR", "../diplomski"))
     clause_types_path: Path = ROOT / "data" / "clause_types.json"
 
-    def decode_settings(self) -> dict:
+    def decode_settings(self) -> dict[str, str | int]:
         """The settings a cache must have been written with to be reused."""
         return {
-            "id": self.extractor_model_id,
+            "name": self.extractor_name,
             "max_seq_len": self.max_seq_len,
             "doc_stride": self.doc_stride,
             "max_answer_len": self.max_answer_len,
