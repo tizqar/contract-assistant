@@ -1,9 +1,13 @@
 import re
+import time
 import zlib
 
 import numpy as np
 
+from contract_assistant.clause_types import load_clause_types
+from contract_assistant.config import load_settings
 from contract_assistant.extract.qa_core import Candidate
+from contract_assistant.router.base import RouteResult
 
 
 class FakeQA:
@@ -49,3 +53,69 @@ class FakeEncoder:
                 vectors[row, zlib.crc32(word.encode()) % FAKE_DIMENSIONS] += 1
         norms = np.linalg.norm(vectors, axis=1, keepdims=True)
         return vectors / np.where(norms == 0, 1, norms)
+
+
+ROUTE_KEYWORDS: dict[str, list[str]] = {
+    "parties": ["Parties"],
+    "law": ["Governing Law"],
+    "governs": ["Governing Law"],
+    "terminat": ["Termination For Convenience"],
+    "dates": ["Agreement Date", "Effective Date", "Expiration Date", "Renewal Term"],
+    "escrow": ["Source Code Escrow"],
+    "exclusive": ["Exclusivity"],
+}
+SLOW_QA_DELAY_S = 0.1
+LAW_CONFIDENCE = 0.95
+LAW_SENTENCE = re.compile(r"[^.\n]*\blaws?\b[^.\n]*\.")
+
+
+class FakeRouter:
+    """Router that matches clause type names and a few keywords in the question."""
+
+    kind = "explicit"
+
+    def __init__(self):
+        self.names = [c.name for c in load_clause_types(load_settings().clause_types_path)]
+
+    def route(self, question: str) -> RouteResult:
+        started = time.perf_counter()
+        lowered = question.lower()
+        first_seen: dict[str, int] = {}
+        for name in self.names:
+            self._note(first_seen, name, lowered.find(name.lower()))
+        for keyword, names in ROUTE_KEYWORDS.items():
+            for name in names:
+                self._note(first_seen, name, lowered.find(keyword))
+        ordered = sorted(first_seen, key=lambda name: first_seen[name])
+        latency_ms = (time.perf_counter() - started) * 1000
+        return RouteResult(clause_types=ordered, kind="explicit", latency_ms=latency_ms)
+
+    @staticmethod
+    def _note(first_seen: dict[str, int], name: str, position: int) -> None:
+        if position >= 0:
+            first_seen[name] = min(position, first_seen.get(name, position))
+
+
+class _SlowQA(FakeQA):
+    def __init__(self, delay_s: float, law_question: str):
+        super().__init__()
+        self.delay_s = delay_s
+        self.law_question = law_question
+
+    def __call__(self, question: str, context: str, **kwargs) -> list[Candidate]:
+        time.sleep(self.delay_s)
+        candidates = super().__call__(question, context, **kwargs)
+        match = LAW_SENTENCE.search(context)
+        if question == self.law_question and match:
+            sentence = match.group()
+            start = match.start() + len(sentence) - len(sentence.lstrip())
+            sentence = sentence.strip()
+            candidates.append(Candidate(sentence, LAW_CONFIDENCE, start, start + len(sentence)))
+        return candidates
+
+
+def slow_fake_qa(delay_s: float = SLOW_QA_DELAY_S) -> FakeQA:
+    """Return a FakeQA that sleeps per call and cites the first sentence on law."""
+    clause_types = load_clause_types(load_settings().clause_types_path)
+    law = next(c for c in clause_types if c.name == "Governing Law")
+    return _SlowQA(delay_s, law.cuad_question)

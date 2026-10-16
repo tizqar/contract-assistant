@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import re
 import sys
 from pathlib import Path
@@ -15,6 +16,7 @@ from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.extract.extractor import Extractor, ModelNotFoundError
 from contract_assistant.extract.windowing import assert_sliding_windows
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
+from contract_assistant.router.factory import build_router
 from contract_assistant.store import (
     DOC_ID_PREFIX,
     CacheIntegrityError,
@@ -197,6 +199,27 @@ def _cmd_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_serve(args: argparse.Namespace) -> int:
+    # Imported here so the other commands do not pay for loading Gradio.
+    from contract_assistant.ui.app import Services, build_app, launch_app
+
+    logging.basicConfig(level=logging.INFO)
+    settings = load_settings()
+    store = Store(settings.cache_dir, settings.demo_cache_dir)
+    try:
+        extractor = Extractor.from_settings(settings)
+    except ModelNotFoundError:
+        extractor = None
+        print(
+            f"uploads need the extractor model in {settings.extractor_path}",
+            file=sys.stderr,
+        )
+    clause_types = load_clause_types(settings.clause_types_path)
+    services = Services(store, build_router(settings), extractor, clause_types, settings)
+    launch_app(build_app(services), services, share=args.share, port=args.port)
+    return 0
+
+
 def _relative(path: Path) -> Path:
     return path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
 
@@ -217,6 +240,10 @@ def _parser() -> argparse.ArgumentParser:
     show.set_defaults(func=_cmd_show)
     check = commands.add_parser("check", help="load the model and answer one question")
     check.set_defaults(func=_cmd_check)
+    serve = commands.add_parser("serve", help="start the web app")
+    serve.add_argument("--share", action="store_true", help="create a public Gradio link")
+    serve.add_argument("--port", type=int, help="port to listen on")
+    serve.set_defaults(func=_cmd_serve)
     return parser
 
 

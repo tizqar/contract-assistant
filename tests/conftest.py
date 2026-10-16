@@ -1,7 +1,10 @@
 import json
+import os
 from pathlib import Path
 
 import pytest
+
+os.environ.setdefault("GRADIO_ANALYTICS_ENABLED", "False")
 
 FIXTURES = Path(__file__).parent / "fixtures"
 ROOT = Path(__file__).resolve().parent.parent
