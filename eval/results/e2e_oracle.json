@@ -1,0 +1,926 @@
+{
+  "router": "oracle",
+  "model": null,
+  "tau_low": 0.06,
+  "tau_high": 0.91,
+  "n_questions": 50,
+  "n_contracts": 102,
+  "policies": {
+    "found": {
+      "counts": {
+        "correct": 984,
+        "wrong": 35,
+        "false": 301,
+        "omission": 1804,
+        "abstention": 5342,
+        "missed": 0,
+        "correct_asked": 984,
+        "omission_asked": 1804,
+        "present_asked": 2823,
+        "quotes_attempted": 1320,
+        "quotes_dropped": 0
+      },
+      "metrics": {
+        "citation_precision": 0.7454545454545455,
+        "citation_recall": 0.3485653560042508,
+        "omission_rate": 0.6390364860077932,
+        "false_citation_rate": 0.053340421761474396,
+        "abstention_accuracy": 0.9466595782385256,
+        "hallucination_rate": 0.0
+      }
+    },
+    "shown": {
+      "counts": {
+        "correct": 2472,
+        "wrong": 287,
+        "false": 1216,
+        "omission": 64,
+        "abstention": 4427,
+        "missed": 0,
+        "correct_asked": 2472,
+        "omission_asked": 64,
+        "present_asked": 2823,
+        "quotes_attempted": 3975,
+        "quotes_dropped": 0
+      },
+      "metrics": {
+        "citation_precision": 0.6218867924528302,
+        "citation_recall": 0.8756641870350691,
+        "omission_rate": 0.02267091746369111,
+        "false_citation_rate": 0.21548821548821548,
+        "abstention_accuracy": 0.7845117845117845,
+        "hallucination_rate": 0.0
+      }
+    }
+  },
+  "fallback_rate": 0.0,
+  "latency_median_ms": 0.0,
+  "questions": [
+    {
+      "id": "q01",
+      "question": "Which law governs this agreement?",
+      "kind": "single",
+      "gold": [
+        "Governing Law"
+      ],
+      "route": {
+        "clause_types": [
+          "Governing Law"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q02",
+      "question": "Who are the parties?",
+      "kind": "single",
+      "gold": [
+        "Parties"
+      ],
+      "route": {
+        "clause_types": [
+          "Parties"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q03",
+      "question": "When was it signed, and when does it take effect?",
+      "kind": "compound",
+      "gold": [
+        "Agreement Date",
+        "Effective Date"
+      ],
+      "route": {
+        "clause_types": [
+          "Agreement Date",
+          "Effective Date"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q04",
+      "question": "When does it expire, and does it renew on its own?",
+      "kind": "compound",
+      "gold": [
+        "Expiration Date",
+        "Renewal Term",
+        "Notice Period To Terminate Renewal"
+      ],
+      "route": {
+        "clause_types": [
+          "Expiration Date",
+          "Renewal Term",
+          "Notice Period To Terminate Renewal"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q05",
+      "question": "Can either side walk away without cause?",
+      "kind": "single",
+      "gold": [
+        "Termination For Convenience"
+      ],
+      "route": {
+        "clause_types": [
+          "Termination For Convenience"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q06",
+      "question": "Is there a non-compete?",
+      "kind": "single",
+      "gold": [
+        "Non-Compete"
+      ],
+      "route": {
+        "clause_types": [
+          "Non-Compete"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q07",
+      "question": "Are there exclusivity obligations?",
+      "kind": "single",
+      "gold": [
+        "Exclusivity"
+      ],
+      "route": {
+        "clause_types": [
+          "Exclusivity"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q08",
+      "question": "Is liability capped anywhere? Is anything uncapped?",
+      "kind": "compound",
+      "gold": [
+        "Uncapped Liability",
+        "Cap On Liability"
+      ],
+      "route": {
+        "clause_types": [
+          "Uncapped Liability",
+          "Cap On Liability"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q09",
+      "question": "Can this be assigned if the company is sold?",
+      "kind": "compound",
+      "gold": [
+        "Change Of Control",
+        "Anti-Assignment"
+      ],
+      "route": {
+        "clause_types": [
+          "Change Of Control",
+          "Anti-Assignment"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q10",
+      "question": "What licences are granted, and are any perpetual?",
+      "kind": "compound",
+      "gold": [
+        "License Grant",
+        "Irrevocable Or Perpetual License"
+      ],
+      "route": {
+        "clause_types": [
+          "License Grant",
+          "Irrevocable Or Perpetual License"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q11",
+      "question": "Give me all the important dates.",
+      "kind": "compound",
+      "gold": [
+        "Agreement Date",
+        "Effective Date",
+        "Expiration Date",
+        "Renewal Term",
+        "Notice Period To Terminate Renewal"
+      ],
+      "route": {
+        "clause_types": [
+          "Agreement Date",
+          "Effective Date",
+          "Expiration Date",
+          "Renewal Term",
+          "Notice Period To Terminate Renewal"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q13",
+      "question": "Are we allowed to pitch to their existing clients?",
+      "kind": "single",
+      "gold": [
+        "No-Solicit Of Customers"
+      ],
+      "route": {
+        "clause_types": [
+          "No-Solicit Of Customers"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q16",
+      "question": "Do we also get to use things owned by their parent company or sister companies?",
+      "kind": "single",
+      "gold": [
+        "Affiliate License-Licensor"
+      ],
+      "route": {
+        "clause_types": [
+          "Affiliate License-Licensor"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q19",
+      "question": "Could we get into trouble for criticising them publicly, say on social media?",
+      "kind": "single",
+      "gold": [
+        "Non-Disparagement"
+      ],
+      "route": {
+        "clause_types": [
+          "Non-Disparagement"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q20",
+      "question": "Does anyone who isn't signing this still get rights under it?",
+      "kind": "single",
+      "gold": [
+        "Third Party Beneficiary"
+      ],
+      "route": {
+        "clause_types": [
+          "Third Party Beneficiary"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q21",
+      "question": "If they decide to sell this product line, do we get to make an offer before anyone else?",
+      "kind": "single",
+      "gold": [
+        "Rofr/Rofo/Rofn"
+      ],
+      "route": {
+        "clause_types": [
+          "Rofr/Rofo/Rofn"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q22",
+      "question": "Is there anything that lets us work with a rival despite the non-compete?",
+      "kind": "compound",
+      "gold": [
+        "Non-Compete",
+        "Competitive Restriction Exception"
+      ],
+      "route": {
+        "clause_types": [
+          "Non-Compete",
+          "Competitive Restriction Exception"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q23",
+      "question": "Will they help us move to another provider once we leave?",
+      "kind": "single",
+      "gold": [
+        "Post-Termination Services"
+      ],
+      "route": {
+        "clause_types": [
+          "Post-Termination Services"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q24",
+      "question": "If we think their patents are invalid, are we allowed to challenge them?",
+      "kind": "single",
+      "gold": [
+        "Covenant Not To Sue"
+      ],
+      "route": {
+        "clause_types": [
+          "Covenant Not To Sue"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q25",
+      "question": "can they put the price up halfway through the contract",
+      "kind": "single",
+      "gold": [
+        "Price Restrictions"
+      ],
+      "route": {
+        "clause_types": [
+          "Price Restrictions"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q26",
+      "question": "My boss wants to know if we're stuck with this. Can we leave early, and would it cost us anything?",
+      "kind": "compound",
+      "gold": [
+        "Termination For Convenience",
+        "Liquidated Damages"
+      ],
+      "route": {
+        "clause_types": [
+          "Termination For Convenience",
+          "Liquidated Damages"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q27",
+      "question": "What happens if we go over the usage limit?",
+      "kind": "single",
+      "gold": [
+        "Volume Restriction"
+      ],
+      "route": {
+        "clause_types": [
+          "Volume Restriction"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q28",
+      "question": "If it breaks after a year, are we still covered, and is there a ceiling on what we can claim?",
+      "kind": "compound",
+      "gold": [
+        "Cap On Liability",
+        "Warranty Duration"
+      ],
+      "route": {
+        "clause_types": [
+          "Cap On Liability",
+          "Warranty Duration"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q29",
+      "question": "Can our subsidiaries use the software too?",
+      "kind": "single",
+      "gold": [
+        "Affiliate License-Licensee"
+      ],
+      "route": {
+        "clause_types": [
+          "Affiliate License-Licensee"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q30",
+      "question": "Just the basics: who's it between, which law applies and how long does it run?",
+      "kind": "compound",
+      "gold": [
+        "Parties",
+        "Expiration Date",
+        "Governing Law"
+      ],
+      "route": {
+        "clause_types": [
+          "Parties",
+          "Expiration Date",
+          "Governing Law"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q31",
+      "question": "If the developer shuts down, is the source code kept somewhere safe for us?",
+      "kind": "single",
+      "gold": [
+        "Source Code Escrow"
+      ],
+      "route": {
+        "clause_types": [
+          "Source Code Escrow"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q32",
+      "question": "How long does their guarantee last after delivery?",
+      "kind": "single",
+      "gold": [
+        "Warranty Duration"
+      ],
+      "route": {
+        "clause_types": [
+          "Warranty Duration"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q33",
+      "question": "What's the exact title at the top of this document?",
+      "kind": "single",
+      "gold": [
+        "Document Name"
+      ],
+      "route": {
+        "clause_types": [
+          "Document Name"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q34",
+      "question": "If they give another customer a better deal, do we get it too?",
+      "kind": "single",
+      "gold": [
+        "Most Favored Nation"
+      ],
+      "route": {
+        "clause_types": [
+          "Most Favored Nation"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q37",
+      "question": "Do they get to use what we develop for their own products later?",
+      "kind": "compound",
+      "gold": [
+        "IP Ownership Assignment",
+        "Joint IP Ownership",
+        "License Grant"
+      ],
+      "route": {
+        "clause_types": [
+          "IP Ownership Assignment",
+          "Joint IP Ownership",
+          "License Grant"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q38",
+      "question": "Can they check our sales records to make sure they get their full share?",
+      "kind": "compound",
+      "gold": [
+        "Revenue/Profit Sharing",
+        "Audit Rights"
+      ],
+      "route": {
+        "clause_types": [
+          "Revenue/Profit Sharing",
+          "Audit Rights"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q39",
+      "question": "Are we tied to selling only to them, or do they just get first refusal on our products?",
+      "kind": "compound",
+      "gold": [
+        "Exclusivity",
+        "Rofr/Rofo/Rofn"
+      ],
+      "route": {
+        "clause_types": [
+          "Exclusivity",
+          "Rofr/Rofo/Rofn"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q40",
+      "question": "Do we have to take out insurance because of this deal?",
+      "kind": "single",
+      "gold": [
+        "Insurance"
+      ],
+      "route": {
+        "clause_types": [
+          "Insurance"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q41",
+      "question": "What can't they do after it ends?",
+      "kind": "compound",
+      "gold": [
+        "Non-Compete",
+        "Exclusivity",
+        "No-Solicit Of Customers",
+        "No-Solicit Of Employees",
+        "Post-Termination Services"
+      ],
+      "route": {
+        "clause_types": [
+          "Non-Compete",
+          "Exclusivity",
+          "No-Solicit Of Customers",
+          "No-Solicit Of Employees",
+          "Post-Termination Services"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q42",
+      "question": "Do I need their say-so to sign this contract over to another company?",
+      "kind": "single",
+      "gold": [
+        "Anti-Assignment"
+      ],
+      "route": {
+        "clause_types": [
+          "Anti-Assignment"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q43",
+      "question": "How early do I have to tell them if I don't want it to carry on after the first term?",
+      "kind": "single",
+      "gold": [
+        "Notice Period To Terminate Renewal"
+      ],
+      "route": {
+        "clause_types": [
+          "Notice Period To Terminate Renewal"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q44",
+      "question": "If we come up with something new while doing this work, does it become theirs?",
+      "kind": "single",
+      "gold": [
+        "IP Ownership Assignment"
+      ],
+      "route": {
+        "clause_types": [
+          "IP Ownership Assignment"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q45",
+      "question": "Is it OK if we headhunt some of their people?",
+      "kind": "single",
+      "gold": [
+        "No-Solicit Of Employees"
+      ],
+      "route": {
+        "clause_types": [
+          "No-Solicit Of Employees"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q46",
+      "question": "Can they look through our records or visit our premises to check we're following the rules?",
+      "kind": "single",
+      "gold": [
+        "Audit Rights"
+      ],
+      "route": {
+        "clause_types": [
+          "Audit Rights"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q47",
+      "question": "Name of the agreement and the parties, please.",
+      "kind": "compound",
+      "gold": [
+        "Document Name",
+        "Parties"
+      ],
+      "route": {
+        "clause_types": [
+          "Document Name",
+          "Parties"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q48",
+      "question": "Can we install it on as many machines as we like?",
+      "kind": "single",
+      "gold": [
+        "Unlimited/All-You-Can-Eat-License"
+      ],
+      "route": {
+        "clause_types": [
+          "Unlimited/All-You-Can-Eat-License"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q49",
+      "question": "Is the price fixed, or can it go up if we use more than we planned?",
+      "kind": "compound",
+      "gold": [
+        "Price Restrictions",
+        "Volume Restriction"
+      ],
+      "route": {
+        "clause_types": [
+          "Price Restrictions",
+          "Volume Restriction"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q50",
+      "question": "Do they get a cut of what we earn from this?",
+      "kind": "single",
+      "gold": [
+        "Revenue/Profit Sharing"
+      ],
+      "route": {
+        "clause_types": [
+          "Revenue/Profit Sharing"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q51",
+      "question": "Can we give someone else our right to use the software?",
+      "kind": "single",
+      "gold": [
+        "Non-Transferable License"
+      ],
+      "route": {
+        "clause_types": [
+          "Non-Transferable License"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q52",
+      "question": "What happens to our deal if the other company gets taken over?",
+      "kind": "compound",
+      "gold": [
+        "Change Of Control",
+        "Anti-Assignment"
+      ],
+      "route": {
+        "clause_types": [
+          "Change Of Control",
+          "Anti-Assignment"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q53",
+      "question": "Are there pre-agreed penalties if someone misses a deadline or breaks a promise?",
+      "kind": "single",
+      "gold": [
+        "Liquidated Damages"
+      ],
+      "route": {
+        "clause_types": [
+          "Liquidated Damages"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q55",
+      "question": "What's the most we could be made to pay if we mess up?",
+      "kind": "compound",
+      "gold": [
+        "Uncapped Liability",
+        "Cap On Liability",
+        "Liquidated Damages"
+      ],
+      "route": {
+        "clause_types": [
+          "Uncapped Liability",
+          "Cap On Liability",
+          "Liquidated Damages"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q57",
+      "question": "Are we limited in competing with them, recruiting their staff or going after their clients?",
+      "kind": "compound",
+      "gold": [
+        "Non-Compete",
+        "No-Solicit Of Customers",
+        "No-Solicit Of Employees"
+      ],
+      "route": {
+        "clause_types": [
+          "Non-Compete",
+          "No-Solicit Of Customers",
+          "No-Solicit Of Employees"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q58",
+      "question": "Walk me through the licence: what we're allowed to do, whether our subsidiaries can use it, whether we can pass it on and whether it lasts forever.",
+      "kind": "compound",
+      "gold": [
+        "License Grant",
+        "Non-Transferable License",
+        "Affiliate License-Licensee",
+        "Irrevocable Or Perpetual License"
+      ],
+      "route": {
+        "clause_types": [
+          "License Grant",
+          "Non-Transferable License",
+          "Affiliate License-Licensee",
+          "Irrevocable Or Perpetual License"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    },
+    {
+      "id": "q60",
+      "question": "What's the smallest order we're allowed to place?",
+      "kind": "single",
+      "gold": [
+        "Minimum Commitment"
+      ],
+      "route": {
+        "clause_types": [
+          "Minimum Commitment"
+        ],
+        "kind": "oracle",
+        "latency_ms": 0.0,
+        "raw": null
+      }
+    }
+  ]
+}
