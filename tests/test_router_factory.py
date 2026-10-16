@@ -53,6 +53,44 @@ def clients(monkeypatch):
     return SimpleNamespace(ollama=ollama, openai=openai)
 
 
+def test_none_backend_has_no_llm_client():
+    assert factory.build_llm_client(Settings(llm_backend="none")) is None
+
+
+def test_ollama_backend_returns_the_ollama_client(clients):
+    assert factory.build_llm_client(Settings(llm_backend="ollama")) is clients.ollama
+
+
+def test_openai_backend_returns_the_openai_client(clients):
+    assert factory.build_llm_client(Settings(llm_backend="openai")) is clients.openai
+
+
+def test_ollama_backend_without_the_model_has_no_llm_client(clients):
+    clients.ollama.is_available = False
+    assert factory.build_llm_client(Settings(llm_backend="ollama")) is None
+
+
+def test_ollama_backend_without_the_model_warns_naming_the_model(clients, caplog):
+    clients.ollama.is_available = False
+    with caplog.at_level(logging.WARNING):
+        factory.build_llm_client(Settings(llm_backend="ollama"))
+    [record] = caplog.records
+    assert record.levelno == logging.WARNING
+    assert OLLAMA_MODEL in record.getMessage()
+    assert "embedding router" in record.getMessage()
+
+
+def test_unknown_backend_has_no_client_and_raises():
+    with pytest.raises(factory.UnknownBackendError, match="olama"):
+        factory.build_llm_client(Settings(llm_backend="olama"))
+
+
+def test_unknown_backend_error_lists_the_valid_backends():
+    with pytest.raises(factory.UnknownBackendError) as raised:
+        factory.build_llm_client(Settings(llm_backend="olama"))
+    assert str(raised.value).endswith("use one of ollama, openai, none")
+
+
 def test_none_backend_returns_the_embedding_router_over_all_types(model_ids):
     settings = Settings(llm_backend="none")
     router = factory.build_router(settings)
@@ -88,26 +126,10 @@ def test_ollama_backend_without_the_model_returns_the_embedding_router(clients):
     assert isinstance(router, EmbeddingRouter)
 
 
-def test_ollama_backend_without_the_model_warns_naming_the_model(clients, caplog):
-    clients.ollama.is_available = False
-    with caplog.at_level(logging.WARNING):
-        factory.build_router(Settings(llm_backend="ollama"))
-    [record] = caplog.records
-    assert record.levelno == logging.WARNING
-    assert OLLAMA_MODEL in record.getMessage()
-    assert "embedding router" in record.getMessage()
-
-
 def test_unknown_backend_raises_before_any_model_is_loaded(model_ids):
     with pytest.raises(factory.UnknownBackendError, match="olama"):
         factory.build_router(Settings(llm_backend="olama"))
     assert model_ids == []
-
-
-def test_unknown_backend_error_lists_the_valid_backends():
-    with pytest.raises(factory.UnknownBackendError) as raised:
-        factory.build_router(Settings(llm_backend="olama"))
-    assert str(raised.value).endswith("use one of ollama, openai, none")
 
 
 def test_embedding_router_is_built_without_any_llm_client(model_ids):

@@ -9,17 +9,44 @@ import re
 import sys
 from dataclasses import replace
 from pathlib import Path
+from typing import get_args
 
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 from contract_assistant.answer import answer, render_markdown
 from contract_assistant.clause_types import load_clause_types
 from contract_assistant.config import ROOT, Settings, load_settings
+from contract_assistant.evaluation.e2e import (
+    ORACLE,
+    E2EReport,
+    GoldError,
+    OracleRouter,
+    evaluate_e2e,
+    load_cuad_gold,
+)
+from contract_assistant.evaluation.e2e import markdown_table as e2e_table
+from contract_assistant.evaluation.phrase_eval import PhrasingReport, evaluate_phrasing
+from contract_assistant.evaluation.questions import EvalQuestion, Split, load_questions
+from contract_assistant.evaluation.router_eval import (
+    THRESHOLD_GRID,
+    RouterRun,
+    evaluate_router,
+    threshold_sweep,
+    tune_threshold,
+)
+from contract_assistant.evaluation.router_eval import markdown_table as router_table
 from contract_assistant.extract.extractor import Extractor, ModelNotFoundError
 from contract_assistant.extract.windowing import assert_sliding_windows
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
 from contract_assistant.router.base import Router, RouteResult
-from contract_assistant.router.factory import BACKEND_NONE, UnknownBackendError, build_router
+from contract_assistant.router.factory import (
+    BACKEND_NONE,
+    UnknownBackendError,
+    build_embedding_router,
+    build_llm_client,
+    build_router,
+)
 from contract_assistant.store import (
     DOC_ID_PREFIX,
     CacheIntegrityError,
@@ -29,6 +56,7 @@ from contract_assistant.store import (
     Store,
     doc_id_of,
     import_harness_preds,
+    read_cache,
     write_cache,
 )
 
@@ -42,15 +70,32 @@ EXIT_NO_MODEL = 2
 EXIT_USAGE = 2
 JSON_INDENT = 2
 ROUTER_CHOICES = ("embedding", "llm")
+E2E_ROUTER_CHOICES = (ORACLE, *ROUTER_CHOICES)
+SPLITS = get_args(Split)
+MODEL_FIELDS = {"embedding": "embedding_model_id", "llm": "llm_model"}
+RESULTS_DIR = ROOT / "eval" / "results"
+TUNING_RESULT = "embedding_threshold.json"
+TUNING_SPLIT = "dev"
+ROUTER_RESULTS = "router_*.json"
+ROUTER_TABLE = "router.md"
+E2E_RESULTS = "e2e_*.json"
+E2E_TABLE = "e2e.md"
+ORACLE_RESULT = f"e2e_{ORACLE}.json"
+WARM_UP_QUESTION = "Is there an arbitration clause?"
 CLEAR_LINE = "\r\033[K"
 CACHE_ERRORS = (CacheMismatchError, CacheIntegrityError)
 DOCUMENT_ERRORS = (UnsupportedFileError, EmptyDocumentError, FileNotFoundError)
+THESIS_ERRORS = (HarnessImportError, GoldError, FileNotFoundError)
+
+
+def _thesis_paths(settings: Settings) -> tuple[Path, Path]:
+    preds_path = settings.diplomski_dir / "results" / f"{settings.extractor_name}_preds.jsonl"
+    return preds_path, settings.diplomski_dir / "data" / "raw" / "test.json"
 
 
 def _cmd_import_demo(args: argparse.Namespace) -> int:
     settings = load_settings()
-    preds_path = settings.diplomski_dir / "results" / f"{settings.extractor_name}_preds.jsonl"
-    cuad_json = settings.diplomski_dir / "data" / "raw" / "test.json"
+    preds_path, cuad_json = _thesis_paths(settings)
     demo = json.loads(DEMO_DOCUMENTS.read_text(encoding="utf-8"))
     slugs = {entry["cuad_title"]: entry["slug"] for entry in demo}
     try:
@@ -200,18 +245,17 @@ def _valid_ask_arguments(args: argparse.Namespace, names: list[str]) -> bool:
     return False
 
 
+def _llm_settings(settings: Settings) -> str:
+    return f"LLM_BACKEND={settings.llm_backend}, LLM_MODEL={settings.llm_model}"
+
+
 def _asked_router(choice: str | None, settings: Settings) -> Router | None:
     if choice == "embedding":
         settings = replace(settings, llm_backend=BACKEND_NONE)
-    try:
-        router = build_router(settings)
-    except UnknownBackendError as error:
-        print(f"error: {error}", file=sys.stderr)
-        return None
+    router = build_router(settings)
     if choice is not None and router.kind != choice:
         print(
-            f"error: the {choice} router is not available "
-            f"(LLM_BACKEND={settings.llm_backend}, LLM_MODEL={settings.llm_model})",
+            f"error: the {choice} router is not available ({_llm_settings(settings)})",
             file=sys.stderr,
         )
         return None
@@ -244,6 +288,162 @@ def _cmd_ask(args: argparse.Namespace) -> int:
     print(render_markdown(result, names))
     if args.types is None:
         print(f"\nrouter: {route.kind} · {route.latency_ms:.0f} ms")
+    return 0
+
+
+def _slug(model: str) -> str:
+    return model.rsplit("/", 1)[-1].replace(":", "-")
+
+
+def _model_name(settings: Settings, choice: str) -> str | None:
+    name = MODEL_FIELDS.get(choice)
+    return None if name is None else getattr(settings, name)
+
+
+def _with_model(settings: Settings, choice: str, model: str | None) -> Settings:
+    if model is None or choice not in MODEL_FIELDS:
+        return settings
+    return replace(settings, **{MODEL_FIELDS[choice]: model})
+
+
+def _write_result(name: str, text: str) -> Path:
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = RESULTS_DIR / name
+    path.write_text(text + "\n", encoding="utf-8")
+    return path
+
+
+def _oracle_first(path: Path) -> tuple[bool, str]:
+    return path.name != ORACLE_RESULT, path.name
+
+
+def _read_results[T: BaseModel](pattern: str, model: type[T]) -> list[T]:
+    paths = sorted(RESULTS_DIR.glob(pattern), key=_oracle_first)
+    return [model.model_validate_json(path.read_text(encoding="utf-8")) for path in paths]
+
+
+def _publish(name: str, table: str) -> None:
+    _write_result(name, table)
+    print(table)
+
+
+def _warmed_router(choice: str, settings: Settings) -> Router | None:
+    router = _asked_router(choice, settings)
+    if router is None:
+        return None
+    # The first call loads the model, so its latency says nothing about a question.
+    router.route(WARM_UP_QUESTION)
+    return router
+
+
+def _cmd_router_tune(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    dev = load_questions(settings.router_eval_path, TUNING_SPLIT)
+    router = build_embedding_router(settings)
+    sweep = threshold_sweep(router, dev, THRESHOLD_GRID)
+    threshold = tune_threshold(router, dev, THRESHOLD_GRID)
+    tuning = {
+        "model": settings.embedding_model_id,
+        "split": TUNING_SPLIT,
+        "n_questions": len(dev),
+        "threshold": threshold,
+        "f1": sweep[threshold],
+        "sweep": {f"{value:.2f}": f1 for value, f1 in sweep.items()},
+    }
+    path = _write_result(TUNING_RESULT, json.dumps(tuning, indent=JSON_INDENT))
+    print(f"threshold {threshold:.2f}, dev F1 {sweep[threshold]:.3f} -> {_relative(path)}")
+    print(f"set EMBEDDING_THRESHOLD={threshold:.2f} in .env and .env.example to use it")
+    return 0
+
+
+def _cmd_router_eval(args: argparse.Namespace) -> int:
+    settings = _with_model(load_settings(), args.router, args.model)
+    questions = load_questions(settings.router_eval_path, args.split)
+    router = _warmed_router(args.router, settings)
+    if router is None:
+        return EXIT_ERROR
+    run = RouterRun(
+        router=router.kind,
+        model=_model_name(settings, args.router),
+        split=args.split,
+        threshold=settings.embedding_threshold if args.router == "embedding" else None,
+        report=evaluate_router(router, questions),
+    )
+    name = f"router_{run.router}_{_slug(run.model)}_{run.split}.json"
+    _write_result(name, run.model_dump_json(indent=JSON_INDENT))
+    _publish(ROUTER_TABLE, router_table(_read_results(ROUTER_RESULTS, RouterRun)))
+    return 0
+
+
+def _e2e_report(
+    router: Router, questions: list[EvalQuestion], settings: Settings, model: str | None
+) -> E2EReport:
+    preds_path, cuad_json = _thesis_paths(settings)
+    caches = import_harness_preds(preds_path, cuad_json, settings)
+    gold = load_cuad_gold(cuad_json, load_clause_types(settings.clause_types_path))
+    return evaluate_e2e(
+        router, questions, caches, gold, settings.tau_low, settings.tau_high, model=model
+    )
+
+
+def _e2e_filename(report: E2EReport) -> str:
+    if report.model is None:
+        return f"e2e_{report.router}.json"
+    return f"e2e_{report.router}_{_slug(report.model)}.json"
+
+
+def _publish_e2e_table() -> int:
+    try:
+        table = e2e_table(_read_results(E2E_RESULTS, E2EReport))
+    except ValueError as error:
+        print(f"error: stale results in {_relative(RESULTS_DIR)}: {error}", file=sys.stderr)
+        print("re-run e2e-eval for the oracle and for every other router", file=sys.stderr)
+        return EXIT_ERROR
+    _publish(E2E_TABLE, table)
+    return 0
+
+
+def _cmd_e2e_eval(args: argparse.Namespace) -> int:
+    settings = _with_model(load_settings(), args.router, args.model)
+    questions = load_questions(settings.router_eval_path)
+    if args.router == ORACLE:
+        router = OracleRouter(questions)
+    else:
+        router = _warmed_router(args.router, settings)
+    if router is None:
+        return EXIT_ERROR
+    try:
+        report = _e2e_report(router, questions, settings, _model_name(settings, args.router))
+    except THESIS_ERRORS as error:
+        print(f"error: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    _write_result(_e2e_filename(report), report.model_dump_json(indent=JSON_INDENT))
+    return _publish_e2e_table()
+
+
+def _phrasing_line(report: PhrasingReport, path: Path) -> str:
+    replies = report.calls - report.llm_failures
+    rate = "n/a" if report.violation_rate is None else f"{report.violation_rate:.3f}"
+    return (
+        f"violations {report.violations} of {replies} replies (rate {rate}), "
+        f"unquoted {report.unquoted_replies}, failures {report.llm_failures}, "
+        f"invalid {report.invalid_replies} -> {_relative(path)}"
+    )
+
+
+def _cmd_phrase_eval(args: argparse.Namespace) -> int:
+    settings = _with_model(load_settings(), "llm", args.model)
+    client = build_llm_client(settings)
+    if client is None:
+        print(f"error: phrase-eval needs an LLM ({_llm_settings(settings)})", file=sys.stderr)
+        return EXIT_ERROR
+    questions = load_questions(settings.router_eval_path)
+    paths = sorted(settings.demo_cache_dir.glob("*.json"))
+    caches = {path.stem: read_cache(path, settings) for path in paths}
+    report = evaluate_phrasing(client, questions, caches, settings.tau_low, settings.tau_high)
+    name = f"phrasing_{_slug(report.model)}.json"
+    path = _write_result(name, report.model_dump_json(indent=JSON_INDENT))
+    print(_phrasing_line(report, path))
     return 0
 
 
@@ -282,6 +482,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
 
     logging.basicConfig(level=logging.INFO)
     settings = load_settings()
+    router = build_router(settings)
     store = Store(settings.cache_dir, settings.demo_cache_dir)
     try:
         extractor = Extractor.from_settings(settings)
@@ -292,13 +493,47 @@ def _cmd_serve(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
     clause_types = load_clause_types(settings.clause_types_path)
-    services = Services(store, build_router(settings), extractor, clause_types, settings)
+    services = Services(store, router, extractor, clause_types, settings)
     launch_app(build_app(services), services, share=args.share, port=args.port)
     return 0
 
 
 def _relative(path: Path) -> Path:
     return path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+
+
+def _add_evaluation_commands(commands: argparse._SubParsersAction) -> None:
+    router_tune = commands.add_parser(
+        "router-tune", help="choose the embedding threshold on the dev questions"
+    )
+    router_tune.set_defaults(func=_cmd_router_tune)
+    router_eval = commands.add_parser(
+        "router-eval", help="score a router on the evaluation questions"
+    )
+    router_eval.add_argument("--router", choices=ROUTER_CHOICES, required=True)
+    router_eval.add_argument(
+        "--model", help="model of the router instead of the configured one"
+    )
+    router_eval.add_argument(
+        "--split", choices=SPLITS, default="test", help="questions to score"
+    )
+    router_eval.set_defaults(func=_cmd_router_eval)
+    e2e_eval = commands.add_parser(
+        "e2e-eval", help="score a router end to end on CUAD's test contracts"
+    )
+    e2e_eval.add_argument(
+        "--router",
+        choices=E2E_ROUTER_CHOICES,
+        required=True,
+        help="the oracle routes with the gold clause types",
+    )
+    e2e_eval.add_argument("--model", help="model of the router; the oracle has none")
+    e2e_eval.set_defaults(func=_cmd_e2e_eval)
+    phrase_eval = commands.add_parser(
+        "phrase-eval", help="check that LLM-phrased answers quote only verified text"
+    )
+    phrase_eval.add_argument("--model", help="LLM model instead of the configured one")
+    phrase_eval.set_defaults(func=_cmd_phrase_eval)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -325,6 +560,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     ask.add_argument("--json", action="store_true", help="print the answer as JSON")
     ask.set_defaults(func=_cmd_ask)
+    _add_evaluation_commands(commands)
     check = commands.add_parser("check", help="load the model and answer one question")
     check.set_defaults(func=_cmd_check)
     serve = commands.add_parser("serve", help="start the web app")
@@ -338,7 +574,11 @@ def main(argv: list[str] | None = None) -> int:
     """Run the command line interface and return the exit code."""
     load_dotenv()
     args = _parser().parse_args(argv)
-    return args.func(args)
+    try:
+        return args.func(args)
+    except UnknownBackendError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return EXIT_ERROR
 
 
 if __name__ == "__main__":

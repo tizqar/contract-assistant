@@ -40,26 +40,28 @@ def build_embedding_router(settings: Settings) -> EmbeddingRouter:
     )
 
 
+def build_llm_client(settings: Settings) -> LLMClient | None:
+    """Build the client of LLM_BACKEND; None without a backend or when Ollama lacks the model."""
+    backend = settings.llm_backend
+    if backend == BACKEND_OPENAI:
+        return OpenAICompatClient.from_settings(settings)
+    if backend == BACKEND_OLLAMA:
+        return _ollama_client(settings)
+    if backend == BACKEND_NONE:
+        return None
+    raise UnknownBackendError(
+        f"unknown LLM_BACKEND {backend!r}; use one of {', '.join(BACKENDS)}"
+    )
+
+
 def build_router(settings: Settings) -> Router:
     """Build the router that LLM_BACKEND selects, with the embedding router as fallback."""
-    if settings.llm_backend not in BACKENDS:
-        raise UnknownBackendError(
-            f"unknown LLM_BACKEND {settings.llm_backend!r}; use one of {', '.join(BACKENDS)}"
-        )
+    client = build_llm_client(settings)
     embedding = build_embedding_router(settings)
-    client = _llm_client(settings)
     if client is None:
         return embedding
     clause_types = load_clause_types(settings.clause_types_path)
     return LLMRouter(client, embedding, clause_types)
-
-
-def _llm_client(settings: Settings) -> LLMClient | None:
-    if settings.llm_backend == BACKEND_OPENAI:
-        return OpenAICompatClient.from_settings(settings)
-    if settings.llm_backend == BACKEND_OLLAMA:
-        return _ollama_client(settings)
-    return None
 
 
 def _ollama_client(settings: Settings) -> OllamaClient | None:
