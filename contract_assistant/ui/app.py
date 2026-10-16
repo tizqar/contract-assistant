@@ -44,7 +44,23 @@ UNEXPECTED_ERROR = "Something went wrong; see the server log."
 DAMAGED_CACHE = "The cache file for this document is damaged or inconsistent."
 UPLOAD_ERRORS = (UnsupportedFileError, EmptyDocumentError, CacheIntegrityError)
 
-THEME = gr.themes.Soft(primary_hue="slate", neutral_hue="slate")
+FONT_SANS = ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"]
+FONT_MONO = ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"]
+THEME = gr.themes.Soft(
+    primary_hue="indigo", neutral_hue="slate", font=FONT_SANS, font_mono=FONT_MONO
+)
+UPLOAD_HEIGHT = 120
+COLUMN_WIDTHS = ["22%", "17%", "12%", "12%", "37%"]
+CHAT_PLACEHOLDER = (
+    "**Ask about this contract**\n\n"
+    "- who are the parties and which law governs?\n"
+    "- can either side terminate for convenience?\n"
+    "- give me all the important dates"
+)
+SCROLL_TO_HIGHLIGHT = """() => {
+  const token = document.querySelector('#view .token:not(:has(.unlabeled))');
+  if (token) token.scrollIntoView({block: 'center'});
+}"""
 
 CSS = """
 .tier {
@@ -65,8 +81,18 @@ CSS = """
   overflow-wrap: anywhere;
   white-space: normal;
 }
+#upload svg.feather-upload { display: none; }
+#clause-table, #clause-table * { font-family: var(--font); }
 #view { max-height: 460px; overflow-y: auto; }
-#view * { overflow-wrap: anywhere; }
+#view .textfield {
+  display: block;
+  line-height: 1.7;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+#view .token-container { display: inline; }
+#view .line-break { display: block; }
+#view .text, #view .token { word-break: normal; overflow-wrap: break-word; }
 """
 
 
@@ -308,11 +334,20 @@ def build_app(services: Services) -> gr.Blocks:
                 )
                 with gr.Row():
                     upload = gr.File(
-                        file_types=[".pdf", ".txt"], label="Upload PDF or TXT", elem_id="upload"
+                        file_types=[".pdf", ".txt"],
+                        label="Upload PDF or TXT",
+                        height=UPLOAD_HEIGHT,
+                        elem_id="upload",
                     )
                     extract = gr.Button("Extract", elem_id="extract")
                 extract_status = gr.Markdown(elem_id="extract-status")
-                chat = gr.Chatbot(height=CHAT_HEIGHT, elem_id="chat", show_label=False)
+                chat = gr.Chatbot(
+                    height=CHAT_HEIGHT,
+                    elem_id="chat",
+                    show_label=False,
+                    placeholder=CHAT_PLACEHOLDER,
+                    buttons=["copy"],
+                )
                 with gr.Row():
                     question = gr.Textbox(
                         placeholder="Ask about this contract",
@@ -359,7 +394,8 @@ def build_app(services: Services) -> gr.Blocks:
                     reset = gr.Button("Reset", elem_id="reset")
                 table = gr.Dataframe(
                     headers=CLAUSE_HEADERS,
-                    datatype=["str", "html", "number", "str", "str"],
+                    datatype=["str", "html", "str", "str", "str"],
+                    column_widths=COLUMN_WIDTHS,
                     interactive=False,
                     wrap=True,
                     max_height=TABLE_MAX_HEIGHT,
@@ -391,13 +427,13 @@ def build_app(services: Services) -> gr.Blocks:
             inputs=[question, chat, cache_state, tau_low, tau_high],
             outputs=[question, chat, answer_state, picker, view_label, view, sources],
             api_name="ask",
-        )
+        ).then(None, None, None, js=SCROLL_TO_HIGHLIGHT)
         picker.input(
             handlers.pick_citation,
             [picker, answer_state, cache_state],
             [view_label, view],
             api_name="pick_citation",
-        )
+        ).then(None, None, None, js=SCROLL_TO_HIGHLIGHT)
         tau_low.release(
             handlers.release_low,
             [tau_low, tau_high, cache_state],
@@ -416,7 +452,9 @@ def build_app(services: Services) -> gr.Blocks:
             [tau_low, tau_high, table],
             api_name="reset_thresholds",
         )
-        table.select(handlers.show_row, [cache_state], [view_label, view], api_name="show_row")
+        table.select(
+            handlers.show_row, [cache_state], [view_label, view], api_name="show_row"
+        ).then(None, None, None, js=SCROLL_TO_HIGHLIGHT)
         extract.click(
             handlers.extract_upload,
             [upload],

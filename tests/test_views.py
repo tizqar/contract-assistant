@@ -95,7 +95,7 @@ def test_empty_n_best_row_is_not_found(settings):
     row = clause_rows(cache, TAU_LOW, TAU_HIGH)[0]
     assert row[0] == "Term"
     assert TABLE_STATUS_WORDS["not_found"] in row[1]
-    assert row[2:] == [0.0, "n/a", ""]
+    assert row[2:] == ["0.00", "n/a", ""]
 
 
 def test_top_citation_is_none_for_empty_n_best(settings):

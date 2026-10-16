@@ -40,16 +40,20 @@ def _row(
 ) -> tuple[tuple[int, float, str], list]:
     if not candidates:
         key = (STATUS_ORDER["not_found"], 0.0, name)
-        return key, [name, _status_cell("not_found"), 0.0, NO_PAGE, ""]
+        return key, [name, _status_cell("not_found"), _conf_cell(0.0), NO_PAGE, ""]
     top = candidates[0]
     status = tier(top.conf, tau_low, tau_high)
     page = NO_PAGE if top.page is None else top.page
-    cells = [name, _status_cell(status), round(top.conf, CONF_DECIMALS), page]
+    cells = [name, _status_cell(status), _conf_cell(top.conf), page]
     return (STATUS_ORDER[status], -top.conf, name), [*cells, _short_quote(top.text)]
 
 
 def _status_cell(status: Status) -> str:
     return f'<span class="tier tier-{status}">{TABLE_STATUS_WORDS[status]}</span>'
+
+
+def _conf_cell(conf: float) -> str:
+    return f"{conf:.{CONF_DECIMALS}f}"
 
 
 def _short_quote(text: str) -> str:
