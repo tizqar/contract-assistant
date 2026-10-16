@@ -55,7 +55,7 @@ class Settings:
         default_factory=lambda: _env("EMBEDDING_MODEL_ID", "BAAI/bge-base-en-v1.5")
     )
     embedding_threshold: float = field(
-        default_factory=lambda: float(_env("EMBEDDING_THRESHOLD", "0.62"))
+        default_factory=lambda: float(_env("EMBEDDING_THRESHOLD", "0.55"))
     )
 
     answer_style: str = field(default_factory=lambda: _env("ANSWER_STYLE", "template"))

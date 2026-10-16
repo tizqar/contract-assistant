@@ -43,7 +43,7 @@ class SentenceTransformerEncoder:
         return self._encode(texts)
 
     def _encode(self, texts: list[str]) -> np.ndarray:
-        return self.model.encode(texts, normalize_embeddings=True)
+        return self.model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
 
 
 class EmbeddingRouter:
