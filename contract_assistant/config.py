@@ -51,11 +51,19 @@ class Settings:
     openai_api_key: str | None = field(default_factory=lambda: _env("OPENAI_API_KEY"))
     llm_timeout_s: float = 10.0
 
+    embedding_model_id: str = field(
+        default_factory=lambda: _env("EMBEDDING_MODEL_ID", "BAAI/bge-base-en-v1.5")
+    )
+    embedding_threshold: float = field(
+        default_factory=lambda: float(_env("EMBEDDING_THRESHOLD", "0.62"))
+    )
+
     answer_style: str = field(default_factory=lambda: _env("ANSWER_STYLE", "template"))
     cache_dir: Path = field(default_factory=lambda: _path("CACHE_DIR", "cache"))
     demo_cache_dir: Path = ROOT / "demo" / "cache"
     diplomski_dir: Path = field(default_factory=lambda: _path("DIPLOMSKI_DIR", "../diplomski"))
     clause_types_path: Path = ROOT / "data" / "clause_types.json"
+    router_descriptions_path: Path = ROOT / "data" / "router_descriptions.json"
 
     def decode_settings(self) -> dict[str, str | int]:
         """The settings a cache must have been written with to be reused."""

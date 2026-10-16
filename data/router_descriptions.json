@@ -1,0 +1,172 @@
+{
+  "Document Name": [
+    "what is this contract called",
+    "the title of the agreement"
+  ],
+  "Parties": [
+    "which companies or people entered into this agreement",
+    "the names of the contracting parties",
+    "who is the buyer and who is the seller"
+  ],
+  "Agreement Date": [
+    "the date on which the agreement was signed",
+    "when was this contract made"
+  ],
+  "Effective Date": [
+    "the date the agreement comes into force",
+    "from when does the contract start to apply"
+  ],
+  "Expiration Date": [
+    "the date the initial term ends",
+    "how long does the contract last before it expires"
+  ],
+  "Renewal Term": [
+    "automatic renewal or extension of the contract after the first term",
+    "for how long is the agreement renewed",
+    "does the term roll over unless someone objects"
+  ],
+  "Notice Period To Terminate Renewal": [
+    "how much advance notice is needed to stop the contract from renewing",
+    "deadline to give notice of non-renewal"
+  ],
+  "Governing Law": [
+    "which country's or state's law applies to the contract",
+    "choice of law and jurisdiction for disputes",
+    "where would a dispute be heard"
+  ],
+  "Most Favored Nation": [
+    "the customer gets the best price or terms offered to anyone else",
+    "most favoured customer pricing clause"
+  ],
+  "Non-Compete": [
+    "a party may not compete with the other party",
+    "restriction on operating in the same business or region",
+    "non-competition covenant"
+  ],
+  "Exclusivity": [
+    "one party must deal only with the other party",
+    "exclusive supplier or exclusive distributor arrangement",
+    "a party may not sell to or work with third parties"
+  ],
+  "No-Solicit Of Customers": [
+    "a party may not approach the other party's customers",
+    "ban on poaching clients or business partners"
+  ],
+  "Competitive Restriction Exception": [
+    "exceptions to the non-compete or exclusivity obligations",
+    "carve-outs from the restrictions on competing"
+  ],
+  "No-Solicit Of Employees": [
+    "a party may not hire the other party's staff",
+    "ban on recruiting or poaching employees and contractors"
+  ],
+  "Non-Disparagement": [
+    "a party may not say negative things about the other",
+    "obligation not to make disparaging statements"
+  ],
+  "Termination For Convenience": [
+    "ending the contract early without a reason by giving notice",
+    "can a party walk away from the agreement at will"
+  ],
+  "Rofr/Rofo/Rofn": [
+    "right of first refusal",
+    "right of first offer or first negotiation before selling to others",
+    "a party gets the first chance to buy or license"
+  ],
+  "Change Of Control": [
+    "what happens if a party is acquired or merges with another company",
+    "consent or termination right when ownership of a party changes"
+  ],
+  "Anti-Assignment": [
+    "can the contract be transferred to someone else",
+    "consent needed before assigning the agreement to a third party"
+  ],
+  "Revenue/Profit Sharing": [
+    "splitting revenue or profits between the parties",
+    "royalties or a share of income paid to the other party"
+  ],
+  "Price Restrictions": [
+    "limits on raising or lowering prices",
+    "price caps or price freezes on the goods or services"
+  ],
+  "Minimum Commitment": [
+    "minimum purchase amount or minimum order quantity",
+    "the customer must buy at least a certain volume"
+  ],
+  "Volume Restriction": [
+    "extra fees or consent needed if usage goes above a threshold",
+    "limit on how much of the product or service can be used"
+  ],
+  "IP Ownership Assignment": [
+    "who owns the intellectual property that is created under the contract",
+    "work product or inventions are transferred to the other party"
+  ],
+  "Joint IP Ownership": [
+    "intellectual property owned jointly by both parties",
+    "shared ownership of jointly developed technology"
+  ],
+  "License Grant": [
+    "what licence rights are given to the other party",
+    "permission to use the software, trademark or technology"
+  ],
+  "Non-Transferable License": [
+    "the licence cannot be passed on to anyone else",
+    "restrictions on transferring or sublicensing the licence"
+  ],
+  "Affiliate License-Licensor": [
+    "licence that also covers the licensor's affiliates' intellectual property",
+    "rights granted by the licensor's group companies"
+  ],
+  "Affiliate License-Licensee": [
+    "licence extends to the licensee's affiliates or subsidiaries",
+    "group companies of the licensee may use the licensed rights"
+  ],
+  "Unlimited/All-You-Can-Eat-License": [
+    "enterprise-wide or unlimited usage licence",
+    "licence with no cap on the number of users or copies"
+  ],
+  "Irrevocable Or Perpetual License": [
+    "a licence that lasts forever",
+    "a licence that cannot be revoked or taken back"
+  ],
+  "Source Code Escrow": [
+    "source code is deposited with a third party",
+    "release of the source code if the vendor goes bankrupt"
+  ],
+  "Post-Termination Services": [
+    "obligations that continue after the contract ends",
+    "transition assistance or wind-down support after termination"
+  ],
+  "Audit Rights": [
+    "can a party inspect the other party's books and records",
+    "right to audit for compliance"
+  ],
+  "Uncapped Liability": [
+    "liability that has no upper limit",
+    "damages that are not limited for certain breaches"
+  ],
+  "Cap On Liability": [
+    "maximum amount a party can be liable for",
+    "limitation of liability and time limit for bringing claims"
+  ],
+  "Liquidated Damages": [
+    "a fixed sum payable if a party breaches the contract",
+    "termination fee or penalty for early exit"
+  ],
+  "Warranty Duration": [
+    "how long the warranty lasts",
+    "period during which defects must be fixed"
+  ],
+  "Insurance": [
+    "a party must carry insurance coverage",
+    "required insurance policies and minimum coverage"
+  ],
+  "Covenant Not To Sue": [
+    "a party promises not to bring a claim or challenge the other's intellectual property",
+    "agreement not to contest the validity of the other party's rights"
+  ],
+  "Third Party Beneficiary": [
+    "someone who is not a party can enforce the contract",
+    "rights given to outside beneficiaries"
+  ]
+}

@@ -30,3 +30,13 @@ def test_decode_settings_has_no_model_path():
 def test_extractor_name_from_env(monkeypatch):
     monkeypatch.setenv("EXTRACTOR_NAME", "other-run")
     assert Settings().decode_settings()["name"] == "other-run"
+
+
+def test_embedding_threshold_from_env(monkeypatch):
+    monkeypatch.setenv("EMBEDDING_THRESHOLD", "0.55")
+    assert Settings().embedding_threshold == 0.55
+
+
+def test_embedding_model_defaults_to_bge_base(monkeypatch):
+    monkeypatch.delenv("EMBEDDING_MODEL_ID", raising=False)
+    assert Settings().embedding_model_id == "BAAI/bge-base-en-v1.5"
