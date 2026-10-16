@@ -58,7 +58,6 @@ class Settings:
         default_factory=lambda: float(_env("EMBEDDING_THRESHOLD", "0.55"))
     )
 
-    answer_style: str = field(default_factory=lambda: _env("ANSWER_STYLE", "template"))
     cache_dir: Path = field(default_factory=lambda: _path("CACHE_DIR", "cache"))
     demo_cache_dir: Path = ROOT / "demo" / "cache"
     diplomski_dir: Path = field(default_factory=lambda: _path("DIPLOMSKI_DIR", "../diplomski"))
