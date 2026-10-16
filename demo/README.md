@@ -13,5 +13,5 @@ types present, so the defence demo has something to show on every question:
 `demo_documents.json` carries CUAD's gold spans for each, so the demo can be checked
 against ground truth live. The PDFs with real page numbers are in CUAD's full release
 (`CUAD_v1.zip` → `full_contract_pdf/`, same titles); the `.txt` files here are the exact
-text the model was evaluated on. Pre-extracted caches for the three ship in `cache/demo/`
+text the model was evaluated on. Pre-extracted caches for the three ship in `demo/cache/`
 once M1 is done, so the demo never waits on extraction.
