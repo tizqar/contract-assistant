@@ -7,16 +7,19 @@ import json
 import logging
 import re
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 from dotenv import load_dotenv
 
+from contract_assistant.answer import answer, render_markdown
 from contract_assistant.clause_types import load_clause_types
 from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.extract.extractor import Extractor, ModelNotFoundError
 from contract_assistant.extract.windowing import assert_sliding_windows
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
-from contract_assistant.router.factory import build_router
+from contract_assistant.router.base import Router, RouteResult
+from contract_assistant.router.factory import BACKEND_NONE, UnknownBackendError, build_router
 from contract_assistant.store import (
     DOC_ID_PREFIX,
     CacheIntegrityError,
@@ -36,6 +39,9 @@ QUOTE_WIDTH = 80
 ELLIPSIS = "…"
 EXIT_ERROR = 1
 EXIT_NO_MODEL = 2
+EXIT_USAGE = 2
+JSON_INDENT = 2
+ROUTER_CHOICES = ("embedding", "llm")
 CLEAR_LINE = "\r\033[K"
 CACHE_ERRORS = (CacheMismatchError, CacheIntegrityError)
 DOCUMENT_ERRORS = (UnsupportedFileError, EmptyDocumentError, FileNotFoundError)
@@ -132,6 +138,18 @@ def _resolve_cache(target: str, settings: Settings, store: Store) -> DocumentCac
     return store.load(doc_id_of(load_document(path).text), settings)
 
 
+def _load_cache(target: str, settings: Settings) -> DocumentCache | None:
+    store = Store(settings.cache_dir, settings.demo_cache_dir)
+    try:
+        cache = _resolve_cache(target, settings, store)
+    except (*DOCUMENT_ERRORS, *CACHE_ERRORS) as error:
+        print(f"error: {target}: {error}", file=sys.stderr)
+        return None
+    if cache is None:
+        print(f"no cache for {target}; run extract first", file=sys.stderr)
+    return cache
+
+
 def _quote(text: str) -> str:
     text = re.sub(r"\s+", " ", text).strip()
     if len(text) <= QUOTE_WIDTH:
@@ -150,14 +168,8 @@ def _row(name: str, width: int, cache: DocumentCache) -> str:
 
 def _cmd_show(args: argparse.Namespace) -> int:
     settings = load_settings()
-    store = Store(settings.cache_dir, settings.demo_cache_dir)
-    try:
-        cache = _resolve_cache(args.target, settings, store)
-    except (*DOCUMENT_ERRORS, *CACHE_ERRORS) as error:
-        print(f"error: {args.target}: {error}", file=sys.stderr)
-        return EXIT_ERROR
+    cache = _load_cache(args.target, settings)
     if cache is None:
-        print(f"no cache for {args.target}; run extract first", file=sys.stderr)
         return EXIT_ERROR
     print(
         f"{cache.source.filename}  {cache.source.n_chars} chars  "
@@ -167,6 +179,71 @@ def _cmd_show(args: argparse.Namespace) -> int:
     width = max(len(name) for name in names)
     for name in names:
         print(_row(name, width, cache))
+    return 0
+
+
+def _split_names(raw: str) -> list[str]:
+    return [name.strip() for name in raw.split(",")]
+
+
+def _valid_ask_arguments(args: argparse.Namespace, names: list[str]) -> bool:
+    if args.types is None:
+        if args.question.strip():
+            return True
+        print("error: a question is required unless --types is given", file=sys.stderr)
+        return False
+    unknown = [name for name in _split_names(args.types) if name not in names]
+    if not unknown:
+        return True
+    print(f"error: unknown clause types: {', '.join(unknown)}", file=sys.stderr)
+    print("\n".join(names), file=sys.stderr)
+    return False
+
+
+def _asked_router(choice: str | None, settings: Settings) -> Router | None:
+    if choice == "embedding":
+        settings = replace(settings, llm_backend=BACKEND_NONE)
+    try:
+        router = build_router(settings)
+    except UnknownBackendError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return None
+    if choice is not None and router.kind != choice:
+        print(
+            f"error: the {choice} router is not available "
+            f"(LLM_BACKEND={settings.llm_backend}, LLM_MODEL={settings.llm_model})",
+            file=sys.stderr,
+        )
+        return None
+    return router
+
+
+def _route(args: argparse.Namespace, settings: Settings) -> RouteResult | None:
+    if args.types is not None:
+        types = _split_names(args.types)
+        return RouteResult(clause_types=types, kind="explicit", latency_ms=0.0)
+    router = _asked_router(args.router, settings)
+    return None if router is None else router.route(args.question)
+
+
+def _cmd_ask(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    names = [clause_type.name for clause_type in load_clause_types(settings.clause_types_path)]
+    if not _valid_ask_arguments(args, names):
+        return EXIT_USAGE
+    cache = _load_cache(args.target, settings)
+    if cache is None:
+        return EXIT_ERROR
+    route = _route(args, settings)
+    if route is None:
+        return EXIT_ERROR
+    result = answer(args.question, route, cache, settings.tau_low, settings.tau_high)
+    if args.json:
+        print(result.model_dump_json(indent=JSON_INDENT))
+        return 0
+    print(render_markdown(result, names))
+    if args.types is None:
+        print(f"\nrouter: {route.kind} · {route.latency_ms:.0f} ms")
     return 0
 
 
@@ -238,6 +315,16 @@ def _parser() -> argparse.ArgumentParser:
     show = commands.add_parser("show", help="show the cached result of a document")
     show.add_argument("target", help="document, cache file or sha256: document id")
     show.set_defaults(func=_cmd_show)
+    ask = commands.add_parser("ask", help="answer a question about an extracted document")
+    ask.add_argument("target", help="document, cache file or sha256: document id")
+    ask.add_argument("question", nargs="?", default="", help="the question to answer")
+    selection = ask.add_mutually_exclusive_group()
+    selection.add_argument("--types", help="comma separated clause types; no router is used")
+    selection.add_argument(
+        "--router", choices=ROUTER_CHOICES, help="use this router; fail if it is unavailable"
+    )
+    ask.add_argument("--json", action="store_true", help="print the answer as JSON")
+    ask.set_defaults(func=_cmd_ask)
     check = commands.add_parser("check", help="load the model and answer one question")
     check.set_defaults(func=_cmd_check)
     serve = commands.add_parser("serve", help="start the web app")
