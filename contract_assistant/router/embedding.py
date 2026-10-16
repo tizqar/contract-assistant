@@ -46,6 +46,13 @@ class SentenceTransformerEncoder:
         return self.model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
 
 
+def select_types(scores: dict[str, float], threshold: float, max_types: int) -> list[str]:
+    """Types scoring at least the threshold, best first, at most max_types."""
+    ranked = sorted(scores.items(), key=lambda item: -item[1])
+    chosen = [name for name, score in ranked if score >= threshold]
+    return chosen[:max_types]
+
+
 class EmbeddingRouter:
     """Routes a question to the clause types whose descriptions are close to it."""
 
@@ -80,10 +87,9 @@ class EmbeddingRouter:
     def route(self, question: str) -> RouteResult:
         """Return the types scoring at least the threshold, best first."""
         start = time.perf_counter()
-        scored = sorted(self.scores(question).items(), key=lambda item: -item[1])
-        chosen = [name for name, score in scored if score >= self.threshold]
+        chosen = select_types(self.scores(question), self.threshold, self.max_types)
         return RouteResult(
-            clause_types=chosen[: self.max_types],
+            clause_types=chosen,
             kind="embedding",
             latency_ms=(time.perf_counter() - start) * MS_PER_S,
         )

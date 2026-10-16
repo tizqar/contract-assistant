@@ -12,6 +12,7 @@ from contract_assistant.router.embedding import (
     RouterDataError,
     SentenceTransformerEncoder,
     load_descriptions,
+    select_types,
 )
 from tests.support.fakes import FakeEncoder
 
@@ -21,6 +22,7 @@ DESCRIPTIONS = {
     "Insurance": ["required insurance coverage"],
     "Audit Rights": ["right to audit the books"],
 }
+SCORES = {"Insurance": 0.4, "Governing Law": 0.9, "Audit Rights": 0.6, "Term": 0.5}
 
 
 def make_router(threshold=0.1, max_types=5, descriptions=DESCRIPTIONS):
@@ -77,6 +79,25 @@ def test_route_is_ordered_by_score():
 
 def test_question_matching_nothing_gives_empty_route():
     assert make_router(threshold=0.5).route("zzz qqq").clause_types == []
+
+
+def test_select_types_keeps_scores_at_the_threshold_best_first():
+    assert select_types(SCORES, 0.5, 5) == ["Governing Law", "Audit Rights", "Term"]
+
+
+def test_select_types_stops_at_max_types():
+    assert select_types(SCORES, 0.0, 2) == ["Governing Law", "Audit Rights"]
+
+
+def test_select_types_is_empty_when_no_score_reaches_the_threshold():
+    assert select_types(SCORES, 0.95, 5) == []
+
+
+def test_route_follows_select_types():
+    router = make_router(threshold=0.3, max_types=2)
+    question = "insurance coverage and which law"
+    expected = select_types(router.scores(question), router.threshold, router.max_types)
+    assert router.route(question).clause_types == expected
 
 
 def test_route_reports_kind_and_latency():
