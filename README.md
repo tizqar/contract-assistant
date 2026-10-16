@@ -7,13 +7,16 @@ explicit *"not found"*.
 The expensive model (a fine-tuned 150M-parameter encoder, trained in the companion
 `diplomski` repo) runs **once at upload** and extracts all 41 CUAD clause types with
 character offsets. Every later question is a cache lookup: a router only maps the question
-to clause types and never writes legal content. The intended router is a small local LLM
-(Qwen3 via Ollama); today an embedding router (bge-base-en-v1.5) does the routing. Quotes
-are verified against the source text before they are shown.
+to clause types and never writes legal content. The router is Qwen3-1.7B served by Ollama,
+constrained to the 41 clause type names; without Ollama an embedding router
+(bge-base-en-v1.5) routes instead. Quotes are verified against the source text before they
+are shown.
 
 **Status:** built are the inference core, the extractor and cache, three-tier answers with
-the verbatim guard, the embedding router and the Gradio app. Still to do are the LLM
-router, the router evaluation and the end-to-end evaluation. Build order:
+the verbatim guard, the embedding and LLM routers, the Gradio app, and the router,
+end-to-end and phrasing evaluations, with the oracle end-to-end results. Still to do: the
+author's review of the 60 evaluation questions, then the run phase (threshold tuning, the
+router table, the embedding and LLM end-to-end rows, the phrasing rate). Build order:
 [IMPLEMENTATION.md](IMPLEMENTATION.md).
 
 ## Install
@@ -27,6 +30,20 @@ cp .env.example .env
 
 The `api` extra (`openai`) is optional. The Makefile expects the environment in `.venv/`.
 
+The LLM router needs Ollama and the model. This step is optional:
+
+```bash
+brew install ollama && brew services start ollama
+ollama pull qwen3:1.7b      # qwen3:4b for the comparison row
+```
+
+`LLM_BACKEND` in `.env` selects the router: `ollama` (default), `openai` (an
+OpenAI-compatible endpoint, set by `OPENAI_BASE_URL`, `OPENAI_API_KEY` and `LLM_MODEL`;
+needs the `api` extra) or `none`, which routes with the embedding router only. If Ollama is
+not running or the model is not pulled, the app logs a warning and uses the embedding
+router alone. When the LLM fails on a single question, the embedding router routes that
+question.
+
 ## Model weights
 
 The fine-tuned 150M extractor is the one manual step: download it from the Kaggle run
@@ -39,15 +56,40 @@ a new contract needs the model, and the app says so.
 ## Run
 
 ```bash
-make demo      # http://127.0.0.1:7860
-make ui-dev    # fake backends, no model, reloads on save
-make test      # fast tests
-make lint      # ruff
+make demo         # http://127.0.0.1:7860
+make ui-dev       # fake backends, no model, reloads on save
+make test         # fast tests
+make lint         # ruff
+make router-eval  # router-eval --router llm --split test
+make e2e          # e2e-eval --router llm
 ```
 
 The first `make demo` loads the embedding model and downloads it if it is not cached.
-`make ui-dev` is meant for the VS Code Simple Browser. The other commands are
-`contract-assistant import-demo | extract | show | check | serve`.
+`make ui-dev` is meant for the VS Code Simple Browser.
+
+`ask` answers a question about a document, a cache file or a `sha256:` document id:
+
+```bash
+contract-assistant ask demo/short_supply_agreement.txt \
+    "who are the parties and which law governs?"
+contract-assistant ask demo/short_supply_agreement.txt --types "Governing Law,Exclusivity"
+```
+
+With a question, the router picks the clause types; `--router embedding|llm` asks for one
+router and fails if it is not available. `--types` names the clause types and loads no
+model. `--json` prints the answer as JSON.
+
+The evaluations are described in PLAN.md, sections 4 to 6:
+
+```bash
+contract-assistant router-tune                                 # embedding threshold, on dev
+contract-assistant router-eval --router embedding --split test
+contract-assistant router-eval --router llm --split test       # make router-eval
+contract-assistant e2e-eval --router oracle                    # also embedding and llm
+contract-assistant phrase-eval                                 # LLM paragraphs vs. the quotes
+```
+
+The other commands are `contract-assistant import-demo | extract | show | check | serve`.
 
 ## How answers read
 
@@ -87,7 +129,10 @@ the page.
 
 Three CUAD contracts with pre-extracted caches: see [demo/README.md](demo/README.md).
 
-Results tables will appear under `eval/results/` once the evaluations are built.
+The end-to-end table is `eval/results/e2e.md`. It has the oracle-router rows, which route by
+the gold clause types and so show the extractor and the tiers without routing errors. The
+router table (`eval/results/router.md`) and the embedding and LLM rows follow the review of
+the evaluation questions.
 
 ## Repository layout
 

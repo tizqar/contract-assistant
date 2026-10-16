@@ -1,7 +1,9 @@
 # Contract assistant — plan
 
 **Date:** 2026-10-04
-**Status:** M0 done; build order in [IMPLEMENTATION.md](IMPLEMENTATION.md) (v2, 2026-10-16)
+**Status:** M0, M1, M3 and M4 done; M2 and M5 built, with the oracle end-to-end rows in
+and the router numbers waiting for the review of the evaluation questions. Build order in
+[IMPLEMENTATION.md](IMPLEMENTATION.md) (v2, 2026-10-16)
 **Companion repo:** `diplomski` (encoder training, evaluation harness, figures). That repo
 produces the model and the operating threshold; this repo consumes them. Training never
 happens here.
@@ -27,7 +29,7 @@ QUESTION (many per document, instant)
   "which law governs, and can they terminate without cause?"
      └─> ROUTER: question -> {Governing Law, Termination For Convenience}
            (embedding baseline, or local Qwen3 constrained to the 41-label enum)
-         └─> CACHE lookup, threshold τ
+         └─> CACHE lookup, tiers by τ_low / τ_high
              └─> VERIFY: every quote must occur verbatim in the document text
                  └─> ANSWER: quotes + page + confidence, or "not found (checked)"
 ```
@@ -44,7 +46,7 @@ hallucination rate is zero by construction** — and it is measured, not asserte
 | where the expensive model runs | **once, at upload** | per-question latency becomes a cache lookup; the demo feels instant |
 | LLM role | **router only**, closed set of 41 labels | removes the LLM from the correctness path entirely |
 | LLM choice | **local Qwen3-1.7B via Ollama** (Ollama's default 4-bit quantisation, ~1.1 GB, runs on the M4 CPU/GPU); any OpenAI-compatible API behind the same interface | consistent with the thesis claim (cheap, local, private — legal documents should not leave the machine); the router task is a closed 41-label set, 1.7B is enough. 4B only if M2 numbers say so; a Kaggle/Colab-hosted router is possible but unnecessary |
-| answer text | **template by default** (`Governing Law — p. 12, 0.94: "…"`), optional LLM phrasing behind a verbatim-quote guard | the template is auditable; LLM phrasing adds nothing to correctness |
+| answer text | **template** (`Governing Law — found · p. 12 · confidence 0.94` and the quote); LLM phrasing is only measured, behind a verbatim-quote check (section 4) | the template is auditable; LLM phrasing adds nothing to correctness |
 | UI | **Gradio 6 `Blocks`** over a UI-independent core package | fastest Python route to upload + chat + highlighted citations; the core stays testable and could sit behind FastAPI later |
 | runs on | the M4 (MPS fp32 for Ettin, Ollama for Qwen3) | no GPU dependency; measured ~2 s per 1,000 characters of contract for the 150M model |
 
@@ -81,18 +83,27 @@ contract-assistant/
     cuad_match.py        CUAD's span match rule (Jaccard >= 0.5, Parties relaxed)
     router/
       base.py            Router protocol: route(question) -> RouteResult
-      embedding.py       bge-base: question vs 41 descriptions, cosine, threshold + top-k
+      embedding.py       bge-base: question vs descriptions and paraphrases, threshold + top-k
       llm.py             LLMRouter(client): JSON-schema-constrained {"clause_types": [...]}
       clients.py         OllamaClient (native, format=schema, think=False) | OpenAICompatClient
-    answer.py            compose(cache, route, τ) -> Answer; verify quotes; template rendering
-    ui/app.py            Gradio Blocks
-    cli.py               extract | show | check | import-demo | ask | router-eval | e2e-eval | serve
+      factory.py         build_router(settings): the router that LLM_BACKEND selects
+    answer.py            tiers, one citation per type, exact quote guard, Markdown template
+    phrase.py            LLM paragraph from the verified quotes; check of its quoted spans
+    evaluation/
+      questions.py       loads data/router_eval.jsonl
+      router_eval.py     set P/R/F1 per router; embedding threshold tuning (section 5)
+      e2e.py             citation outcomes on CUAD test contracts, automatic (section 6)
+      phrase_eval.py     violation rate of LLM paragraphs against the verified quotes
+    ui/
+      app.py             Gradio Blocks
+      views.py           caches and answers -> component values (pure functions)
+    cli.py               import-demo | extract | show | check | ask | router-tune | router-eval
+                         | e2e-eval | phrase-eval | serve
   data/
-    clause_types.json    41 entries, generated from the training repo
-    router_eval.jsonl    60 questions with gold clause-type sets (section 5)
-  eval/
-    router_eval.py       set P/R/F1 per router
-    e2e_eval.py          citation accuracy on CUAD test contracts, automatic (section 6)
+    clause_types.json          41 entries, generated from the training repo
+    router_descriptions.json   2-3 hand-written paraphrases per clause type
+    router_eval.jsonl          60 questions with gold clause-type sets (section 5)
+  eval/results/          results JSON and markdown tables, committed
   tests/
   demo/cache/            the three demo caches, committed
   cache/                 (gitignored) one JSON per processed document
@@ -144,19 +155,34 @@ just the top one, so the τ slider in the UI works without re-running the model.
 ```json
 {
   "question": "which law governs, and can they terminate without cause?",
-  "router": {"kind": "llm", "clause_types": ["Governing Law", "Termination For Convenience"], "latency_ms": 1400},
-  "tau": 0.42,
+  "route": {"clause_types": ["Governing Law", "Termination For Convenience"], "kind": "llm",
+            "latency_ms": 1400,
+            "raw": "{\"clause_types\": [\"Governing Law\", \"Termination For Convenience\"]}"},
+  "tau_low": 0.06,
+  "tau_high": 0.91,
   "items": [
-    {"clause_type": "Governing Law", "status": "present",
-     "citations": [{"quote": "…", "page": 12, "conf": 0.94, "start": 48210, "end": 48290}]},
-    {"clause_type": "Termination For Convenience", "status": "absent", "best_conf": 0.07, "citations": []}
+    {"clause_type": "Governing Law", "status": "found", "best_conf": 0.94,
+     "citation": {"quote": "…", "page": 12, "conf": 0.94, "start": 48210, "end": 48290},
+     "withheld": false},
+    {"clause_type": "Termination For Convenience", "status": "not_found", "best_conf": 0.03,
+     "citation": null, "withheld": false}
   ],
-  "verified": true
+  "dropped_quotes": 0
 }
 ```
 
-`status` ∈ `present` (conf ≥ τ), `absent` (best candidate < τ), `low_confidence` (within a
-band under τ, shown greyed with its number so the user can judge).
+`status` follows the confidence of the top candidate: `found` when it is at least τ_high
+(0.91); `check`, shown as "possible, verify", from τ_low (0.06) up to τ_high; `not_found`
+below τ_low, or when the type has no candidate (`best_conf` 0).
+
+- **One citation per type**, the top candidate. Confidences are a softmax over the n-best
+  and the null score, so they sum to at most 1 and at most one candidate can reach τ_high.
+  The other candidates are in the sources view.
+- **`withheld`** is true when the citation failed the guard of section 4: `citation` is
+  then null, the item keeps its tier, and `dropped_quotes` counts it.
+- **`route.kind`** is `explicit` (types given to `ask --types`), `oracle` (the gold types,
+  in the evaluations), `embedding`, `llm` or `llm_fallback`. `raw` is the LLM's reply, or
+  the error class on a fallback.
 
 ### 2.2 Extraction (`extract/extractor.py`)
 
@@ -230,63 +256,98 @@ demo can use real PDFs.
 ## 3. Router
 
 Input: a free-form question. Output: a **set** of clause types from the closed list of
-41, possibly empty. Two implementations behind one interface, both evaluated.
+41, possibly empty. Two implementations behind one interface, both evaluated. A route
+carries the types, how they were chosen (`kind`), the latency and, for the LLM, the `raw`
+reply.
 
 **`EmbeddingRouter` (baseline, no LLM).** `bge-base-en-v1.5` with its query instruction
-prefix; cosine similarity between the question and each clause type's description (CUAD's
-own "Details: …" text plus a few hand-written paraphrases per type); return every type
-above a similarity threshold, at most *k*. Deterministic, ~10 ms, no dependency. Expected
-to handle single-intent questions and fail on compound/abstract ones ("the important
-dates").
+prefix. Each clause type is represented by its CUAD description and two or three
+hand-written paraphrases (`data/router_descriptions.json`); a type's score is the maximum
+cosine similarity between the question and any of its texts. The router returns the types
+scoring at least `EMBEDDING_THRESHOLD`, best first, at most 5 (the largest gold set in
+section 5). The threshold, 0.55, is a hand-set placeholder until the value that
+`router-tune` chooses on the dev split replaces it. Deterministic and needs no server.
+Expected to handle single-intent questions and fail on compound or abstract ones ("the
+important dates").
 
-**`LLMRouter` (default).** Qwen3-1.7B or -4B through Ollama with `format=` the JSON schema
-of `{"clause_types": [<enum of 41>]}` — constrained decoding, so an invalid label cannot
-be emitted — `think=False` for latency, temperature 0. Prompt = the 41 names with
-one-line descriptions, three worked examples (single, compound, out-of-scope), the
-question. Pydantic validates the result; on any failure fall back to the embedding
-router and mark `router.kind = "embedding (fallback)"`.
+**`LLMRouter` (default).** Qwen3-1.7B through Ollama (`qwen3:4b` for the comparison row)
+with `format=` the JSON schema of `{"clause_types": [<enum of 41>]}` — constrained
+decoding, so an invalid label cannot be emitted — `think=False` for latency, temperature 0
+and a 10 s timeout. The prompt has the task in two sentences, the 41 names with one-line
+descriptions and three worked examples (single, compound, out of scope). The examples are
+not in the evaluation set; a test enforces it. The reply is validated with Pydantic (only
+the 41 names, no other keys) and duplicates are removed, keeping order. `[]` is a valid
+answer, not a failure: it means out of scope. On an LLM error, malformed JSON or an
+invalid name, the embedding router's route is returned with kind `llm_fallback` and the
+error class in `raw`, and a warning is logged. A failed call is not retried; the router
+falls back instead.
 
 **Closed-world behaviour.** Questions outside the 41 types ("what about data privacy?")
 route to the empty set and the assistant says so, listing what it *can* answer. This is
 a feature: the system never pretends.
 
 **Backends.** `clients.py` has `OllamaClient` (native library) and `OpenAICompatClient`
-(any OpenAI-compatible endpoint, including a hosted model behind an API key; `base_url`,
-`model`, `api_key` from env). Switching is `LLM_BACKEND=ollama|openai`. The demo runs
-`ollama`; the API path exists for the comparison row and for anyone without a capable
-laptop.
+(any OpenAI-compatible endpoint, including a hosted model behind an API key).
+`build_router` in `factory.py` reads `LLM_BACKEND`:
+
+| `LLM_BACKEND` | router |
+|---|---|
+| `ollama` (default) | `LLMRouter` over `OllamaClient` (`LLM_MODEL`, default `qwen3:1.7b`), with the embedding router as fallback. If the server does not list the model at start-up (Ollama not running, or the model not pulled), a warning is logged and the embedding router is used alone, so a missing Ollama costs nothing per question |
+| `openai` | `LLMRouter` over `OpenAICompatClient` (`OPENAI_BASE_URL`, `OPENAI_API_KEY`, `LLM_MODEL`; needs the `api` extra), with the embedding router as fallback |
+| `none` | the embedding router |
+
+The demo runs `ollama`; the API path exists for the comparison row and for anyone without
+a capable laptop.
 
 ---
 
 ## 4. Answer composition and the guard (`answer.py`)
 
-1. For each routed type, take the cache's candidates; `present` if the best conf ≥ τ.
-2. **Verify** every quote: `quote` must occur in the document text (whitespace-normalised
-   comparison; the extractor's offsets make this exact in practice). A quote that fails is
-   dropped and counted — this counter is the *displayed hallucination rate* reported in
-   the thesis. Expected 0; measured anyway.
+1. For each routed type, take the top candidate in the cache and tier its confidence:
+   `found` at τ_high (0.91) or above, `check` from τ_low (0.06), `not_found` below. One
+   citation per type (section 2.1).
+2. **Verify** every citation: it is shown only if `text[start:end] == quote`, exactly. The
+   extractor's offsets make this exact, so there is no whitespace normalisation and no
+   fuzzy matching (`rapidfuzz` is not a dependency). A citation that fails is withheld: the
+   item keeps its tier and renders "quote withheld (failed verification)", and
+   `dropped_quotes` counts it. That counter is the *displayed hallucination rate* reported
+   in the thesis. Expected 0; measured anyway.
 3. Render the template:
 
 ```
-Governing Law — p. 12, confidence 0.94
-  "This Agreement shall be governed by the laws of the State of New York."
-Termination For Convenience — not found (checked; best candidate 0.07)
+**Governing Law** — found · p. 12 · confidence 0.94
+> This Agreement shall be governed by the laws of the State of New York.
+
+**Exclusivity** — possible, verify · p. n/a · confidence 0.42
+> …
+
+**Termination For Convenience** — not found (checked; best candidate 0.03)
 ```
 
-4. Optional (`ANSWER_STYLE=llm`): ask the LLM to phrase one paragraph **using only the
-   quotes above, verbatim**. Post-check: every quoted substring in its output must be one
-   of the verified quotes, else discard and show the template. Off by default; it exists
-   to measure how often a small LLM breaks the quote rule (a thesis number), not to
-   improve answers.
+The status word is always printed. Quotes are Markdown-escaped, blockquoted and cut at 400
+characters with "…". An empty route answers "I can only answer about these clause types:"
+followed by the 41 names.
+
+4. LLM phrasing is measured offline only (`phrase.py`, `phrase-eval`); the app always shows
+   the template and there is no `ANSWER_STYLE` setting. The LLM writes one paragraph from
+   the verified items. Every span in double quotes, straight or curly, must occur word for
+   word in one of the verified quotes, compared with whitespace collapsed; any other span
+   is a violation. `phrase-eval` phrases each in-scope evaluation question on each of the
+   three demo contracts with the configured LLM, using the gold clause types as the route,
+   and reports the violation rate (`eval/results/phrasing_<model>.json`). It exists to
+   measure how often a small LLM breaks the quote rule (a thesis number), not to improve
+   answers. Replies with no quoted span are counted separately.
 
 ---
 
 ## 5. Router evaluation set (`data/router_eval.jsonl`)
 
-60 questions, hand-written, each with its gold set of clause types. Mix: ~30 single-type,
-~20 compound, ~10 out-of-scope or abstract. Scored with set precision / recall / F1 per
-question, averaged; both routers; also the fallback rate of the LLM router. First dozen,
-to fix the style:
+60 questions, each with its gold set of clause types: 30 single-type, 20 compound and 10
+out of scope (empty gold set). One JSON object per line: `id`, `question`, `gold`, `kind`,
+`split`. The `dev` and `test` splits hold 30 questions each, stratified (15 single, 10
+compound and 5 out of scope per split). The twelve questions below are included as
+written. Every clause type is in at least one gold set, and the abstract questions ("the
+important dates") are compound, with a gold set. First dozen, to fix the style:
 
 | question | gold set |
 |---|---|
@@ -303,31 +364,82 @@ to fix the style:
 | Give me all the important dates. | Agreement Date, Effective Date, Expiration Date, Renewal Term, Notice Period To Terminate Renewal |
 | What does it say about data privacy? | ∅ (out of scope) |
 
-The full 60 are written in M2 and reviewed by the author before any router is tuned on
-them. They are never used to tune the extractor.
+The full 60 are written in M2 and reviewed by the author before any router is tuned or
+scored on them; that review is still to come. They are never used to tune the extractor.
+
+**Scoring.** For each question, set precision, recall and F1 of the routed types against
+the gold set, averaged over all questions and by kind. An empty gold set scores 1 if the
+route is empty and 0 otherwise; a non-empty gold set with an empty route scores 0. The
+report adds exact-set accuracy, out-of-scope accuracy (the share of out-of-scope
+questions routed to the empty set), the fallback rate of the LLM router, and the median
+and p90 routing latency.
+
+**Tuning.** The embedding threshold is tuned on `dev` only: a grid from 0.30 to 0.90 in
+steps of 0.01, maximum mean F1, ties to the higher threshold. The chosen value is then set
+as `EMBEDDING_THRESHOLD` in `.env` and `.env.example`, with its provenance, before the
+embedding router is scored. The LLM router has no threshold. A router is scored once, on
+`test`.
+
+- `contract-assistant router-tune` writes `eval/results/embedding_threshold.json`.
+- `contract-assistant router-eval --router embedding|llm [--model M] [--split dev|test]`
+  scores a router (the split defaults to `test`) and writes
+  `eval/results/router_<kind>_<model>_<split>.json` and the table `eval/results/router.md`.
 
 ---
 
-## 6. End-to-end evaluation — automatic, on CUAD's test contracts (`eval/e2e_eval.py`)
+## 6. End-to-end evaluation — automatic, on CUAD's test contracts (`evaluation/e2e.py`)
 
-No human labelling needed: CUAD's gold spans *are* the citations. For each of the 102
-official test contracts and each router-eval question whose gold types are present in
-that contract:
+No human labelling and no new inference: CUAD's gold spans *are* the citations, and the
+thesis test predictions of the chosen run are imported as caches (`import_harness_preds`,
+parity-tested) for all 102 CUAD test contracts. The gold comes from `test.json`. The
+in-scope questions of section 5 are each routed once, and the route is reused for every
+contract. Out-of-scope questions are scored in the router evaluation only.
 
-- route → cache lookup at τ → citations
-- **citation accuracy**: for each routed type that is gold-present, does the top citation
-  match a gold span (Jaccard ≥ 0.5, CUAD's rule)?
-- **false citation rate**: for each routed type that is gold-absent, did we cite anyway?
-- **abstention accuracy**: gold-absent → `absent` status?
-- **router error contribution**: the same metrics with an oracle router, so routing and
-  extraction errors are separated
-- **displayed hallucination rate**: verified-quote failures / quotes shown (expect 0)
-- **latency**: upload-time extraction per document (M4), answer latency with each router
+Every (test contract, in-scope question) pair is scored, not only the pairs whose gold
+types occur in the contract. Asking about a clause the contract does not have is the case
+the tiers exist for: 266 of the 325 validation errors are false citations.
 
-Output: one table for the application chapter, per router, with the oracle-router row as
-the ceiling. This reuses `test.json` and the clause-type match rule from the training
-repo; it needs the cache for the 102 contracts, which is one overnight run on the M4
-(~1.5 h at ~50 s/contract) or 20 min on Kaggle.
+Two display policies are scored: *found only* (τ_high) and *shown* (found and check, i.e.
+τ_low). A question *asks* for the types of its gold set; the router *routes* the types it
+returns. For each type t that is asked or routed, the outcome is:
+
+| case | outcome |
+|---|---|
+| t routed, shown, gold present, the citation matches a gold span (CUAD's rule, Parties relaxed) | correct |
+| t routed, shown, gold present, no match | wrong |
+| t routed, shown, gold absent | false citation |
+| t routed, not shown, gold present | omission |
+| t routed, not shown, gold absent | correct abstention |
+| t asked but not routed, gold present | missed by the router |
+
+A quote withheld by the guard is not shown. The metrics:
+
+| metric | definition |
+|---|---|
+| citation precision | correct / (correct + wrong + false) |
+| citation recall | correct on asked types / asked types present in the contract |
+| omission rate | (omissions on asked types + missed) / asked types present |
+| false-citation rate | false / routed types absent from the contract |
+| abstention accuracy | abstentions / routed types absent |
+| displayed hallucination rate | withheld quotes / quotes the answer tried to show under the policy (shown + withheld); expected 0, measured |
+| routing loss | each metric with the router minus the same metric with the oracle router |
+
+The oracle router returns the gold types of each question, which separates routing errors
+from extraction errors.
+
+**Consistency check.** 41 one-type questions with the oracle router reproduce the thesis
+operating-point counts on the test split exactly, over its 4,182 (contract, type) pairs.
+At τ_low: 1,078 correct, 138 wrong, 595 false, 28 omissions and 2,343 abstentions. At
+τ_high: 444 correct, 17 wrong, 143 false, 783 omissions and 2,795 abstentions. So the
+evaluation scores what the thesis scored.
+
+Output: `eval/results/e2e_oracle.json` for the oracle router, `e2e_<kind>_<model>.json` for
+the others, and the table `eval/results/e2e.md` (one row per router and policy, then the
+routing loss). The oracle rows come first, because they need neither Ollama nor a tuned
+embedding threshold. They depend on the gold sets, so they are re-run if the review of
+section 5 changes a question. The embedding and LLM rows follow that review. Latency is
+reported elsewhere: extraction per document in section 2.2, routing latency (median and
+p90) in the router table.
 
 ---
 
@@ -383,9 +495,9 @@ thesis value; the core package is UI-agnostic, so that door stays open.
 | **M0** | repo skeleton; model on the Hub; `clause_types.json`; vendored `qa_core.py` with offsets + guard | **parity test passes**: on 2 CUAD test contracts, `(text, conf)` lists equal the training harness's byte for byte; `pytest` green | ½ day |
 | **M1** | `extract` CLI → cache JSON; pages for PDFs; device auto | runs on the M4; timing table for 5 contracts of different lengths; re-upload is a cache hit | 1 day |
 | **M2** | both routers; 60-question set; `router-eval` CLI | set P/R/F1 table for embedding vs LLM router; LLM fallback rate reported | 1 day |
-| **M3** | answer composer + verification guard; `ask` CLI | `ask <doc> "<q>"` prints the template; every shown quote verified; unit tests for present/absent/low-confidence and for the guard rejecting a tampered quote | ½ day |
+| **M3** | answer composer + verification guard; `ask` CLI | `ask <doc> "<q>"` prints the template; every shown quote verified; unit tests for found / check / not found and for the guard rejecting a tampered quote | ½ day |
 | **M4** | Gradio UI | upload → progress → chat → highlighted page → clause table with τ slider → download; a 2-minute demo script written down | 1 day |
-| **M5** | end-to-end evaluation on the 102 CUAD test contracts | the application-chapter table (section 6) for both routers + oracle router; latency numbers | ½ day + one overnight extraction run |
+| **M5** | end-to-end evaluation on the 102 CUAD test contracts | the application-chapter table (section 6) for both routers + oracle router; latency numbers | ½ day |
 | M6 *(optional)* | LLM phrasing behind the guard; OpenAI-compatible backend; Ettin-400M as extractor | guard-violation rate measured; backend switch documented | ½ day each |
 
 None of this waits on Kaggle. M0–M4 run on the M4 alone.
@@ -401,7 +513,7 @@ None of this waits on Kaggle. M0–M4 run on the M4 alone.
 | MPS fp32 too slow for a live demo on long contracts | extraction happens before the demo; cache ships with the pre-extracted demo documents; progress bar for live uploads |
 | Qwen3 router is slow or flaky | `think=False`, temperature 0, constrained schema, 10 s timeout, automatic fallback to the embedding router (which is also the honest "no LLM" baseline) |
 | PDF text extraction differs from the text CUAD annotated | irrelevant for the demo (we quote what *we* extracted); for the e2e evaluation use CUAD's `.txt` so gold offsets line up |
-| τ chosen badly | it comes from the thesis's val-selected value; the slider lets the user see the trade-off, and the e2e eval reports accuracy at three τ values |
+| τ chosen badly | it comes from the thesis's val-selected value; the slider lets the user see the trade-off, and the e2e eval reports both display policies (τ_low and τ_high) |
 
 ---
 
@@ -410,16 +522,21 @@ None of this waits on Kaggle. M0–M4 run on the M4 alone.
 - Python 3.12, `uv` (or `pip`), `pyproject.toml` with console script `contract-assistant`.
 - Dependencies: `torch`, `transformers>=5.13,<5.16`, `tokenizers<0.23`, `pdfplumber`,
   `gradio>=6.29,<7`, `pydantic>=2`, `numpy`, `sentence-transformers` (embedding router),
-  `ollama` (local LLM), `python-dotenv`. The verbatim guard is an exact match, so there is no
-  fuzzy-matching dependency.
+  `ollama>=0.5` (local LLM; 0.5 added `think`), `httpx`, `python-dotenv`. The verbatim
+  guard is an exact match, so there is no fuzzy-matching dependency.
 - Extras: `dev` (`pytest`, `ruff`, `fpdf2`) and `api` (`openai`, for the OpenAI-compatible
   client). Install with `uv pip install -e ".[dev]"`.
-- Ollama: `brew install ollama && ollama pull qwen3:1.7b` (or `qwen3:4b`).
+- Ollama: `brew install ollama && brew services start ollama && ollama pull qwen3:1.7b`
+  (`qwen3:4b` for the comparison row). `LLM_BACKEND=none` routes with the embedding router
+  only.
 - Env (see `.env.example`): `EXTRACTOR_MODEL_ID`, `EXTRACTOR_NAME`, `EXTRACTOR_DEVICE` (auto),
   `TAU_LOW`, `TAU_HIGH`, `TAU_SOURCE`, `EMBEDDING_MODEL_ID`, `EMBEDDING_THRESHOLD`,
-  `LLM_BACKEND`, `LLM_MODEL`, `ANSWER_STYLE=template|llm`, `CACHE_DIR`.
+  `LLM_BACKEND` (`ollama|openai|none`), `LLM_MODEL`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`,
+  `CACHE_DIR`.
 - `make test` (pytest incl. parity test; slow tests excluded), `make lint` (`ruff check`),
-  `make demo` (`contract-assistant serve`), `make import-demo` (thesis predictions to caches).
+  `make demo` (`contract-assistant serve`), `make import-demo` (thesis predictions to caches),
+  `make router-eval` (the LLM router on the test split) and `make e2e` (the LLM router end
+  to end).
 - `make ui-dev` runs the dev app with fakes and no model, with reload on save. In VS Code,
   open it with Simple Browser: Show at http://127.0.0.1:7860.
 
@@ -466,8 +583,13 @@ PDFs with real page numbers come from CUAD's full release (`CUAD_v1.zip →
 full_contract_pdf/`, same titles) — an M6 nicety; the `.txt` demo works without them.
 
 Demo script (2 minutes): open the short contract → "who are the parties and which law
-governs?" (two high-confidence quotes with pages) → "can either side terminate for
-convenience?" (absent, checked, best candidate shown) → "give me all the important dates"
-(compound routing, 4–5 quotes) → slide τ down and watch low-confidence rows appear in the
-table → switch to the long contract and ask about source-code escrow (a rare type the
-model finds here).
+governs?" (Governing Law found at 1.00, Parties to verify at 0.18) → "is there a source code
+escrow?" (not found, checked, best candidate 0.00) → "give me all the important dates"
+(compound routing, five quotes: three found, two to verify) → slide τ_high down and watch
+rows move from verify to found in the table → switch to the long contract and ask about
+source-code escrow (a rare type the model finds here, to verify at 0.33).
+
+On the short contract, "can either side terminate for convenience?" is answered *found*
+(0.97) with the six-month notice clause, which CUAD's annotators did not label as
+Termination For Convenience: a false citation by the gold standard, though the clause
+reads like one.
