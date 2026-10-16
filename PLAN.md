@@ -57,7 +57,7 @@ These are the only things that cross the repo boundary. Everything else is indep
 | artefact | from `diplomski` | into this repo | how |
 |---|---|---|---|
 | **model weights** | `runs/<RUN_NAME>/final/` (575 MB) | `EXTRACTOR_MODEL_ID` env / config | **public** HuggingFace Hub repo `<user>/ettin-encoder-150m-cuad-qa` (MIT weights, CC-BY-4.0 data; public makes the thesis reproducible from a model id). Uploaded straight from the Kaggle notebook — the files never need to touch the laptop |
-| **operating threshold τ** | `results/<tag>_proposal_metrics.json` → `tau_val_selected` | `cache.tau_default`, slider default in the UI | copied as a number with its provenance string |
+| **operating threshold τ** | `results/<tag>_proposal_metrics.json` → `tau_val_selected` | `TAU_LOW` / `TAU_HIGH` in `config.py`, slider defaults in the UI | copied as a number with its provenance string |
 | **decode settings** | `max_seq_len=1024, doc_stride=256, top_k=20, max_answer_len=512` | `config.py` | must equal training; the eval harness proved the window mismatch is silent and fatal |
 | **clause types + CUAD questions** | `src/schema.py` + the 41 question strings in `data/raw/test.json` | `data/clause_types.json`: `{id, name, cuad_question, description}` | the extractor must be asked with CUAD's exact wording — it was trained on it |
 | **inference core** | `QAModel` + n-best postprocessing in `src/eval_cuad_qa.py` | `contract_assistant/extract/qa_core.py` **(vendored, + char offsets)** | the harness returns `(text, conf)`; citations need `(text, conf, start, end)`, which the n-best already has internally. A parity test asserts identical `(text, conf)` lists on a sample contract |
@@ -71,12 +71,14 @@ These are the only things that cross the repo boundary. Everything else is indep
 contract-assistant/
   contract_assistant/
     config.py            model id, decode settings, τ, device, LLM backend -- all env-overridable
+    clause_types.py      the 41 clause types with CUAD's exact questions
     pdf.py               pdfplumber -> text, page_starts; page_of(offset); txt passthrough
     extract/
       qa_core.py         vendored QAModel + n-best WITH offsets; device auto (cuda > mps > cpu)
       windowing.py       vendored sliding-window guard
-      extractor.py       run 41 questions over a document -> ClauseHit[]; progress callback
-    store.py             cache/<sha256>.json read/write; doc index; fingerprint = sha256(text)
+      extractor.py       run 41 questions over a document -> DocumentCache; progress callback
+    store.py             cache schema; cache/<sha256>.json + demo/cache/ read/write; harness import
+    cuad_match.py        CUAD's span match rule (Jaccard >= 0.5, Parties relaxed)
     router/
       base.py            Router protocol: route(question) -> RouteResult
       embedding.py       bge-base: question vs 41 descriptions, cosine, threshold + top-k
@@ -84,7 +86,7 @@ contract-assistant/
       clients.py         OllamaClient (native, format=schema, think=False) | OpenAICompatClient
     answer.py            compose(cache, route, τ) -> Answer; verify quotes; template rendering
     ui/app.py            Gradio Blocks
-    cli.py               extract | ask | router-eval | e2e-eval | serve
+    cli.py               extract | show | check | import-demo | ask | router-eval | e2e-eval | serve
   data/
     clause_types.json    41 entries, generated from the training repo
     router_eval.jsonl    60 questions with gold clause-type sets (section 5)
@@ -92,23 +94,27 @@ contract-assistant/
     router_eval.py       set P/R/F1 per router
     e2e_eval.py          citation accuracy on CUAD test contracts, automatic (section 6)
   tests/
+  demo/cache/            the three demo caches, committed
   cache/                 (gitignored) one JSON per processed document
   pyproject.toml  README.md  PLAN.md
 ```
 
 ### 2.1 Data shapes
 
-**Cache, one file per document** (`cache/<sha256>.json`):
+**Cache, one file per document** (`cache/<sha256>.json`; the demo caches are
+`demo/cache/<slug>.json`, committed and read-only):
 
 ```json
 {
   "schema_version": 1,
   "doc_id": "sha256:…",
   "source": {"filename": "ACME_Supply_Agreement.pdf", "kind": "pdf", "n_chars": 46848, "n_pages": 23},
-  "model": {"id": "<user>/ettin-encoder-150m-cuad-qa", "max_seq_len": 1024, "doc_stride": 256,
-            "top_k": 20, "max_answer_len": 512, "device": "mps"},
-  "tau_default": 0.42,
+  "model": {"name": "ettin-encoder-150m_w1024_s256_multi_neg1_seed3407_e3v",
+            "path": "models/ettin-150m-cuad-seed3407", "max_seq_len": 1024, "doc_stride": 256,
+            "max_answer_len": 512, "top_k": 20, "n_best_size": 20, "device": "mps",
+            "origin": "extractor"},
   "page_starts": [0, 2103, 4311],
+  "text": "…",
   "clauses": {
     "Governing Law": [{"text": "This Agreement shall be governed by the laws of the State of New York.",
                        "start": 48210, "end": 48290, "page": 12, "conf": 0.94}],
@@ -117,6 +123,18 @@ contract-assistant/
   "timing": {"extract_s": 51.3}
 }
 ```
+
+- **Identity.** A cache is reused only when `model.name` (the run tag) and the five decode
+  settings equal `Settings.decode_settings()`; `path` and `device` are informational, so
+  the harness's `runs/<tag>/final` and the app's `models/…` are the same model.
+- **Integrity.** `text` is the full extracted document; on load `sha256(text)` must equal
+  `doc_id` and every candidate's `text[start:end]` must equal its `text`.
+- **Origin.** `extractor` for caches written by the app; `harness` for caches imported
+  from the thesis test predictions (`store.import_harness_preds`), whose offsets come
+  from `text.find` and may point at an earlier copy of a repeated passage.
+- **No threshold.** τ belongs to answers, not to caches (`TAU_LOW`, `TAU_HIGH` in
+  `config.py`).
+- `.txt` documents have `page_starts: []` and `page: null`, shown as "n/a".
 
 `clauses[type]` keeps the full n-best (up to 20 candidates with their confidences), not
 just the top one, so the τ slider in the UI works without re-running the model.
@@ -394,7 +412,7 @@ against ground truth live.
 | `demo/long_outsourcing_agreement.txt` | Tri-City Bankshares … Outsourcing Agreement (1998) | 101,639 | 19 |
 
 `demo/demo_documents.json` holds titles, lengths, present clause types and gold spans.
-M1 produces `cache/demo/<slug>.json` for all three (≈ 40 s + 100 s + 200 s on the M4) and
+M1 produces `demo/cache/<slug>.json` for all three (≈ 40 s + 100 s + 200 s on the M4) and
 they are committed, so `contract-assistant serve` opens with three ready documents. The
 PDFs with real page numbers come from CUAD's full release (`CUAD_v1.zip →
 full_contract_pdf/`, same titles) — an M6 nicety; the `.txt` demo works without them.

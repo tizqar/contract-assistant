@@ -10,7 +10,7 @@ character offsets. Every later question is a cache lookup: a small local LLM (Qw
 Ollama) only maps the question to clause types; it never writes legal content. Quotes
 are verified against the source text before they are shown.
 
-**Status:** M0 done (skeleton, vendored inference core with offsets, parity test, demo documents). Build order: [IMPLEMENTATION.md](IMPLEMENTATION.md).
+**Status:** M0 and M1 done (inference core with offsets, extractor over the 41 clause types, document cache, demo caches). Build order: [IMPLEMENTATION.md](IMPLEMENTATION.md).
 
 ## Repository layout
 
@@ -28,10 +28,12 @@ Separate git history, separate virtualenv. See [IMPLEMENTATION.md](IMPLEMENTATIO
 
 | from `diplomski` | into here |
 |---|---|
-| fine-tuned extractor (HF Hub id) | `EXTRACTOR_MODEL_ID` |
-| operating threshold τ (val-selected) | `TAU` |
+| fine-tuned extractor (local folder) and its run tag | `EXTRACTOR_MODEL_ID`, `EXTRACTOR_NAME` |
+| operating thresholds (val-selected) | `TAU_LOW`, `TAU_HIGH` |
 | 41 clause types + CUAD's question wording | `data/clause_types.json` |
 | inference core + sliding-window guard | vendored, with a parity test |
+| CUAD's span match rule | `contract_assistant/cuad_match.py`, vendored |
+| test predictions of the chosen run | demo caches, via `contract-assistant import-demo` |
 
 Training, evaluation against published CUAD numbers, and the thesis figures stay in
 `diplomski`.
