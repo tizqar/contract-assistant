@@ -1,0 +1,37 @@
+[project]
+name = "contract-assistant"
+version = "0.1.0"
+description = "Local contract assistant: extract once with a fine-tuned CUAD encoder, answer many questions with verified verbatim citations."
+requires-python = ">=3.12"
+dependencies = [
+  "torch>=2.4",
+  "transformers>=5.13,<5.16",   # 5.16+ silently breaks sliding-window tokenisation (see extract/windowing.py)
+  "tokenizers<0.23",
+  "numpy>=1.26",
+  "pydantic>=2.7",
+  "pdfplumber>=0.11",
+  "rapidfuzz>=3.9",
+  "sentence-transformers>=3.0",
+  "ollama>=0.4",
+  "gradio>=5.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6", "openai>=1.40"]
+
+[project.scripts]
+contract-assistant = "contract_assistant.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["contract_assistant*"]
+
+[tool.ruff]
+line-length = 96
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: downloads a model and runs inference; run explicitly"]
