@@ -45,7 +45,7 @@ hallucination rate is zero by construction** — and it is measured, not asserte
 | LLM role | **router only**, closed set of 41 labels | removes the LLM from the correctness path entirely |
 | LLM choice | **local Qwen3-1.7B via Ollama** (Ollama's default 4-bit quantisation, ~1.1 GB, runs on the M4 CPU/GPU); any OpenAI-compatible API behind the same interface | consistent with the thesis claim (cheap, local, private — legal documents should not leave the machine); the router task is a closed 41-label set, 1.7B is enough. 4B only if M2 numbers say so; a Kaggle/Colab-hosted router is possible but unnecessary |
 | answer text | **template by default** (`Governing Law — p. 12, 0.94: "…"`), optional LLM phrasing behind a verbatim-quote guard | the template is auditable; LLM phrasing adds nothing to correctness |
-| UI | **Gradio 5 `Blocks`** over a UI-independent core package | fastest Python route to upload + chat + highlighted citations; the core stays testable and could sit behind FastAPI later |
+| UI | **Gradio 6 `Blocks`** over a UI-independent core package | fastest Python route to upload + chat + highlighted citations; the core stays testable and could sit behind FastAPI later |
 | runs on | the M4 (MPS fp32 for Ettin, Ollama for Qwen3) | no GPU dependency; measured ~2 s per 1,000 characters of contract for the 150M model |
 
 ---
@@ -331,7 +331,7 @@ repo; it needs the cache for the 102 contracts, which is one overnight run on th
 
 ---
 
-## 7. UI (`ui/app.py`, Gradio 5 Blocks)
+## 7. UI (`ui/app.py`, Gradio 6 Blocks)
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -343,11 +343,11 @@ repo; it needs the cache for the 102 contracts, which is one overnight run on th
 │                            │ │ … This Agreement shall be governed by │ │
 │ ┌────────────────────────┐ │ │ the laws of the State of ▓New York▓…  │ │
 │ │ chat                   │ │ └───────────────────────────────────────┘ │
-│ │ > governing law and    │ │ Clauses found      τ ──●──── 0.42         │
-│ │   termination?         │ │ type · conf · page · quote                │
-│ │ Governing Law — p.12,  │ │ Parties        0.97   1  "ACME Corp…"     │
-│ │  0.94: "…New York."    │ │ Governing Law  0.94  12  "…governed by…"  │
-│ │ Termination For        │ │ Expiration D.  0.91   3  "…five (5) yrs"  │
+│ │ > governing law and    │ │ τ_low ─●─ 0.06  τ_high ──●─ 0.91          │
+│ │   termination?         │ │ type · status · conf · page · quote       │
+│ │ Governing Law — p.12,  │ │ Parties       found   0.97   1  "ACME…"   │
+│ │  0.94: "…New York."    │ │ Governing Law found   0.94  12  "…law…"   │
+│ │ Termination For        │ │ Expiration D. verify  0.41   3  "…yrs"    │
 │ │  Convenience — not     │ │ …                                         │
 │ │  found (checked)       │ │ [ Download JSON ]  [ Show sources ▾ ]     │
 │ └────────────────────────┘ │                                           │
@@ -356,13 +356,18 @@ repo; it needs the cache for the 102 contracts, which is one overnight run on th
 
 | component | Gradio | notes |
 |---|---|---|
-| upload | `gr.File` (pdf, txt) + `gr.Button("Extract")` | content hash → cache hit skips extraction |
+| upload | `gr.File` (pdf, txt) + `gr.Button("Extract")` | content hash → cache hit skips extraction; demo documents open without the extractor model, uploads then say the model is needed |
 | progress | `gr.Progress` driven by the extractor's per-type callback | shows type name and elapsed time |
-| chat | `gr.Chatbot(type="messages")` + `gr.Textbox` | each assistant turn is the rendered template; a "sources" accordion holds the raw `Answer` JSON |
-| document view | `gr.HighlightedText` | renders the **page** containing the last answer's citations with spans coloured by clause type — never the whole 300k-char contract at once |
-| clause table | `gr.Dataframe` | all types, best candidate, conf, page; filtered live by the τ `gr.Slider` (cache holds the full n-best, no re-run) |
+| chat | `gr.Chatbot` + `gr.Textbox` | messages format (no `type=` in Gradio 6); each assistant turn is the rendered template |
+| document view | `gr.HighlightedText` | PDF: the citation's page. TXT: a window of 1,500 characters either side of the citation, widened to line breaks and labelled with its character range. The cited span is highlighted; never the whole contract |
+| citation picker | `gr.Radio` | picks which citation of a compound answer is in view |
+| clause table | `gr.Dataframe` | all types, status word on every row (found / verify / not found, styled by CSS class), best candidate, conf, page; clicking a row shows that type's top candidate |
+| thresholds | two `gr.Slider`, τ_low and τ_high, and a Reset button | defaults 0.06 / 0.91; τ_low is clamped to ≤ τ_high; filters the cached n-best live, no re-run |
+| sources | `gr.Accordion` | the answer JSON and the other n-best candidates |
 | export | `gr.DownloadButton` | the cache JSON |
-| state | `gr.State(doc_id)` | one document per session; switching documents resets the chat |
+| state | `gr.State` | the loaded cache and the last answer; one document per session; switching documents resets the chat |
+
+Gradio 6 takes `theme` and `css` in `launch()`, not in `Blocks`.
 
 Why Gradio and not Streamlit: Streamlit re-executes the script on every interaction, which
 fights a 600 MB model and a chat history; Gradio's event model keeps the model loaded once
@@ -404,15 +409,19 @@ None of this waits on Kaggle. M0–M4 run on the M4 alone.
 
 - Python 3.12, `uv` (or `pip`), `pyproject.toml` with console script `contract-assistant`.
 - Dependencies: `torch`, `transformers>=5.13,<5.16`, `tokenizers<0.23`, `pdfplumber`,
-  `gradio>=5`, `pydantic>=2`, `numpy`, `sentence-transformers` (embedding router),
-  `ollama` (local LLM), `openai` (compat client, optional), `rapidfuzz` (whitespace-tolerant
-  quote check), `pytest`, `ruff`.
+  `gradio>=6.29,<7`, `pydantic>=2`, `numpy`, `sentence-transformers` (embedding router),
+  `ollama` (local LLM), `python-dotenv`. The verbatim guard is an exact match, so there is no
+  fuzzy-matching dependency.
+- Extras: `dev` (`pytest`, `ruff`, `fpdf2`) and `api` (`openai`, for the OpenAI-compatible
+  client). Install with `uv pip install -e ".[dev]"`.
 - Ollama: `brew install ollama && ollama pull qwen3:1.7b` (or `qwen3:4b`).
-- Env: `EXTRACTOR_MODEL_ID`, `EXTRACTOR_DEVICE` (auto), `TAU` (default from the thesis),
-  `LLM_BACKEND=ollama|openai|none`, `LLM_MODEL`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`,
-  `ANSWER_STYLE=template|llm`, `CACHE_DIR`.
-- `make test` (pytest incl. parity test), `make demo` (`contract-assistant serve`),
-  `make e2e` (section 6).
+- Env (see `.env.example`): `EXTRACTOR_MODEL_ID`, `EXTRACTOR_NAME`, `EXTRACTOR_DEVICE` (auto),
+  `TAU_LOW`, `TAU_HIGH`, `TAU_SOURCE`, `EMBEDDING_MODEL_ID`, `EMBEDDING_THRESHOLD`,
+  `LLM_BACKEND`, `LLM_MODEL`, `ANSWER_STYLE=template|llm`, `CACHE_DIR`.
+- `make test` (pytest incl. parity test; slow tests excluded), `make lint` (`ruff check`),
+  `make demo` (`contract-assistant serve`), `make import-demo` (thesis predictions to caches).
+- `make ui-dev` runs the dev app with fakes and no model, with reload on save. In VS Code,
+  open it with Simple Browser: Show at http://127.0.0.1:7860.
 
 Documentation language: English in the repo, as in the training repo; the thesis text is
 Serbian.
