@@ -64,6 +64,7 @@ class Settings:
     diplomski_dir: Path = field(default_factory=lambda: _path("DIPLOMSKI_DIR", "../diplomski"))
     clause_types_path: Path = ROOT / "data" / "clause_types.json"
     router_descriptions_path: Path = ROOT / "data" / "router_descriptions.json"
+    router_eval_path: Path = ROOT / "data" / "router_eval.jsonl"
 
     def decode_settings(self) -> dict[str, str | int]:
         """The settings a cache must have been written with to be reused."""

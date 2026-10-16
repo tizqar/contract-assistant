@@ -1,0 +1,60 @@
+{"id": "q01", "question": "Which law governs this agreement?", "gold": ["Governing Law"], "kind": "single", "split": "dev"}
+{"id": "q02", "question": "Who are the parties?", "gold": ["Parties"], "kind": "single", "split": "test"}
+{"id": "q03", "question": "When was it signed, and when does it take effect?", "gold": ["Agreement Date", "Effective Date"], "kind": "compound", "split": "test"}
+{"id": "q04", "question": "When does it expire, and does it renew on its own?", "gold": ["Expiration Date", "Renewal Term", "Notice Period To Terminate Renewal"], "kind": "compound", "split": "test"}
+{"id": "q05", "question": "Can either side walk away without cause?", "gold": ["Termination For Convenience"], "kind": "single", "split": "test"}
+{"id": "q06", "question": "Is there a non-compete?", "gold": ["Non-Compete"], "kind": "single", "split": "dev"}
+{"id": "q07", "question": "Are there exclusivity obligations?", "gold": ["Exclusivity"], "kind": "single", "split": "test"}
+{"id": "q08", "question": "Is liability capped anywhere? Is anything uncapped?", "gold": ["Uncapped Liability", "Cap On Liability"], "kind": "compound", "split": "test"}
+{"id": "q09", "question": "Can this be assigned if the company is sold?", "gold": ["Change Of Control", "Anti-Assignment"], "kind": "compound", "split": "dev"}
+{"id": "q10", "question": "What licences are granted, and are any perpetual?", "gold": ["License Grant", "Irrevocable Or Perpetual License"], "kind": "compound", "split": "dev"}
+{"id": "q11", "question": "Give me all the important dates.", "gold": ["Agreement Date", "Effective Date", "Expiration Date", "Renewal Term", "Notice Period To Terminate Renewal"], "kind": "compound", "split": "dev"}
+{"id": "q12", "question": "What does it say about data privacy?", "gold": [], "kind": "out_of_scope", "split": "test"}
+{"id": "q13", "question": "Are we allowed to pitch to their existing clients?", "gold": ["No-Solicit Of Customers"], "kind": "single", "split": "dev"}
+{"id": "q14", "question": "Who covers shipping and delivery costs?", "gold": [], "kind": "out_of_scope", "split": "test"}
+{"id": "q15", "question": "If someone sues us over something the other side did, who pays for our defence?", "gold": [], "kind": "out_of_scope", "split": "dev"}
+{"id": "q16", "question": "Do we also get to use things owned by their parent company or sister companies?", "gold": ["Affiliate License-Licensor"], "kind": "single", "split": "test"}
+{"id": "q17", "question": "Can you summarise this contract in a few sentences?", "gold": [], "kind": "out_of_scope", "split": "test"}
+{"id": "q18", "question": "How many days do we have to pay an invoice?", "gold": [], "kind": "out_of_scope", "split": "test"}
+{"id": "q19", "question": "Could we get into trouble for criticising them publicly, say on social media?", "gold": ["Non-Disparagement"], "kind": "single", "split": "dev"}
+{"id": "q20", "question": "Does anyone who isn't signing this still get rights under it?", "gold": ["Third Party Beneficiary"], "kind": "single", "split": "dev"}
+{"id": "q21", "question": "If they decide to sell this product line, do we get to make an offer before anyone else?", "gold": ["Rofr/Rofo/Rofn"], "kind": "single", "split": "test"}
+{"id": "q22", "question": "Is there anything that lets us work with a rival despite the non-compete?", "gold": ["Non-Compete", "Competitive Restriction Exception"], "kind": "compound", "split": "test"}
+{"id": "q23", "question": "Will they help us move to another provider once we leave?", "gold": ["Post-Termination Services"], "kind": "single", "split": "dev"}
+{"id": "q24", "question": "If we think their patents are invalid, are we allowed to challenge them?", "gold": ["Covenant Not To Sue"], "kind": "single", "split": "dev"}
+{"id": "q25", "question": "can they put the price up halfway through the contract", "gold": ["Price Restrictions"], "kind": "single", "split": "dev"}
+{"id": "q26", "question": "My boss wants to know if we're stuck with this. Can we leave early, and would it cost us anything?", "gold": ["Termination For Convenience", "Liquidated Damages"], "kind": "compound", "split": "dev"}
+{"id": "q27", "question": "What happens if we go over the usage limit?", "gold": ["Volume Restriction"], "kind": "single", "split": "dev"}
+{"id": "q28", "question": "If it breaks after a year, are we still covered, and is there a ceiling on what we can claim?", "gold": ["Cap On Liability", "Warranty Duration"], "kind": "compound", "split": "dev"}
+{"id": "q29", "question": "Can our subsidiaries use the software too?", "gold": ["Affiliate License-Licensee"], "kind": "single", "split": "dev"}
+{"id": "q30", "question": "Just the basics: who's it between, which law applies and how long does it run?", "gold": ["Parties", "Expiration Date", "Governing Law"], "kind": "compound", "split": "test"}
+{"id": "q31", "question": "If the developer shuts down, is the source code kept somewhere safe for us?", "gold": ["Source Code Escrow"], "kind": "single", "split": "test"}
+{"id": "q32", "question": "How long does their guarantee last after delivery?", "gold": ["Warranty Duration"], "kind": "single", "split": "test"}
+{"id": "q33", "question": "What's the exact title at the top of this document?", "gold": ["Document Name"], "kind": "single", "split": "test"}
+{"id": "q34", "question": "If they give another customer a better deal, do we get it too?", "gold": ["Most Favored Nation"], "kind": "single", "split": "dev"}
+{"id": "q35", "question": "How can we change something in this contract once it's signed?", "gold": [], "kind": "out_of_scope", "split": "dev"}
+{"id": "q36", "question": "Should I sign this, or is it a bad deal for us?", "gold": [], "kind": "out_of_scope", "split": "dev"}
+{"id": "q37", "question": "Do they get to use what we develop for their own products later?", "gold": ["IP Ownership Assignment", "Joint IP Ownership", "License Grant"], "kind": "compound", "split": "test"}
+{"id": "q38", "question": "Can they check our sales records to make sure they get their full share?", "gold": ["Revenue/Profit Sharing", "Audit Rights"], "kind": "compound", "split": "dev"}
+{"id": "q39", "question": "Are we tied to selling only to them, or do they just get first refusal on our products?", "gold": ["Exclusivity", "Rofr/Rofo/Rofn"], "kind": "compound", "split": "dev"}
+{"id": "q40", "question": "Do we have to take out insurance because of this deal?", "gold": ["Insurance"], "kind": "single", "split": "dev"}
+{"id": "q41", "question": "What can't they do after it ends?", "gold": ["Non-Compete", "Exclusivity", "No-Solicit Of Customers", "No-Solicit Of Employees", "Post-Termination Services"], "kind": "compound", "split": "test"}
+{"id": "q42", "question": "Do I need their say-so to sign this contract over to another company?", "gold": ["Anti-Assignment"], "kind": "single", "split": "test"}
+{"id": "q43", "question": "How early do I have to tell them if I don't want it to carry on after the first term?", "gold": ["Notice Period To Terminate Renewal"], "kind": "single", "split": "dev"}
+{"id": "q44", "question": "If we come up with something new while doing this work, does it become theirs?", "gold": ["IP Ownership Assignment"], "kind": "single", "split": "dev"}
+{"id": "q45", "question": "Is it OK if we headhunt some of their people?", "gold": ["No-Solicit Of Employees"], "kind": "single", "split": "test"}
+{"id": "q46", "question": "Can they look through our records or visit our premises to check we're following the rules?", "gold": ["Audit Rights"], "kind": "single", "split": "test"}
+{"id": "q47", "question": "Name of the agreement and the parties, please.", "gold": ["Document Name", "Parties"], "kind": "compound", "split": "dev"}
+{"id": "q48", "question": "Can we install it on as many machines as we like?", "gold": ["Unlimited/All-You-Can-Eat-License"], "kind": "single", "split": "test"}
+{"id": "q49", "question": "Is the price fixed, or can it go up if we use more than we planned?", "gold": ["Price Restrictions", "Volume Restriction"], "kind": "compound", "split": "test"}
+{"id": "q50", "question": "Do they get a cut of what we earn from this?", "gold": ["Revenue/Profit Sharing"], "kind": "single", "split": "test"}
+{"id": "q51", "question": "Can we give someone else our right to use the software?", "gold": ["Non-Transferable License"], "kind": "single", "split": "dev"}
+{"id": "q52", "question": "What happens to our deal if the other company gets taken over?", "gold": ["Change Of Control", "Anti-Assignment"], "kind": "compound", "split": "test"}
+{"id": "q53", "question": "Are there pre-agreed penalties if someone misses a deadline or breaks a promise?", "gold": ["Liquidated Damages"], "kind": "single", "split": "test"}
+{"id": "q54", "question": "where do formal notices to the other side have to be sent", "gold": [], "kind": "out_of_scope", "split": "test"}
+{"id": "q55", "question": "What's the most we could be made to pay if we mess up?", "gold": ["Uncapped Liability", "Cap On Liability", "Liquidated Damages"], "kind": "compound", "split": "dev"}
+{"id": "q56", "question": "Who has to pay the taxes on all this?", "gold": [], "kind": "out_of_scope", "split": "dev"}
+{"id": "q57", "question": "Are we limited in competing with them, recruiting their staff or going after their clients?", "gold": ["Non-Compete", "No-Solicit Of Customers", "No-Solicit Of Employees"], "kind": "compound", "split": "dev"}
+{"id": "q58", "question": "Walk me through the licence: what we're allowed to do, whether our subsidiaries can use it, whether we can pass it on and whether it lasts forever.", "gold": ["License Grant", "Non-Transferable License", "Affiliate License-Licensee", "Irrevocable Or Perpetual License"], "kind": "compound", "split": "test"}
+{"id": "q59", "question": "Can I show this contract to our investors?", "gold": [], "kind": "out_of_scope", "split": "dev"}
+{"id": "q60", "question": "What's the smallest order we're allowed to place?", "gold": ["Minimum Commitment"], "kind": "single", "split": "test"}
