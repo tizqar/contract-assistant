@@ -96,6 +96,36 @@ class FakeRouter:
             first_seen[name] = min(position, first_seen.get(name, position))
 
 
+class FixedRouter:
+    """Router returning a prepared route per question; records the questions it was asked."""
+
+    kind = "explicit"
+
+    def __init__(self, routes: dict[str, RouteResult]):
+        self.routes = routes
+        self.questions: list[str] = []
+
+    def route(self, question: str) -> RouteResult:
+        self.questions.append(question)
+        return self.routes[question]
+
+
+class FakeLLMClient:
+    """LLM client returning queued replies or raising queued errors; records its calls."""
+
+    def __init__(self, replies: list[str | Exception], model: str = "fake-llm"):
+        self.model = model
+        self.replies = list(replies)
+        self.calls: list[tuple[str, str, dict]] = []
+
+    def complete_json(self, system: str, user: str, schema: dict) -> str:
+        self.calls.append((system, user, schema))
+        reply = self.replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+
 class _SlowQA(FakeQA):
     def __init__(self, delay_s: float, law_question: str):
         super().__init__()
