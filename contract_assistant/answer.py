@@ -147,7 +147,8 @@ def _render_item(item: AnswerItem) -> str:
 def _blockquote(quote: str) -> str:
     if len(quote) > MAX_CHAT_QUOTE_CHARS:
         quote = quote[: MAX_CHAT_QUOTE_CHARS - len(ELLIPSIS)] + ELLIPSIS
-    lines = _escape(quote).split("\n")
+    # Indentation would turn a line into a Markdown code block.
+    lines = [line.strip() for line in _escape(quote).split("\n")]
     return "\n".join(f"> {line}" if line else ">" for line in lines)
 
 

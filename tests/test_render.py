@@ -100,6 +100,11 @@ def test_multiline_quote_stays_one_blockquote():
     assert text.endswith("> first\n>\n> second")
 
 
+def test_indented_quote_line_does_not_become_a_code_block():
+    text = render(found_item("events:\n\n     A.   M&I ceases to do business"))
+    assert text.endswith("> events:\n>\n> A.   M&I ceases to do business")
+
+
 def test_long_quote_is_cut_to_a_verbatim_prefix_with_ellipsis():
     quote = "abcdefghij" * 100
     body = render(found_item(quote)).split("\n> ", 1)[1]
