@@ -11,6 +11,7 @@ from contract_assistant.store import (
     CacheMismatchError,
     Store,
     doc_id_of,
+    read_cache,
     write_cache,
 )
 from tests.support.caches import make_cache
@@ -113,3 +114,27 @@ def test_list_of_missing_directories_is_empty(store):
 def test_write_cache_leaves_no_temp_file(tmp_path, settings):
     write_cache(make_cache(TEXT, settings), tmp_path / "out" / "cache.json")
     assert [p.name for p in (tmp_path / "out").iterdir()] == ["cache.json"]
+
+
+def test_load_rejects_a_cache_stored_under_another_id(store, settings):
+    cache = make_cache(TEXT, settings, CLAUSES)
+    other = "sha256:" + "1" * 64
+    write_cache(cache, store.cache_dir / f"{'1' * 64}.json")
+    with pytest.raises(CacheIntegrityError):
+        store.load(other, settings)
+
+
+def test_scan_skips_invalid_files_and_warns(store, settings, caplog):
+    cache = make_cache(TEXT, settings, CLAUSES)
+    write_cache(cache, store.demo_dir / "good.json")
+    (store.demo_dir / "bad.json").write_text("{not json", encoding="utf-8")
+    assert [entry.path.name for entry in store.list()] == ["good.json"]
+    assert store.find(cache.doc_id) == store.demo_dir / "good.json"
+    assert "bad.json" in caplog.text
+
+
+def test_read_cache_turns_invalid_json_into_integrity_error(tmp_path, settings):
+    path = tmp_path / "broken.json"
+    path.write_text("{}", encoding="utf-8")
+    with pytest.raises(CacheIntegrityError, match="broken.json"):
+        read_cache(path, settings)

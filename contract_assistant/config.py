@@ -20,6 +20,8 @@ def _path(name: str, default: str) -> Path:
 
 @dataclass(frozen=True)
 class Settings:
+    """Paths, model and decoding settings, thresholds and backends."""
+
     extractor_name: str = field(
         default_factory=lambda: _env(
             "EXTRACTOR_NAME", "ettin-encoder-150m_w1024_s256_multi_neg1_seed3407_e3v"
@@ -68,4 +70,5 @@ class Settings:
 
 
 def load_settings() -> Settings:
+    """Read the settings from the environment."""
     return Settings()

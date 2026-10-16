@@ -67,6 +67,17 @@ def _progress(done: int, total: int, name: str) -> None:
     print(f"{CLEAR_LINE}  {done}/{total} {name}", end="", file=sys.stderr, flush=True)
 
 
+def _valid_cache_path(store: Store, doc_id: str, settings: Settings) -> Path | None:
+    found = store.find(doc_id)
+    if found is None:
+        return None
+    try:
+        store.load_path(found, settings)
+    except CacheMismatchError:
+        return None
+    return found
+
+
 def _extract_file(
     path: Path,
     args: argparse.Namespace,
@@ -76,9 +87,8 @@ def _extract_file(
 ) -> tuple[str, Extractor | None]:
     doc = load_document(path)
     doc_id = doc_id_of(doc.text)
-    found = None if args.demo else store.find(doc_id)
+    found = None if args.demo else _valid_cache_path(store, doc_id, settings)
     if found:
-        store.load_path(found, settings)
         return f"{path.name}: cache hit -> {_relative(found)}", extractor
     extractor = extractor or Extractor.from_settings(settings)
     cache = extractor.extract(doc, _progress)

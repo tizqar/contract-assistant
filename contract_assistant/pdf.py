@@ -37,12 +37,19 @@ def load_document(path: Path) -> Document:
         text, page_starts = _read_pdf(path)
         kind = "pdf"
     elif suffix == ".txt":
-        text, page_starts = path.read_bytes().decode("utf-8"), []
+        text, page_starts = _read_txt(path), []
         kind = "txt"
     else:
         raise UnsupportedFileError(f"unsupported file type: {path.suffix}")
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
     return Document(text, page_starts, path.name, kind, digest)
+
+
+def _read_txt(path: Path) -> str:
+    try:
+        return path.read_bytes().decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise UnsupportedFileError(f"not a UTF-8 text file: {path.name}") from error
 
 
 def page_of(doc: Document, offset: int) -> int | None:

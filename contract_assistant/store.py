@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import tempfile
@@ -12,9 +13,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from contract_assistant.config import Settings
+
+logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 1
 DOC_ID_PREFIX = "sha256:"
@@ -108,7 +111,10 @@ def write_cache(cache: DocumentCache, path: Path) -> None:
 
 def read_cache(path: Path, settings: Settings) -> DocumentCache:
     """Read a cache and check it against the settings and its own contents."""
-    cache = DocumentCache.model_validate_json(path.read_text(encoding="utf-8"))
+    try:
+        cache = DocumentCache.model_validate_json(path.read_text(encoding="utf-8"))
+    except ValidationError as error:
+        raise CacheIntegrityError(f"not a valid cache: {path.name}") from error
     _check_settings(cache, settings)
     _check_integrity(cache)
     return cache
@@ -161,7 +167,10 @@ class Store:
         path = self.find(doc_id)
         if path is None:
             return None
-        return read_cache(path, settings)
+        cache = read_cache(path, settings)
+        if cache.doc_id != doc_id:
+            raise CacheIntegrityError(f"cache {path.name} belongs to {cache.doc_id}")
+        return cache
 
     def load_path(self, path: Path, settings: Settings) -> DocumentCache:
         """Read a cache from an explicit file."""
@@ -175,7 +184,11 @@ class Store:
 def _scan(directory: Path) -> list[CacheEntry]:
     entries = []
     for path in sorted(directory.glob("*.json")):
-        cache = DocumentCache.model_validate_json(path.read_text(encoding="utf-8"))
+        try:
+            cache = DocumentCache.model_validate_json(path.read_text(encoding="utf-8"))
+        except ValidationError:
+            logger.warning("skipping invalid cache file: %s", path)
+            continue
         entries.append(CacheEntry(cache.doc_id, cache.source, path))
     return entries
 

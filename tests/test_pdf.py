@@ -53,6 +53,14 @@ def test_last_character_is_on_the_last_page(pdf_doc):
     assert page_of(pdf_doc, len(pdf_doc.text) - 1) == 3
 
 
+def test_empty_middle_page_keeps_its_page_start(tmp_path):
+    lines = ["Alpha supplies the goods.", "", "Gamma governs this agreement."]
+    doc = load_document(write_pdf(tmp_path / "gap.pdf", lines))
+    assert len(doc.page_starts) == 3
+    assert page_of(doc, doc.text.index(lines[0])) == 1
+    assert page_of(doc, doc.text.index(lines[2])) == 3
+
+
 @pytest.mark.parametrize("page, line", list(enumerate(PAGE_LINES, start=1)))
 def test_known_line_is_found_on_its_page(pdf_doc, page, line):
     assert page_of(pdf_doc, pdf_doc.text.index(line)) == page
@@ -89,3 +97,10 @@ def test_pdf_without_text_is_rejected(tmp_path):
 def test_docx_is_rejected(tmp_path):
     with pytest.raises(UnsupportedFileError):
         load_document(tmp_path / "contract.docx")
+
+
+def test_txt_that_is_not_utf8_is_rejected(tmp_path):
+    path = tmp_path / "latin.txt"
+    path.write_bytes("caf\xe9".encode("latin-1"))
+    with pytest.raises(UnsupportedFileError, match="not a UTF-8 text file"):
+        load_document(path)

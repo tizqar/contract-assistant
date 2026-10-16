@@ -1,10 +1,14 @@
+from dataclasses import replace
+
 import pytest
 
 from contract_assistant import cli
 from contract_assistant.clause_types import load_clause_types
 from contract_assistant.cli import main
-from contract_assistant.config import ROOT, load_settings
+from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.extract.extractor import Extractor
+from contract_assistant.store import Store
+from tests.support.caches import make_cache
 from tests.support.fakes import FakeQA
 
 SENTENCE = "This agreement is governed by the laws of Vanuatu."
@@ -68,7 +72,9 @@ def test_show_prints_every_clause_type_once(capsys):
 
 def test_show_accepts_a_cache_file(capsys):
     assert main(["show", str(DEMO_CACHE)]) == 0
-    assert "Supply Agreement.txt" in capsys.readouterr().out.splitlines()[0]
+    lines = capsys.readouterr().out.splitlines()
+    assert "20693 chars" in lines[0]
+    assert len(lines) == 1 + len(load_clause_types(load_settings().clause_types_path))
 
 
 def test_show_without_a_cache_returns_one(contract, capsys):
@@ -82,3 +88,30 @@ def test_extract_with_a_missing_model_prints_the_hint_and_returns_two(
     monkeypatch.setenv("EXTRACTOR_MODEL_ID", str(tmp_path / "missing"))
     assert main(["extract", str(contract)]) == 2
     assert "IMPLEMENTATION.md" in capsys.readouterr().err
+
+
+def test_extract_re_extracts_a_cache_written_with_other_settings(
+    contract, fake_qa, tmp_path, capsys
+):
+    settings = load_settings()
+    text = contract.read_text(encoding="utf-8")
+    stale = make_cache(text, replace(settings, extractor_name="other"))
+    store = Store(tmp_path / "cache", settings.demo_cache_dir)
+    store.save(stale)
+    assert main(["extract", str(contract)]) == 0
+    assert fake_qa.calls
+    assert store.load(stale.doc_id, settings) is not None
+
+
+def test_extract_demo_writes_into_the_demo_cache_dir(contract, fake_qa, tmp_path, monkeypatch):
+    settings = replace(Settings(), demo_cache_dir=tmp_path / "demo_cache")
+    monkeypatch.setattr(cli, "load_settings", lambda: settings)
+    assert main(["extract", "--demo", str(contract)]) == 0
+    assert (tmp_path / "demo_cache" / "contract.json").is_file()
+    assert not (tmp_path / "cache").exists()
+
+
+def test_import_demo_without_thesis_data_returns_one(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("DIPLOMSKI_DIR", str(tmp_path))
+    assert main(["import-demo"]) == 1
+    assert "error" in capsys.readouterr().err
