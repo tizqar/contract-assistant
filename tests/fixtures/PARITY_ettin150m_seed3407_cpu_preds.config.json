@@ -1,0 +1,1 @@
+{"doc_stride": 256, "impl": 3, "max_answer_len": 512, "max_seq_len": 1024, "model": "models/ettin-150m-cuad-seed3407", "top_k": 20}
