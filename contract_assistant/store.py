@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import re
 import tempfile
+from collections.abc import Collection, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -16,6 +19,10 @@ from contract_assistant.config import Settings
 SCHEMA_VERSION = 1
 DOC_ID_PREFIX = "sha256:"
 JSON_INDENT = 1
+HARNESS_IMPL = 3
+# The harness stamp does not record n_best_size; the harness always uses its default.
+HARNESS_N_BEST_SIZE = 20
+HARNESS_MODEL_PATTERN = re.compile(r"runs/([^/]+)/final")
 
 
 class CachedCandidate(BaseModel):
@@ -107,10 +114,13 @@ def read_cache(path: Path, settings: Settings) -> DocumentCache:
     return cache
 
 
-def _check_settings(cache: DocumentCache, settings: Settings) -> None:
+def _differing_keys(settings: Settings, actual: dict) -> list[str]:
     expected = settings.decode_settings()
-    actual = cache.model.model_dump()
-    differing = sorted(key for key in expected if expected[key] != actual[key])
+    return sorted(key for key in expected if expected[key] != actual[key])
+
+
+def _check_settings(cache: DocumentCache, settings: Settings) -> None:
+    differing = _differing_keys(settings, cache.model.model_dump())
     if differing:
         raise CacheMismatchError(
             f"cache was written with other settings: {', '.join(differing)}"
@@ -164,3 +174,98 @@ def _scan(directory: Path) -> list[CacheEntry]:
         cache = DocumentCache.model_validate_json(path.read_text(encoding="utf-8"))
         entries.append(CacheEntry(cache.doc_id, cache.source, path))
     return entries
+
+
+class HarnessImportError(ValueError):
+    """Raised when thesis predictions cannot be imported as caches."""
+
+
+def import_harness_preds(
+    preds_path: Path,
+    cuad_json: Path,
+    settings: Settings,
+    titles: Collection[str] | None = None,
+) -> dict[str, DocumentCache]:
+    """Import thesis predictions as caches keyed by CUAD title."""
+    stamp = json.loads(preds_path.with_suffix(".config.json").read_text(encoding="utf-8"))
+    decode = _stamp_decode_settings(stamp, settings)
+    texts = _cuad_texts(cuad_json)
+    caches = {}
+    for title, preds in _read_preds(preds_path, titles):
+        if title not in texts:
+            raise HarnessImportError(f"contract not in CUAD json: {title}")
+        caches[title] = _harness_cache(title, texts[title], preds, decode, stamp["model"])
+    missing = sorted(set(titles or ()) - set(caches))
+    if missing:
+        raise HarnessImportError(f"no predictions for: {', '.join(missing)}")
+    return caches
+
+
+def _stamp_decode_settings(stamp: dict, settings: Settings) -> dict[str, str | int]:
+    if stamp.get("impl") != HARNESS_IMPL:
+        raise HarnessImportError(f"harness impl {stamp.get('impl')} is not {HARNESS_IMPL}")
+    match = HARNESS_MODEL_PATTERN.fullmatch(str(stamp.get("model")))
+    if match is None:
+        raise HarnessImportError(f"cannot read run name from model {stamp.get('model')}")
+    decode = {
+        "name": match.group(1),
+        "max_seq_len": stamp["max_seq_len"],
+        "doc_stride": stamp["doc_stride"],
+        "max_answer_len": stamp["max_answer_len"],
+        "top_k": stamp["top_k"],
+        "n_best_size": HARNESS_N_BEST_SIZE,
+    }
+    differing = _differing_keys(settings, decode)
+    if differing:
+        raise HarnessImportError(
+            f"predictions were written with other settings: {', '.join(differing)}"
+        )
+    return decode
+
+
+def _cuad_texts(cuad_json: Path) -> dict[str, str]:
+    data = json.loads(cuad_json.read_text(encoding="utf-8"))["data"]
+    return {entry["title"]: entry["paragraphs"][0]["context"] for entry in data}
+
+
+def _read_preds(
+    preds_path: Path, titles: Collection[str] | None
+) -> Iterator[tuple[str, dict[str, list[list]]]]:
+    with preds_path.open(encoding="utf-8") as handle:
+        for line in handle:
+            record = json.loads(line)
+            if titles is None or record["contract_id"] in titles:
+                yield record["contract_id"], record["preds"]
+
+
+def _harness_cache(
+    title: str,
+    text: str,
+    preds: dict[str, list[list]],
+    decode: dict[str, str | int],
+    model_path: str,
+) -> DocumentCache:
+    return DocumentCache(
+        doc_id=doc_id_of(text),
+        source=SourceInfo(filename=f"{title}.txt", kind="txt", n_chars=len(text), n_pages=None),
+        model=ModelInfo(**decode, path=model_path, device="unknown", origin="harness"),
+        page_starts=[],
+        text=text,
+        clauses={
+            clause: [_harness_candidate(title, clause, text, *pred) for pred in candidates]
+            for clause, candidates in preds.items()
+        },
+        timing={},
+    )
+
+
+def _harness_candidate(
+    title: str, clause: str, text: str, answer: str, conf: float
+) -> CachedCandidate:
+    # The harness does not record offsets; the first occurrence is used.
+    start = text.find(answer)
+    if start < 0:
+        raise HarnessImportError(f"predicted text not in contract {title} ({clause})")
+    return CachedCandidate(
+        text=answer, start=start, end=start + len(answer), page=None, conf=conf
+    )
