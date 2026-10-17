@@ -115,15 +115,19 @@ Three answers on the short demo contract:
 **Source Code Escrow** — not found (checked; best candidate 0.00)
 ```
 
-The demo documents are plain text, so there are no page numbers (`p. n/a`); a PDF gives
-the page.
+That is the command-line template. The demo documents are plain text, so there are no page
+numbers (`p. n/a`); a PDF gives the page.
+
+The web app labels the same tiers Found, Verify and Not found, shows each passage
+highlighted in the contract, and lists all 41 clause types by topic in a clause checklist.
+The thresholds and the model details are in their own tabs.
 
 | | |
 |---|---|
-| ![A found answer](docs/screenshots/found.png) | ![A possible, verify answer](docs/screenshots/check.png) |
-| A found answer with its quote and page. | A tier that asks the reader to verify. |
-| ![A not found answer](docs/screenshots/not_found.png) | ![A question that maps to several clause types](docs/screenshots/compound.png) |
-| An explicit not found. | One question routed to several clause types. |
+| ![A found answer](docs/screenshots/found.png) | ![An answer to verify](docs/screenshots/check.png) |
+| A found answer, with the passage highlighted in the contract. | A passage the reader should verify. |
+| ![A not found answer](docs/screenshots/not_found.png) | ![A question about two clause types](docs/screenshots/compound.png) |
+| An explicit not found: the clause was checked. | One question answered for two clause types. |
 
 ## Demo documents
 
