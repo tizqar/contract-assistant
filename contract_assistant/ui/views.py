@@ -3,64 +3,227 @@
 from __future__ import annotations
 
 from bisect import bisect_right
-from collections.abc import Sequence
+from pathlib import Path
 
-from contract_assistant.answer import ELLIPSIS, Answer, Citation, Status, render_markdown, tier
+from contract_assistant.answer import (
+    ELLIPSIS,
+    Answer,
+    AnswerItem,
+    Citation,
+    Status,
+    blockquote,
+    tier,
+)
 from contract_assistant.config import Settings
-from contract_assistant.store import CachedCandidate, DocumentCache
+from contract_assistant.store import DocumentCache
 
-CLAUSE_HEADERS = ["clause type", "status", "conf", "page", "quote"]
-CONF_DECIMALS = 2
-TABLE_QUOTE_CHARS = 120
+CLAUSE_GROUPS: dict[str, tuple[str, ...]] = {
+    "General terms": (
+        "Document Name",
+        "Parties",
+        "Agreement Date",
+        "Effective Date",
+        "Expiration Date",
+        "Renewal Term",
+        "Notice Period To Terminate Renewal",
+        "Governing Law",
+    ),
+    "Competition, termination and assignment": (
+        "Most Favored Nation",
+        "Non-Compete",
+        "Exclusivity",
+        "No-Solicit Of Customers",
+        "Competitive Restriction Exception",
+        "No-Solicit Of Employees",
+        "Non-Disparagement",
+        "Termination For Convenience",
+        "Rofr/Rofo/Rofn",
+        "Change Of Control",
+        "Anti-Assignment",
+    ),
+    "Revenue and pricing": (
+        "Revenue/Profit Sharing",
+        "Price Restrictions",
+        "Minimum Commitment",
+        "Volume Restriction",
+    ),
+    "Intellectual property and licences": (
+        "IP Ownership Assignment",
+        "Joint IP Ownership",
+        "License Grant",
+        "Non-Transferable License",
+        "Affiliate License-Licensor",
+        "Affiliate License-Licensee",
+        "Unlimited/All-You-Can-Eat-License",
+        "Irrevocable Or Perpetual License",
+        "Source Code Escrow",
+    ),
+    "Liability and other terms": (
+        "Post-Termination Services",
+        "Audit Rights",
+        "Uncapped Liability",
+        "Cap On Liability",
+        "Liquidated Damages",
+        "Warranty Duration",
+        "Insurance",
+        "Covenant Not To Sue",
+        "Third Party Beneficiary",
+    ),
+}
+STATUS_LABELS: dict[Status, str] = {
+    "found": "Found",
+    "check": "Verify",
+    "not_found": "Not found",
+}
+CLAUSE_HEADERS = ["Topic", "Clause", "Status", "Confidence", "Page", "Passage"]
+SUGGESTED_QUESTIONS = [
+    "Who are the parties?",
+    "Which law governs the contract?",
+    "When does the agreement expire, and does it renew?",
+    "Can either party terminate without cause?",
+    "Is there a non-compete or exclusivity obligation?",
+    "Is liability capped?",
+]
+SMALL_WORDS = frozenset({"Of", "To", "On", "Or", "For"})
+DISPLAY_OVERRIDES = {
+    "Rofr/Rofo/Rofn": "Right of First Refusal, Offer or Negotiation",
+    "Unlimited/All-You-Can-Eat-License": "Unlimited Usage License",
+    "Affiliate License-Licensor": "License from the Licensor's Affiliates",
+    "Affiliate License-Licensee": "License to the Licensee's Affiliates",
+}
+NOT_FOUND_TEXT = "The contract was checked for this clause; no passage matches it."
+WITHHELD_TEXT = (
+    "A matching passage was found but it could not be verified word for word "
+    "against the contract, so it is not shown."
+)
+EMPTY_ROUTE_TEXT = "This question does not match any of the clauses I check."
+HIGHLIGHT_TEXT = {
+    1: "The passage is highlighted in the document on the right.",
+    2: (
+        "The first passage is highlighted in the document on the right; "
+        "choose another under \u201cPassage shown\u201d."
+    ),
+}
+NO_PAGE = "—"
+EXCERPT_LABEL = "Excerpt around the highlighted passage"
+TEXT_START_LABEL = "Beginning of the contract"
+TABLE_PASSAGE_CHARS = 120
+WORD_ROUNDING = 100
 CONTEXT_CHARS = 1500
 # Longer than any line of the demo texts; a text without line breaks is cut mid-line.
 MAX_WIDEN_CHARS = 3000
-NO_PAGE = "n/a"
-TABLE_STATUS_WORDS: dict[Status, str] = {
-    "found": "found",
-    "check": "verify",
-    "not_found": "not found",
-}
-STATUS_ORDER: dict[Status, int] = {"found": 0, "check": 1, "not_found": 2}
+EXAMPLE_QUESTIONS = 2
 
 Segments = list[tuple[str, str | None]]
 
 
-def clause_rows(cache: DocumentCache, tau_low: float, tau_high: float) -> list[list]:
-    """Return one table row per clause type, sorted by tier, then confidence."""
-    keyed = [
-        _row(name, candidates, tau_low, tau_high) for name, candidates in cache.clauses.items()
-    ]
-    keyed.sort(key=lambda item: item[0])
-    return [row for _, row in keyed]
+def display_name(clause_type: str) -> str:
+    """Return the name of a clause type as it is shown to the user."""
+    if clause_type in DISPLAY_OVERRIDES:
+        return DISPLAY_OVERRIDES[clause_type]
+    first, *rest = clause_type.split(" ")
+    return " ".join([first, *(word.lower() if word in SMALL_WORDS else word for word in rest)])
 
 
-def _row(
-    name: str, candidates: list[CachedCandidate], tau_low: float, tau_high: float
-) -> tuple[tuple[int, float, str], list]:
+def document_name(filename: str) -> str:
+    """Return a file name as a readable title."""
+    stem = Path(filename).stem.replace("_", " ").replace("-", " ")
+    name = " ".join(stem.split())
+    return name[:1].upper() + name[1:]
+
+
+def document_title(cache: DocumentCache) -> str:
+    """Return the document name with its page count or approximate word count."""
+    source = cache.source
+    name = f"**{document_name(source.filename)}**"
+    if source.n_pages is not None:
+        return f"{name} · {source.n_pages} pages"
+    words = len(cache.text.split())
+    if words >= WORD_ROUNDING:
+        words = round(words / WORD_ROUNDING) * WORD_ROUNDING
+        return f"{name} · about {words:,} words"
+    return f"{name} · {words} words"
+
+
+def _badge(status: Status) -> str:
+    return f'<span class="tier tier-{status}">{STATUS_LABELS[status]}</span>'
+
+
+def _percent(conf: float) -> str:
+    return f"{conf:.0%}"
+
+
+def chat_reply(answer: Answer) -> str:
+    """Return the Markdown shown in the chat for an answer."""
+    if not answer.items:
+        return _empty_route_reply()
+    blocks = [_item_block(item) for item in answer.items]
+    shown = sum(item.citation is not None for item in answer.items)
+    if shown:
+        blocks.append(f"<small>{HIGHLIGHT_TEXT[min(shown, 2)]}</small>")
+    return "\n\n".join(blocks)
+
+
+def _item_block(item: AnswerItem) -> str:
+    heading = f"{_badge(item.status)} **{display_name(item.clause_type)}**"
+    if item.withheld:
+        return f"{heading}\n\n{WITHHELD_TEXT}"
+    if item.citation is None:
+        return f"{heading}\n\n{NOT_FOUND_TEXT}"
+    citation = item.citation
+    meta = f"{_percent(citation.conf)} confidence"
+    if citation.page is not None:
+        meta = f"Page {citation.page} · {meta}"
+    return f"{heading}\n{blockquote(citation.quote)}\n\n<small>{meta}</small>"
+
+
+def _empty_route_reply() -> str:
+    topics = "\n".join(
+        f"- **{topic}:** {', '.join(display_name(name) for name in names)}"
+        for topic, names in CLAUSE_GROUPS.items()
+    )
+    examples = " or ".join(f"\u201c{q}\u201d" for q in SUGGESTED_QUESTIONS[:EXAMPLE_QUESTIONS])
+    return f"{EMPTY_ROUTE_TEXT}\n\nI can answer questions about:\n\n{topics}\n\nFor example: {examples}"
+
+
+def clause_rows(
+    cache: DocumentCache, tau_low: float, tau_high: float, status: Status | None = None
+) -> list[list[str]]:
+    """Return one row per clause type in topic order, optionally only those with a status."""
+    rows = []
+    for topic, names in CLAUSE_GROUPS.items():
+        for position, name in enumerate(names):
+            candidates = cache.clauses.get(name, [])
+            row_status = (
+                tier(candidates[0].conf, tau_low, tau_high) if candidates else "not_found"
+            )
+            if status is not None and row_status != status:
+                continue
+            label = topic if position == 0 or status is not None else ""
+            rows.append(_row(label, name, row_status, candidates))
+    return rows
+
+
+def _row(topic: str, name: str, status: Status, candidates: list) -> list[str]:
     if not candidates:
-        key = (STATUS_ORDER["not_found"], 0.0, name)
-        return key, [name, _status_cell("not_found"), _conf_cell(0.0), NO_PAGE, ""]
+        return [topic, display_name(name), _badge(status), _percent(0.0), NO_PAGE, ""]
     top = candidates[0]
-    status = tier(top.conf, tau_low, tau_high)
-    page = NO_PAGE if top.page is None else top.page
-    cells = [name, _status_cell(status), _conf_cell(top.conf), page]
-    return (STATUS_ORDER[status], -top.conf, name), [*cells, _short_quote(top.text)]
+    page = NO_PAGE if top.page is None else str(top.page)
+    return [
+        topic,
+        display_name(name),
+        _badge(status),
+        _percent(top.conf),
+        page,
+        _short_passage(top.text),
+    ]
 
 
-def _status_cell(status: Status) -> str:
-    return f'<span class="tier tier-{status}">{TABLE_STATUS_WORDS[status]}</span>'
-
-
-def _conf_cell(conf: float) -> str:
-    return f"{conf:.{CONF_DECIMALS}f}"
-
-
-def _short_quote(text: str) -> str:
-    quote = " ".join(text.split())
-    if len(quote) <= TABLE_QUOTE_CHARS:
-        return quote
-    return quote[: TABLE_QUOTE_CHARS - len(ELLIPSIS)] + ELLIPSIS
+def _short_passage(text: str) -> str:
+    passage = " ".join(text.split())
+    if len(passage) <= TABLE_PASSAGE_CHARS:
+        return passage
+    return passage[: TABLE_PASSAGE_CHARS - len(ELLIPSIS)] + ELLIPSIS
 
 
 def top_citation(cache: DocumentCache, clause_type: str) -> Citation | None:
@@ -78,10 +241,10 @@ def document_view(
     """Return the label and highlighted segments for the part of the text around a citation."""
     if cache.page_starts:
         first, last, lo, hi = _page_window(cache, citation)
-        label = f"page {first}" if first == last else f"pages {first}–{last}"
+        label = f"Page {first}" if first == last else f"Pages {first}–{last}"
     else:
         lo, hi = _text_window(cache.text, citation)
-        label = f"characters {lo:,}–{hi:,} of {len(cache.text):,}"
+        label = EXCERPT_LABEL if citation else TEXT_START_LABEL
     return label, _segments(cache.text, lo, hi, clause_type, citation)
 
 
@@ -126,35 +289,31 @@ def _segments(
         return [(text[lo:hi], None)]
     parts = [
         (text[lo : citation.start], None),
-        (text[citation.start : citation.end], clause_type),
+        (text[citation.start : citation.end], clause_type and display_name(clause_type)),
         (text[citation.end : hi], None),
     ]
     return [part for part in parts if part[0]]
 
 
-def header_markdown(settings: Settings, route_kind: str) -> str:
-    """Return the header line naming the extractor run and the router."""
-    router = settings.llm_model if route_kind == "llm" else route_kind
-    return f"**Contract assistant** · extractor: `{settings.extractor_name}` · router: {router}"
+def technical_markdown(settings: Settings, route_kind: str) -> str:
+    """Return the technical facts behind the answers as a short Markdown list."""
+    return "\n".join(
+        [
+            f"- **Extraction model:** `{settings.extractor_name}`",
+            f"- **Question matching:** {_matching(settings, route_kind)}",
+            f"- **Found from:** {_percent(settings.tau_high)} confidence ({settings.tau_source})",
+            f"- **Verify from:** {_percent(settings.tau_low)} confidence ({settings.tau_source})",
+        ]
+    )
 
 
-def document_title(cache: DocumentCache) -> str:
-    """Return the file name with its page and character counts."""
-    source = cache.source
-    parts = [source.filename]
-    if source.n_pages is not None:
-        parts.append(f"{source.n_pages} pages")
-    parts.append(f"{source.n_chars:,} chars")
-    return " · ".join(parts)
-
-
-def chat_reply(answer: Answer, clause_type_names: Sequence[str]) -> str:
-    """Return the rendered answer followed by a line with the router and its latency."""
-    line = f"router: {answer.route.kind} · {round(answer.route.latency_ms)} ms"
-    if answer.dropped_quotes:
-        noun = "quote" if answer.dropped_quotes == 1 else "quotes"
-        line += f" · {answer.dropped_quotes} {noun} withheld"
-    return f"{render_markdown(answer, clause_type_names)}\n\n*{line}*"
+def _matching(settings: Settings, route_kind: str) -> str:
+    if route_kind == "llm":
+        backend = "Ollama" if settings.llm_backend == "ollama" else "an OpenAI-compatible API"
+        return f"`{settings.llm_model}` through {backend}"
+    if route_kind == "embedding":
+        return f"embedding model `{settings.embedding_model_id}`"
+    return route_kind
 
 
 def sources_json(answer: Answer, cache: DocumentCache) -> dict:

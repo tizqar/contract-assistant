@@ -14,7 +14,8 @@ from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.extract.extractor import Extractor
 from contract_assistant.store import Store
 from contract_assistant.ui import app
-from contract_assistant.ui.app import Handlers, Services, build_app
+from contract_assistant.ui.app import ALL_CLAUSES, DOCUMENT_TAB, Handlers, Services, build_app
+from contract_assistant.ui.views import SUGGESTED_QUESTIONS, display_name
 from tests.support.caches import make_cache
 from tests.support.fakes import FakeQA, FakeRouter, slow_fake_qa
 
@@ -62,7 +63,7 @@ def warnings(monkeypatch) -> list[str]:
 
 
 def status_of(rows: list[list], clause_type: str) -> str:
-    return next(row[1] for row in rows if row[0] == clause_type)
+    return next(row[2] for row in rows if row[1] == display_name(clause_type))
 
 
 def highlighted(segments: list[tuple[str, str | None]]) -> list[tuple[str, str]]:
@@ -71,6 +72,14 @@ def highlighted(segments: list[tuple[str, str | None]]) -> list[tuple[str, str]]
 
 def is_skip(value) -> bool:
     return value == gr.skip()
+
+
+def row_event(name: str) -> SimpleNamespace:
+    return SimpleNamespace(index=[0, 1], row_value=["Topic", name, "", "", "", ""])
+
+
+def find_component(demo: gr.Blocks, elem_id: str):
+    return next(block for block in demo.blocks.values() if block.elem_id == elem_id)
 
 
 def test_build_app_builds_without_an_extractor(make_services):
@@ -82,27 +91,47 @@ def test_default_document_is_the_short_supply_agreement(make_services):
     assert app.default_document(choices) == SHORT_DOC_ID
 
 
+def test_document_choices_show_readable_names(make_services):
+    choices = app.document_choices(make_services().store)
+    assert ("Short supply agreement", SHORT_DOC_ID) in choices
+
+
+def test_header_names_no_model_or_router(make_services):
+    header = find_component(build_app(make_services()), "header").value
+    assert "Contract Assistant" in header
+    assert not any(word in header.lower() for word in ("router", "qwen", "llm", "model"))
+
+
+def test_technical_tab_names_the_router(make_services):
+    demo = build_app(make_services())
+    texts = [
+        block.value
+        for block in demo.blocks.values()
+        if isinstance(block, gr.Markdown) and block.value
+    ]
+    assert any("explicit" in text for text in texts)
+
+
 def test_document_choices_list_each_document_once(make_services):
     choices = app.document_choices(make_services().store)
     assert len({doc_id for _, doc_id in choices}) == len(choices) == 3
 
 
 def test_open_document_resets_the_page(handlers, demo_cache):
-    result = handlers.open_document(SHORT_DOC_ID, TAU_LOW, TAU_HIGH)
-    cache, last, chat, title, rows, label, _, picker, sources, _ = result
+    result = handlers.open_document(SHORT_DOC_ID, TAU_LOW, TAU_HIGH, ALL_CLAUSES)
+    cache, last, chat, title, rows, _, _, picker, sources, _ = result
     assert (cache.doc_id, last, chat, sources) == (SHORT_DOC_ID, None, [], {})
-    assert title.startswith("short_supply_agreement.txt")
+    assert "Short supply agreement" in title
     assert len(rows) == len(demo_cache.clauses)
-    assert label.startswith("characters 0")
     assert picker.visible is False
 
 
 def test_ask_cites_the_governing_law_clause(make_services, settings):
     cache = make_cache(TEXT, settings, {"Governing Law": [(LAW_SENTENCE, 0.95)]})
     result = Handlers(make_services()).ask("which law governs?", [], cache, TAU_LOW, TAU_HIGH)
-    textbox, history, _, picker, _, segments, sources = result
+    textbox, history, _, picker, _, segments, sources, _ = result
     assert textbox == ""
-    assert "found" in history[-1]["content"]
+    assert "tier-found" in history[-1]["content"]
     assert highlighted(segments) == [(LAW_SENTENCE, "Governing Law")]
     assert picker.value == "Governing Law"
     assert sources["answer"]["question"] == "which law governs?"
@@ -111,8 +140,8 @@ def test_ask_cites_the_governing_law_clause(make_services, settings):
 def test_ask_with_two_types_offers_both_and_shows_the_first(handlers, demo_cache):
     question = "who are the parties and which law governs?"
     result = handlers.ask(question, [], demo_cache, TAU_LOW, TAU_HIGH)
-    _, history, last, picker, _, segments, _ = result
-    assert [name for name, _ in picker.choices] == ["Parties", "Governing Law"]
+    _, history, last, picker, _, segments, _, _ = result
+    assert picker.choices == [("Parties", "Parties"), ("Governing Law", "Governing Law")]
     assert picker.value == "Parties"
     assert highlighted(segments)[0][1] == "Parties"
     assert len(history) == 2 and len(last.items) == 2
@@ -129,6 +158,26 @@ def test_ask_records_the_slider_thresholds(handlers, demo_cache):
     assert (result[2].tau_low, result[2].tau_high) == (0.2, 0.7)
 
 
+def test_ask_switches_to_the_document_tab(handlers, demo_cache):
+    result = handlers.ask("which law governs?", [], demo_cache, TAU_LOW, TAU_HIGH)
+    assert result[-1].selected == DOCUMENT_TAB
+
+
+def test_suggested_questions_are_asked_through_the_ask_handler(make_services):
+    demo = build_app(make_services())
+    buttons = [
+        b for b in demo.blocks.values() if getattr(b, "value", None) in SUGGESTED_QUESTIONS
+    ]
+    ask_handler = Handlers.ask
+    targets = [
+        fn
+        for fn in demo.fns.values()
+        if any(trigger[0] in {b._id for b in buttons} for trigger in fn.targets)
+    ]
+    assert len(buttons) == len(SUGGESTED_QUESTIONS)
+    assert targets and all(fn.fn.__wrapped__ is ask_handler.__wrapped__ for fn in targets)
+
+
 def test_ask_without_a_citation_hides_the_picker(handlers, demo_cache):
     result = handlers.ask("tell me a joke", [], demo_cache, TAU_LOW, TAU_HIGH)
     assert result[3].visible is False
@@ -142,7 +191,7 @@ def test_empty_question_warns_and_changes_nothing(handlers, demo_cache, warnings
 
 def test_ask_without_a_document_warns(handlers, warnings):
     assert is_skip(handlers.ask("which law governs?", [], None, TAU_LOW, TAU_HIGH))
-    assert warnings == ["Open a document first."]
+    assert warnings == ["Select a contract first."]
 
 
 def test_ask_with_inverted_thresholds_warns(handlers, demo_cache, warnings):
@@ -160,35 +209,60 @@ def test_pick_citation_shows_the_chosen_type(handlers, demo_cache):
 def test_raising_tau_low_moves_rows_from_verify_to_not_found(make_services, settings):
     cache = make_cache(TEXT, settings, {"Governing Law": [(LAW_SENTENCE, 0.3)]})
     handlers = Handlers(make_services())
-    before = handlers.release_low(TAU_LOW, TAU_HIGH, cache)[1]
-    after = handlers.release_low(0.5, TAU_HIGH, cache)[1]
-    assert "verify" in status_of(before, "Governing Law")
-    assert "not found" in status_of(after, "Governing Law")
+    before = handlers.release_low(TAU_LOW, TAU_HIGH, cache, ALL_CLAUSES)[1]
+    after = handlers.release_low(0.5, TAU_HIGH, cache, ALL_CLAUSES)[1]
+    assert "tier-check" in status_of(before, "Governing Law")
+    assert "tier-not_found" in status_of(after, "Governing Law")
+
+
+def test_status_filter_keeps_only_rows_of_that_status(handlers, demo_cache):
+    rows = handlers.filter_clauses("found", TAU_LOW, TAU_HIGH, demo_cache)
+    assert rows
+    assert all("tier-found" in row[2] for row in rows)
+
+
+def test_status_filter_is_respected_after_a_threshold_change(make_services, settings):
+    cache = make_cache(TEXT, settings, {"Governing Law": [(LAW_SENTENCE, 0.3)]})
+    handlers = Handlers(make_services())
+    rows = handlers.release_low(0.5, TAU_HIGH, cache, "not_found")[1]
+    assert all("tier-not_found" in row[2] for row in rows)
+    assert status_of(rows, "Governing Law")
 
 
 def test_tau_low_released_above_tau_high_is_clamped(handlers, demo_cache):
-    assert handlers.release_low(0.95, 0.91, demo_cache)[0] == 0.91
+    assert handlers.release_low(0.95, 0.91, demo_cache, ALL_CLAUSES)[0] == 0.91
 
 
 def test_tau_high_released_below_tau_low_is_clamped(handlers, demo_cache):
-    assert handlers.release_high(0.5, 0.2, demo_cache)[0] == 0.5
+    assert handlers.release_high(0.5, 0.2, demo_cache, ALL_CLAUSES)[0] == 0.5
 
 
 def test_reset_restores_the_default_thresholds(handlers, demo_cache, settings):
-    tau_low, tau_high, rows = handlers.reset_thresholds(demo_cache)
+    tau_low, tau_high, rows = handlers.reset_thresholds(demo_cache, ALL_CLAUSES)
     assert (tau_low, tau_high) == (settings.tau_low, settings.tau_high)
     assert len(rows) == len(demo_cache.clauses)
 
 
 def test_slider_release_without_a_document_changes_no_table(handlers):
-    assert is_skip(handlers.release_low(0.1, 0.9, None)[1])
+    assert is_skip(handlers.release_low(0.1, 0.9, None, ALL_CLAUSES)[1])
 
 
 def test_show_row_shows_the_top_citation_of_that_type(handlers, demo_cache):
-    event = SimpleNamespace(index=[0, 0], row_value=["Governing Law", "", 0.9, "n/a", ""])
-    _, segments = handlers.show_row(demo_cache, event)
+    _, segments, _ = handlers.show_row(demo_cache, row_event("Governing Law"))
     top = demo_cache.clauses["Governing Law"][0]
     assert highlighted(segments) == [(top.text, "Governing Law")]
+
+
+def test_show_row_maps_a_display_name_back_to_its_clause_type(handlers, demo_cache):
+    _, segments, _ = handlers.show_row(demo_cache, row_event("Cap on Liability"))
+    top = demo_cache.clauses["Cap On Liability"][0]
+    assert highlighted(segments) == [(top.text, "Cap on Liability")]
+
+
+def test_show_row_switches_to_the_document_tab(handlers, demo_cache):
+    assert (
+        handlers.show_row(demo_cache, row_event("Governing Law"))[-1].selected == DOCUMENT_TAB
+    )
 
 
 def test_upload_with_an_existing_cache_is_a_hit_and_skips_the_model(make_services):
@@ -196,19 +270,15 @@ def test_upload_with_an_existing_cache_is_a_hit_and_skips_the_model(make_service
     extractor = Extractor(qa, [], load_settings(), "fake")
     handlers = Handlers(make_services(extractor))
     dropdown, status = handlers.extract_upload(str(DEMO_TEXT), progress=lambda *a, **k: None)
-    assert (dropdown.value, status) == (SHORT_DOC_ID, "Cache hit")
+    assert (dropdown.value, status) == (SHORT_DOC_ID, "Already analysed")
     assert qa.calls == []
 
 
-def test_upload_without_an_extractor_warns_with_the_model_path(
-    handlers, tmp_path, warnings, settings
-):
+def test_upload_without_an_extractor_says_the_model_is_missing(handlers, tmp_path, warnings):
     path = tmp_path / "new.txt"
     path.write_text(TEXT, encoding="utf-8")
     assert is_skip(handlers.extract_upload(str(path), progress=lambda *a, **k: None))
-    assert warnings == [
-        f"Extraction needs the model in {settings.extractor_path}; see IMPLEMENTATION.md, Step A."
-    ]
+    assert warnings == [app.NO_MODEL]
 
 
 def test_upload_of_a_new_text_writes_a_cache_and_selects_it(
@@ -222,7 +292,7 @@ def test_upload_of_a_new_text_writes_a_cache_and_selects_it(
         str(path), progress=lambda *args, **kwargs: calls.append(args)
     )
     assert len(list(settings.cache_dir.glob("*.json"))) == 1
-    assert status.startswith("Extracted in")
+    assert status == "Analysis complete"
     assert dropdown.value in [doc_id for _, doc_id in dropdown.choices]
     assert calls[-1][0] == (len(clause_types), len(clause_types))
 

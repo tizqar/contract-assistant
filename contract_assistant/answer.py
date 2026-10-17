@@ -141,10 +141,11 @@ def _render_item(item: AnswerItem) -> str:
         return f"{heading}{word} (checked; best candidate {item.best_conf:.2f})"
     page = "n/a" if item.citation.page is None else item.citation.page
     meta = f"{word} · p. {page} · confidence {item.citation.conf:.2f}"
-    return f"{heading}{meta}\n{_blockquote(item.citation.quote)}"
+    return f"{heading}{meta}\n{blockquote(item.citation.quote)}"
 
 
-def _blockquote(quote: str) -> str:
+def blockquote(quote: str) -> str:
+    """Return a quote cut to the chat limit, escaped, as a Markdown blockquote."""
     if len(quote) > MAX_CHAT_QUOTE_CHARS:
         quote = quote[: MAX_CHAT_QUOTE_CHARS - len(ELLIPSIS)] + ELLIPSIS
     # Indentation would turn a line into a Markdown code block.
