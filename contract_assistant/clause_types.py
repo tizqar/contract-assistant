@@ -1,10 +1,12 @@
-"""The 41 CUAD clause types and their questions."""
+"""The 41 CUAD clause types, the extra ones, and their questions."""
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
 from pathlib import Path
+
+from contract_assistant.config import Settings
 
 N_CLAUSE_TYPES = 41
 
@@ -28,6 +30,26 @@ def load_clause_types(path: Path) -> list[ClauseType]:
     entries = json.loads(path.read_text())["clause_types"]
     if len(entries) != N_CLAUSE_TYPES:
         raise ClauseTypeError(f"expected {N_CLAUSE_TYPES} clause types, got {len(entries)}")
+    return _parse(entries)
+
+
+def load_extra_clause_types(path: Path) -> list[ClauseType]:
+    """Read the application's extra clause types in file order and check names."""
+    return _parse(json.loads(path.read_text())["clause_types"])
+
+
+def app_clause_types(settings: Settings) -> list[ClauseType]:
+    """Return the 41 CUAD clause types followed by the extra ones."""
+    cuad = load_clause_types(settings.clause_types_path)
+    extra = load_extra_clause_types(settings.extra_clause_types_path)
+    cuad_names = {clause_type.name for clause_type in cuad}
+    for clause_type in extra:
+        if clause_type.name in cuad_names:
+            raise ClauseTypeError(f"extra clause type clashes with CUAD: {clause_type.name}")
+    return cuad + extra
+
+
+def _parse(entries: list[dict]) -> list[ClauseType]:
     types = [ClauseType(**entry) for entry in entries]
     seen: set[str] = set()
     for clause_type in types:

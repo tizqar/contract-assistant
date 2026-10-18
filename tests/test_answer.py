@@ -123,3 +123,34 @@ def test_untampered_demo_cache_drops_no_quotes(settings):
     route = route_of(*cache.clauses)
     result = answer("q", route, cache, settings.tau_low, settings.tau_high)
     assert (len(result.items), result.dropped_quotes) == (41, 0)
+
+
+def test_unvalidated_type_above_tau_high_is_check(settings):
+    cache = make_cache(TEXT, settings, {"Term": [(TERM, 0.95)]})
+    items = compose(cache, ["Term"], TAU_LOW, TAU_HIGH, unvalidated={"Term"})
+    assert items[0].status == "check"
+    assert items[0].citation.conf == 0.95
+
+
+def test_validated_type_above_tau_high_is_found_when_others_are_unvalidated(settings):
+    cache = make_cache(TEXT, settings, {"Term": [(TERM, 0.95)]})
+    items = compose(cache, ["Term"], TAU_LOW, TAU_HIGH, unvalidated={"Other"})
+    assert items[0].status == "found"
+
+
+def test_unvalidated_type_below_tau_low_stays_not_found(settings):
+    cache = make_cache(TEXT, settings, {"Term": [(TERM, 0.05)]})
+    items = compose(cache, ["Term"], TAU_LOW, TAU_HIGH, unvalidated={"Term"})
+    assert items[0].status == "not_found"
+
+
+def test_answer_caps_unvalidated_types(settings):
+    cache = make_cache(TEXT, settings, {"Term": [(TERM, 0.95)]})
+    result = answer("q", route_of("Term"), cache, TAU_LOW, TAU_HIGH, unvalidated=["Term"])
+    assert result.items[0].status == "check"
+
+
+def test_answer_without_unvalidated_is_unchanged(settings):
+    cache = make_cache(TEXT, settings, {"Term": [(TERM, 0.95)]})
+    result = answer("q", route_of("Term"), cache, TAU_LOW, TAU_HIGH)
+    assert result.items[0].status == "found"

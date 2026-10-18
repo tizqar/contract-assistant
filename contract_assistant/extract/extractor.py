@@ -1,4 +1,4 @@
-"""Run the extractor over the 41 clause types of one document."""
+"""Run the extractor over the clause types of one document."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
-from contract_assistant.clause_types import ClauseType, load_clause_types
+from contract_assistant.clause_types import ClauseType, app_clause_types
 from contract_assistant.config import ROOT, Settings
 from contract_assistant.extract.qa_core import Candidate, QAModel
 from contract_assistant.pdf import Document, page_of
@@ -48,7 +48,7 @@ class ModelNotFoundError(FileNotFoundError):
 
 
 class Extractor:
-    """Asks every clause type's CUAD question and collects the n-best answers."""
+    """Asks every clause type's question and collects the n-best answers."""
 
     def __init__(
         self,
@@ -75,18 +75,13 @@ class Extractor:
             max_seq_len=settings.max_seq_len,
             doc_stride=settings.doc_stride,
         )
-        clause_types = load_clause_types(settings.clause_types_path)
+        clause_types = app_clause_types(settings)
         return cls(qa, clause_types, settings, device=str(qa.device))
 
     def extract(self, doc: Document, progress: ProgressCallback | None = None) -> DocumentCache:
         """Extract the candidates of every clause type from doc."""
         started = time.perf_counter()
-        total = len(self.clause_types)
-        clauses = {}
-        for done, clause_type in enumerate(self.clause_types, start=1):
-            clauses[clause_type.name] = self._candidates(doc, clause_type)
-            if progress:
-                progress(done, total, clause_type.name)
+        clauses = self._extract_types(doc, self.clause_types, progress)
         elapsed = time.perf_counter() - started
         logger.info("extracted %s: %d chars in %.1f s", doc.filename, len(doc.text), elapsed)
         return DocumentCache(
@@ -108,6 +103,50 @@ class Extractor:
             clauses=clauses,
             timing={"extract_s": round(elapsed, TIMING_DECIMALS)},
         )
+
+    def extend(
+        self, cache: DocumentCache, progress: ProgressCallback | None = None
+    ) -> DocumentCache:
+        """Add the clause types missing from cache; return cache itself if none is missing."""
+        missing = [c for c in self.clause_types if c.name not in cache.clauses]
+        if not missing:
+            return cache
+        started = time.perf_counter()
+        doc = Document(
+            cache.text,
+            cache.page_starts,
+            cache.source.filename,
+            cache.source.kind,
+            cache.doc_id,
+        )
+        added = self._extract_types(doc, missing, progress)
+        elapsed = time.perf_counter() - started
+        logger.info(
+            "extended %s: %d clause types in %.1f s",
+            cache.source.filename,
+            len(missing),
+            elapsed,
+        )
+        timing = {
+            **cache.timing,
+            "extract_s": round(cache.timing.get("extract_s", 0.0) + elapsed, TIMING_DECIMALS),
+        }
+        return cache.model_copy(
+            update={"clauses": {**cache.clauses, **added}, "timing": timing}
+        )
+
+    def _extract_types(
+        self,
+        doc: Document,
+        clause_types: list[ClauseType],
+        progress: ProgressCallback | None,
+    ) -> dict[str, list[CachedCandidate]]:
+        clauses = {}
+        for done, clause_type in enumerate(clause_types, start=1):
+            clauses[clause_type.name] = self._candidates(doc, clause_type)
+            if progress:
+                progress(done, len(clause_types), clause_type.name)
+        return clauses
 
     def _candidates(self, doc: Document, clause_type: ClauseType) -> list[CachedCandidate]:
         found = self.qa(

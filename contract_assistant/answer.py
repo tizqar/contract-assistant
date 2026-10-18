@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import Literal
 
 from pydantic import BaseModel
@@ -43,6 +43,16 @@ class AnswerItem(BaseModel):
     withheld: bool = False
 
 
+class Passage(BaseModel):
+    """A span of the document close to a question that matches no clause type."""
+
+    quote: str
+    page: int | None
+    score: float
+    start: int
+    end: int
+
+
 class Answer(BaseModel):
     """The items for one question over one document."""
 
@@ -52,6 +62,7 @@ class Answer(BaseModel):
     tau_high: float
     items: list[AnswerItem]
     dropped_quotes: int
+    passages: list[Passage] = []
 
 
 def _check_thresholds(tau_low: float, tau_high: float) -> None:
@@ -70,19 +81,27 @@ def tier(conf: float, tau_low: float, tau_high: float) -> Status:
 
 
 def compose(
-    cache: DocumentCache, clause_types: list[str], tau_low: float, tau_high: float
+    cache: DocumentCache,
+    clause_types: list[str],
+    tau_low: float,
+    tau_high: float,
+    unvalidated: Collection[str] = (),
 ) -> list[AnswerItem]:
-    """Build one item per clause type from the top candidate in the cache."""
+    """Build one item per clause type; unvalidated types are never above check."""
     _check_thresholds(tau_low, tau_high)
-    return [_item(name, cache, tau_low, tau_high) for name in clause_types]
+    return [_item(name, cache, tau_low, tau_high, name in unvalidated) for name in clause_types]
 
 
-def _item(name: str, cache: DocumentCache, tau_low: float, tau_high: float) -> AnswerItem:
+def _item(
+    name: str, cache: DocumentCache, tau_low: float, tau_high: float, capped: bool
+) -> AnswerItem:
     candidates = cache.clauses[name]
     if not candidates:
         return AnswerItem(clause_type=name, status="not_found", best_conf=0.0, citation=None)
     top = candidates[0]
     status = tier(top.conf, tau_low, tau_high)
+    if capped and status == "found":
+        status = "check"
     citation = None
     if status != "not_found":
         citation = Citation(
@@ -109,10 +128,15 @@ def _is_verbatim(citation: Citation, text: str) -> bool:
 
 
 def answer(
-    question: str, route: RouteResult, cache: DocumentCache, tau_low: float, tau_high: float
+    question: str,
+    route: RouteResult,
+    cache: DocumentCache,
+    tau_low: float,
+    tau_high: float,
+    unvalidated: Collection[str] = (),
 ) -> Answer:
     """Compose the items for a route and verify every quote against the document."""
-    items = compose(cache, route.clause_types, tau_low, tau_high)
+    items = compose(cache, route.clause_types, tau_low, tau_high, unvalidated)
     items, dropped = verify_quotes(items, cache.text)
     return Answer(
         question=question,

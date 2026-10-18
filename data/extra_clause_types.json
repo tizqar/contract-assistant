@@ -1,0 +1,54 @@
+{
+  "source": "Written for this application in CUAD's question wording; not part of CUAD",
+  "n": 8,
+  "clause_types": [
+    {
+      "id": "payment_terms",
+      "name": "Payment Terms",
+      "cuad_question": "Highlight the parts (if any) of this contract related to \"Payment Terms\" that should be reviewed by a lawyer. Details: The amounts payable, when invoices are due and how payment is made",
+      "description": "The amounts payable, when invoices are due and how payment is made"
+    },
+    {
+      "id": "delivery",
+      "name": "Delivery",
+      "cuad_question": "Highlight the parts (if any) of this contract related to \"Delivery\" that should be reviewed by a lawyer. Details: When, where and how the goods or services are delivered and when risk passes",
+      "description": "When, where and how the goods or services are delivered and when risk passes"
+    },
+    {
+      "id": "confidentiality",
+      "name": "Confidentiality",
+      "cuad_question": "Highlight the parts (if any) of this contract related to \"Confidentiality\" that should be reviewed by a lawyer. Details: The duty to keep information confidential and the exceptions to it",
+      "description": "The duty to keep information confidential and the exceptions to it"
+    },
+    {
+      "id": "indemnification",
+      "name": "Indemnification",
+      "cuad_question": "Highlight the parts (if any) of this contract related to \"Indemnification\" that should be reviewed by a lawyer. Details: A party's duty to indemnify, defend or hold the other party harmless against losses and claims",
+      "description": "A party's duty to indemnify, defend or hold the other party harmless against losses and claims"
+    },
+    {
+      "id": "termination_for_breach",
+      "name": "Termination For Breach",
+      "cuad_question": "Highlight the parts (if any) of this contract related to \"Termination For Breach\" that should be reviewed by a lawyer. Details: The right to terminate the contract if the other party materially breaches it or defaults, and any cure period",
+      "description": "The right to terminate the contract if the other party materially breaches it or defaults, and any cure period"
+    },
+    {
+      "id": "force_majeure",
+      "name": "Force Majeure",
+      "cuad_question": "Highlight the parts (if any) of this contract related to \"Force Majeure\" that should be reviewed by a lawyer. Details: Events beyond a party's control that excuse or delay performance",
+      "description": "Events beyond a party's control that excuse or delay performance"
+    },
+    {
+      "id": "dispute_resolution",
+      "name": "Dispute Resolution",
+      "cuad_question": "Highlight the parts (if any) of this contract related to \"Dispute Resolution\" that should be reviewed by a lawyer. Details: How disputes between the parties are resolved, such as escalation, arbitration, mediation or court proceedings",
+      "description": "How disputes between the parties are resolved, such as escalation, arbitration, mediation or court proceedings"
+    },
+    {
+      "id": "data_protection",
+      "name": "Data Protection",
+      "cuad_question": "Highlight the parts (if any) of this contract related to \"Data Protection\" that should be reviewed by a lawyer. Details: The handling of personal data and compliance with data protection and privacy law",
+      "description": "The handling of personal data and compliance with data protection and privacy law"
+    }
+  ]
+}

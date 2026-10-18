@@ -2,12 +2,15 @@ from dataclasses import replace
 
 import pytest
 
-from contract_assistant.clause_types import load_clause_types
-from contract_assistant.config import Settings
+from contract_assistant.clause_types import app_clause_types, load_clause_types
+from contract_assistant.config import ROOT, Settings
+from contract_assistant.extract import extractor as extractor_module
 from contract_assistant.extract.extractor import Extractor, ModelNotFoundError
 from contract_assistant.pdf import Document
 from contract_assistant.store import read_cache, write_cache
 from tests.support.fakes import FakeQA
+
+MIN_DISPUTE_CONFIDENCE = 0.5
 
 PAGES = [
     "Agreement between Acme and Beta.",
@@ -135,3 +138,72 @@ def test_from_settings_names_a_missing_model_folder(settings, tmp_path):
     missing = tmp_path / "missing"
     with pytest.raises(ModelNotFoundError, match=str(missing)):
         Extractor.from_settings(replace(settings, extractor_path=missing))
+
+
+def test_extractor_built_from_settings_covers_the_app_clause_types(
+    settings, monkeypatch, tmp_path
+):
+    class StubModel(FakeQA):
+        device = "cpu"
+
+        def __init__(self, path, **kwargs):
+            super().__init__()
+
+    monkeypatch.setattr(extractor_module, "QAModel", StubModel)
+    extractor = Extractor.from_settings(replace(settings, extractor_path=tmp_path))
+    cache = extractor.extract(txt_document())
+    assert list(cache.clauses) == [c.name for c in app_clause_types(settings)]
+    assert len(cache.clauses) == 49
+
+
+def test_extend_asks_only_the_missing_clause_types(settings, clause_types):
+    first = make_extractor(FakeQA(), clause_types[:5], settings).extract(txt_document())
+    qa = FakeQA()
+    extended = make_extractor(qa, clause_types, settings).extend(first)
+    missing = clause_types[5:]
+    assert [question for question, _ in qa.calls] == [c.cuad_question for c in missing]
+    assert list(extended.clauses) == [c.name for c in clause_types]
+
+
+def test_extend_keeps_existing_candidates(settings, clause_types):
+    question = question_of(clause_types, "Governing Law")
+    qa = FakeQA({question: [("Delaware", 0.9)]})
+    first = make_extractor(qa, clause_types[:20], settings).extract(txt_document())
+    extended = make_extractor(FakeQA(), clause_types, settings).extend(first)
+    assert extended.clauses["Governing Law"] == first.clauses["Governing Law"]
+
+
+def test_extend_adds_candidates_of_the_new_types(settings, clause_types):
+    question = clause_types[-1].cuad_question
+    first = make_extractor(FakeQA(), clause_types[:-1], settings).extract(pdf_document())
+    qa = FakeQA({question: [("Delaware", 0.7)]})
+    extended = make_extractor(qa, clause_types, settings).extend(first)
+    added = extended.clauses[clause_types[-1].name][0]
+    assert (added.text, added.page) == ("Delaware", 2)
+
+
+def test_extend_increases_the_extraction_time(settings, clause_types):
+    first = make_extractor(FakeQA(), clause_types[:-1], settings).extract(txt_document())
+    extended = make_extractor(FakeQA(), clause_types, settings).extend(first)
+    assert extended.timing["extract_s"] >= first.timing["extract_s"]
+
+
+def test_extend_returns_a_complete_cache_unchanged(settings, clause_types):
+    extractor = make_extractor(FakeQA(), clause_types, settings)
+    cache = extractor.extract(txt_document())
+    qa = FakeQA()
+    assert make_extractor(qa, clause_types, settings).extend(cache) is cache
+    assert qa.calls == []
+
+
+@pytest.mark.slow
+def test_real_extractor_finds_the_arbitration_clause_of_the_short_demo(settings):
+    text = (ROOT / "demo/short_supply_agreement.txt").read_text()
+    doc = Document(text, [], "short_supply_agreement.txt", "txt", "unused")
+    extractor = Extractor.from_settings(settings)
+    name = "Dispute Resolution"
+    dispute = next(c for c in extractor.clause_types if c.name == name)
+    extractor.clause_types = [dispute]
+    top = extractor.extract(doc).clauses[name][0]
+    assert "arbitration" in top.text.lower()
+    assert top.conf > MIN_DISPUTE_CONFIDENCE
