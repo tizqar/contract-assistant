@@ -5842,9 +5842,1145 @@
     "page": null,
     "conf": 5.602972650269388e-6
    }
+  ],
+  "Payment Terms": [
+   {
+    "text": "All \"one-time\" fees shall be paid to M&I as\n\n\n\n\n\nset forth in the Fee Schedule.",
+    "start": 39682,
+    "end": 39761,
+    "page": null,
+    "conf": 0.21415576745379183
+   },
+   {
+    "text": "Customer may terminate this Agreement during the Term upon at least one (1) years' written notice to M&I, provided that Customer pays M&I an early termination fee (\"Termination for Convenience Fee\") in an amount equal to REDACTED of the Estimated Remaining Value.",
+    "start": 50579,
+    "end": 50842,
+    "page": null,
+    "conf": 0.12778267314743869
+   },
+   {
+    "text": "All \"one-time\" fees shall be paid to M&I as\n\n\n\n\n\nset forth in the Fee Schedule.  All minimum monthly fees (including the Monthly Base Fee) are due in advance on the first day of the calendar month in which the Services are to be performed, prorated for any partial month.  To effect payment of such minimum monthly fees, Customer hereby authorizes M&I to initiate debit entries from and, if necessary, initiate credit entries and adjustments to Customer's account at the depository institution designated in the ACH Authorization Agreement attached hereto as Exhibit B, which shall be executed by Customer contemporaneously with the execution of this Agreement.  All other amounts due hereunder shall be invoiced by M&I and shall be payable within thirty (30) days of invoice, unless otherwise provided in the Fee Schedule.",
+    "start": 39682,
+    "end": 40505,
+    "page": null,
+    "conf": 0.12153450368486197
+   },
+   {
+    "text": "All other amounts due hereunder shall be invoiced by M&I and shall be payable within thirty (30) days of invoice, unless otherwise provided in the Fee Schedule.",
+    "start": 40345,
+    "end": 40505,
+    "page": null,
+    "conf": 0.08349973319358601
+   },
+   {
+    "text": "Customer may terminate this Agreement during the Term upon at least one (1) years' written notice to M&I, provided that Customer pays M&I an early termination fee (\"Termination for Convenience Fee\") in an amount equal to REDACTED of the Estimated Remaining Value.  The Termination for Convenience Fee shall apply to any early termination of this Agreement other than pursuant to an Event of Default on the part of Customer or M&I or pursuant to Section 11.3 below.  Fifty percent of the Termination for Convenience Fee shall be paid to M&I within thirty (30) days following the date of Customer's notice and the remaining 50% shall be paid to M&I within thirty (30) days prior to the Effective Date of Termination.",
+    "start": 50579,
+    "end": 51293,
+    "page": null,
+    "conf": 0.0827805897429561
+   },
+   {
+    "text": "Fifty percent of the Termination for Convenience Fee shall be paid to M&I within thirty (30) days following the date of Customer's notice and the remaining 50% shall be paid to M&I within thirty (30) days prior to the Effective Date of Termination.",
+    "start": 51045,
+    "end": 51293,
+    "page": null,
+    "conf": 0.05389790810779644
+   },
+   {
+    "text": "All \"one-time\" fees shall be paid to M&I as\n\n\n\n\n\nset forth in the Fee Schedule.  All minimum monthly fees (including the Monthly Base Fee) are due in advance on the first day of the calendar month in which the Services are to be performed, prorated for any partial month.",
+    "start": 39682,
+    "end": 39953,
+    "page": null,
+    "conf": 0.05159618394145443
+   },
+   {
+    "text": "Following the Conversion of the Accounts DP Services, Customer agrees to pay to M&I the fees for the Accounts DP Services as set forth on the Fee Schedule.",
+    "start": 35888,
+    "end": 36043,
+    "page": null,
+    "conf": 0.04616027548046707
+   },
+   {
+    "text": "All \"one-time\" fees shall be paid to M&I as\n\n\n\n\n\nset forth in the Fee Schedule.  All minimum monthly fees (including the Monthly Base Fee) are due in advance on the first day of the calendar month in which the Services are to be performed, prorated for any partial month.  To effect payment of such minimum monthly fees, Customer hereby authorizes M&I to initiate debit entries from and, if necessary, initiate credit entries and adjustments to Customer's account at the depository institution designated in the ACH Authorization Agreement attached hereto as Exhibit B, which shall be executed by Customer contemporaneously with the execution of this Agreement.  All other amounts due hereunder shall be invoiced by M&I and shall be payable within thirty (30) days of invoice, unless otherwise provided in the Fee Schedule.  Customer shall also pay any collection fees and Damages incurred by M&I in collecting payment of the charges and any other amounts for which Customer is liable under the terms and conditions of this Agreement.\n\n     8.14 Modification of Terms and Pricing.\n\n          A.   Following any Event of Default by Customer and pending completion of the dispute resolution procedures set forth in Article 15, Customer agrees that all charges for Services shall be computed using M&I's then-current standard published prices, paid in advance, as determined by M&I.  Upon Customer's cure of all such Event(s) of Default, the pricing terms shall revert to that which were in place prior to the Event(s) of Default.",
+    "start": 39682,
+    "end": 41209,
+    "page": null,
+    "conf": 0.030750076384965387
+   },
+   {
+    "text": "All minimum monthly fees (including the Monthly Base Fee) are due in advance on the first day of the calendar month in which the Services are to be performed, prorated for any partial month.  To effect payment of such minimum monthly fees, Customer hereby authorizes M&I to initiate debit entries from and, if necessary, initiate credit entries and adjustments to Customer's account at the depository institution designated in the ACH Authorization Agreement attached hereto as Exhibit B, which shall be executed by Customer contemporaneously with the execution of this Agreement.  All other amounts due hereunder shall be invoiced by M&I and shall be payable within thirty (30) days of invoice, unless otherwise provided in the Fee Schedule.",
+    "start": 39763,
+    "end": 40505,
+    "page": null,
+    "conf": 0.03073729309948633
+   },
+   {
+    "text": "All other amounts due hereunder shall be invoiced by M&I and shall be payable within thirty (30) days of invoice, unless otherwise provided in the Fee Schedule.  Customer shall also pay any collection fees and Damages incurred by M&I in collecting payment of the charges and any other amounts for which Customer is liable under the terms and conditions of this Agreement.\n\n     8.14 Modification of Terms and Pricing.\n\n          A.   Following any Event of Default by Customer and pending completion of the dispute resolution procedures set forth in Article 15, Customer agrees that all charges for Services shall be computed using M&I's then-current standard published prices, paid in advance, as determined by M&I.  Upon Customer's cure of all such Event(s) of Default, the pricing terms shall revert to that which were in place prior to the Event(s) of Default.",
+    "start": 40345,
+    "end": 41209,
+    "page": null,
+    "conf": 0.021126661142558612
+   },
+   {
+    "text": "All \"one-time\" fees shall be paid to M&I as\n\n\n\n\n\nset forth in the Fee Schedule.  All minimum monthly fees (including the Monthly Base Fee) are due in advance on the first day of the calendar month in which the Services are to be performed, prorated for any partial month.  To effect payment of such minimum monthly fees, Customer hereby authorizes M&I to initiate debit entries from and, if necessary, initiate credit entries and adjustments to Customer's account at the depository institution designated in the ACH Authorization Agreement attached hereto as Exhibit B, which shall be executed by Customer contemporaneously with the execution of this Agreement.  All other amounts due hereunder shall be invoiced by M&I and shall be payable within thirty (30) days of invoice, unless otherwise provided in the Fee Schedule.  Customer shall also pay any collection fees and Damages incurred by M&I in collecting payment of the charges and any other amounts for which Customer is liable under the terms and conditions of this Agreement.",
+    "start": 39682,
+    "end": 40716,
+    "page": null,
+    "conf": 0.021017099572491454
+   },
+   {
+    "text": "Following the Conversion of the Accounts DP Services, Customer agrees to pay to M&I the fees for the Accounts DP Services as set forth on the Fee Schedule.\n\n     8.5  Corporate Support Services.  INTENTIONALLY OMITTED\n\n     8.6  Item Processing Services.  INTENTIONALLY OMITTED\n\n     8.7  Management Services.  INTENTIONALLY OMITTED\n\n     8.8  Visa Check/MasterMoney Card Services.  Following commencement of the Bankcard Services, Customer agrees to pay to M&I the fees set forth on the Fee Schedule.  Notwithstanding any provision to the contrary in the Agreement, or any general discount specified in the Fee Schedule, the fees for Bankcard Services shall not be subject to any discounts.  In addition to the charges specified on the Fee Schedule, Customer shall be responsible for all interchange fees and all dues, fees and assessments established by and owed to Visa U.S.A. Inc. and/or MasterCard International for the processing of Customer's transactions.\n\n     8.9  EFT Services.  Following the commencement of the EFT Services, Customer agrees to pay to M&I the fees set forth on the Fee Schedule subject to the discounts specified in the Fee Schedule.",
+    "start": 35888,
+    "end": 37050,
+    "page": null,
+    "conf": 0.020980692117921137
+   },
+   {
+    "text": "All other amounts due hereunder shall be invoiced by M&I and shall be payable within thirty (30) days of invoice, unless otherwise provided in the Fee Schedule.  Customer shall also pay any collection fees and Damages incurred by M&I in collecting payment of the charges and any other amounts for which Customer is liable under the terms and conditions of this Agreement.",
+    "start": 40345,
+    "end": 40716,
+    "page": null,
+    "conf": 0.014439676029049974
+   },
+   {
+    "text": "All \"one-time\" fees shall be paid to M&I as\n\n\n\n\n\nset forth in the Fee Schedule.  All minimum monthly fees (including the Monthly Base Fee) are due in advance on the first day of the calendar month in which the Services are to be performed, prorated for any partial month.  To effect payment of such minimum monthly fees, Customer hereby authorizes M&I to initiate debit entries from and, if necessary, initiate credit entries and adjustments to Customer's account at the depository institution designated in the ACH Authorization Agreement attached hereto as Exhibit B, which shall be executed by Customer contemporaneously with the execution of this Agreement.",
+    "start": 39682,
+    "end": 40343,
+    "page": null,
+    "conf": 0.014348335589012932
+   },
+   {
+    "text": "Following the Conversion of the Accounts DP Services, Customer agrees to pay to M&I the fees for the Accounts DP Services as set forth on the Fee Schedule.\n\n     8.5  Corporate Support Services.  INTENTIONALLY OMITTED\n\n     8.6  Item Processing Services.  INTENTIONALLY OMITTED\n\n     8.7  Management Services.  INTENTIONALLY OMITTED\n\n     8.8  Visa Check/MasterMoney Card Services.  Following commencement of the Bankcard Services, Customer agrees to pay to M&I the fees set forth on the Fee Schedule.",
+    "start": 35888,
+    "end": 36389,
+    "page": null,
+    "conf": 0.013681801349169716
+   },
+   {
+    "text": "All minimum monthly fees (including the Monthly Base Fee) are due in advance on the first day of the calendar month in which the Services are to be performed, prorated for any partial month.",
+    "start": 39763,
+    "end": 39953,
+    "page": null,
+    "conf": 0.013049191633149637
+   },
+   {
+    "text": "All \"one-time\" fees shall be paid to M&I as\n\n\n\n\n\nset forth in the Fee Schedule.  All minimum monthly fees (including the Monthly Base Fee) are due in advance on the first day of the calendar month in which the Services are to be performed, prorated for any partial month.  To effect payment of such minimum monthly fees, Customer hereby authorizes M&I to initiate debit entries from and, if necessary, initiate credit entries and adjustments to Customer's account at the depository institution designated in the ACH Authorization Agreement attached hereto as Exhibit B, which shall be executed by Customer contemporaneously with the execution of this Agreement.  All other amounts due hereunder shall be invoiced by M&I and shall be payable within thirty (30) days of invoice, unless otherwise provided in the Fee Schedule.  Customer shall also pay any collection fees and Damages incurred by M&I in collecting payment of the charges and any other amounts for which Customer is liable under the terms and conditions of this Agreement.\n\n     8.14 Modification of Terms and Pricing.\n\n          A.   Following any Event of Default by Customer and pending completion of the dispute resolution procedures set forth in Article 15, Customer agrees that all charges for Services shall be computed using M&I's then-current standard published prices, paid in advance, as determined by M&I.",
+    "start": 39682,
+    "end": 41061,
+    "page": null,
+    "conf": 0.013034788649437737
+   },
+   {
+    "text": "All \"one-time\" fees shall be paid to M&I as\n\n\n\n\n\nset forth in the Fee Schedule.  All minimum monthly fees (including the Monthly Base Fee) are due in advance on the first day of the calendar month in which the Services are to be performed, prorated for any partial month.  To effect payment of such minimum monthly fees, Customer hereby authorizes M&I to initiate debit entries from and, if necessary, initiate credit entries and adjustments to Customer's account at the depository institution designated in the ACH Authorization Agreement attached hereto as Exhibit B, which shall be executed by Customer contemporaneously with the execution of this Agreement.  All other amounts due hereunder shall be invoiced by M&I and shall be payable within thirty (30) days of invoice, unless otherwise provided in the Fee Schedule.  Customer shall also pay any collection fees and Damages incurred by M&I in collecting payment of the charges and any other amounts for which Customer is liable under the terms and conditions of this Agreement.\n\n     8.14 Modification of Terms and Pricing.\n\n          A.   Following any Event of Default by Customer and pending completion of the dispute resolution procedures set forth in Article 15, Customer agrees that all charges for Services shall be computed using M&I's then-current standard published prices, paid in advance, as determined by M&I.  Upon Customer's cure of all such Event(s) of Default, the pricing terms shall revert to that which were in place prior to the Event(s) of Default.\n\n          B.   REDACTED\n\n          C.   Customer shall be entitled to receive discounts on certain Services as specifically set forth in the marked up price list made part of the Fee Schedule.",
+    "start": 39682,
+    "end": 41403,
+    "page": null,
+    "conf": 0.012802534574533187
+   },
+   {
+    "text": "Customer agrees to pay M&I the fees relating to the Conversion on the terms and conditions set forth on the Fee Schedule (\"Conversion Fees\").",
+    "start": 34435,
+    "end": 34576,
+    "page": null,
+    "conf": 0.012573915156766258
+   }
+  ],
+  "Delivery": [
+   {
+    "text": "M&I shall make reasonable efforts to deliver ACH Entries to Customer or to an ACH Operator, as appropriate, prior to any applicable deadline for such delivery.",
+    "start": 31187,
+    "end": 31346,
+    "page": null,
+    "conf": 0.38695055802321626
+   },
+   {
+    "text": "M&I hereby grants to Customer a non-exclusive, non-transferable license, through the end of the Term, to use the source code (including the right to make modifications thereto) on the terms and conditions set forth in this Article 23, upon payment of the then current license fees and the occurrence of the following events:\n\n     A.   M&I ceases to do business or refuses to provide the Services to Customer; or\n\n     B.   A voluntary or involuntary petition is commenced by or against M&I under any federal or state bankruptcy law, or a trustee in bankruptcy fails to timely assume this Agreement as an executory contract, or a substantial part of M&I's property or assets become subject to levy or seizure by any creditor and, in the case of an involuntary petition, the same is not dismissed within sixty (60) days after filing.",
+    "start": 99380,
+    "end": 100212,
+    "page": null,
+    "conf": 0.3789642895693546
+   },
+   {
+    "text": "M&I shall make reasonable efforts to deliver ACH Entries to Customer or to an ACH Operator, as appropriate, prior to any applicable deadline for such delivery.  M&I does not guarantee timely delivery.",
+    "start": 31187,
+    "end": 31387,
+    "page": null,
+    "conf": 0.07443485234691288
+   },
+   {
+    "text": "M&I hereby grants to Customer a non-exclusive, non-transferable license, through the end of the Term, to use the source code (including the right to make modifications thereto) on the terms and conditions set forth in this Article 23, upon payment of the then current license fees and the occurrence of the following events:",
+    "start": 99380,
+    "end": 99704,
+    "page": null,
+    "conf": 0.06143619943965488
+   },
+   {
+    "text": "M&I shall make reasonable efforts to deliver ACH Entries to Customer or to an ACH Operator, as appropriate, prior to any applicable deadline for such delivery.  M&I does not guarantee timely delivery.  M&I shall have no liability to Customer as a result of any late delivery, unless such late delivery is (i) caused solely by the gross negligence or wilful misconduct of M&I and (ii) made more than 24 hours delayed from its scheduled deadline.",
+    "start": 31187,
+    "end": 31631,
+    "page": null,
+    "conf": 0.0185654438222581
+   },
+   {
+    "text": "M&I hereby grants to Customer a non-exclusive, non-transferable license, through the end of the Term, to use the source code (including the right to make modifications thereto) on the terms and conditions set forth in this Article 23, upon payment of the then current license fees and the occurrence of the following events:\n\n     A.   M&I ceases to do business or refuses to provide the Services to Customer; or\n\n     B.   A voluntary or involuntary petition is commenced by or against M&I under any federal or state bankruptcy law, or a trustee in bankruptcy fails to timely assume this Agreement as an executory contract, or a substantial part of M&I's property or assets become subject to levy or seizure by any creditor and, in the case of an involuntary petition, the same is not dismissed within sixty (60) days after filing.\n\n     23.5 Use of Source Code.  In the event Customer obtains a copy of the source code pursuant to Section 23.4 above, Customer (or its designee) shall use the source code during the term of the license granted herein solely for Customer's own internal processing and computing needs and to process the Customer Data, but shall not (1) distribute, sell, transfer, assign or sublicense the source code or any parts thereof to any third party, (2) use the source code in any manner to provide service bureau, time sharing or other computer services to third parties, or (3) use any portion of the source code to process data under any application or functionality other than those applications or functionalities which were being provided by M&I to Customer at the time Customer became entitled to receive a copy of the source code.",
+    "start": 99380,
+    "end": 101044,
+    "page": null,
+    "conf": 0.009853978945558475
+   },
+   {
+    "text": "M&I does not guarantee timely delivery.",
+    "start": 31348,
+    "end": 31387,
+    "page": null,
+    "conf": 0.00921097069243187
+   },
+   {
+    "text": "M&I shall make reasonable efforts to deliver ACH Entries to Customer or to an ACH Operator, as appropriate, prior to any applicable deadline for such delivery",
+    "start": 31187,
+    "end": 31345,
+    "page": null,
+    "conf": 0.005260123442634445
+   },
+   {
+    "text": "M&I hereby grants to Customer a non-exclusive, non-transferable license, through the end of the Term, to use the source code (including the right to make modifications thereto) on the terms and conditions set forth in this Article 23, upon payment of the then current license fees and the occurrence of the following events:\n\n     A.   M&I ceases to do business or refuses to provide the Services to Customer;",
+    "start": 99380,
+    "end": 99789,
+    "page": null,
+    "conf": 0.004135555331064282
+   },
+   {
+    "text": "M&I hereby grants to Customer a non-exclusive, non-transferable license, through the end of the Term, to use the source code (including the right to make modifications thereto) on",
+    "start": 99380,
+    "end": 99559,
+    "page": null,
+    "conf": 0.004109708759815538
+   },
+   {
+    "text": "M&I does not guarantee timely delivery.  M&I shall have no liability to Customer as a result of any late delivery, unless such late delivery is (i) caused solely by the gross negligence or wilful misconduct of M&I and (ii) made more than 24 hours delayed from its scheduled deadline.",
+    "start": 31348,
+    "end": 31631,
+    "page": null,
+    "conf": 0.00229738830060166
+   },
+   {
+    "text": "M",
+    "start": 99380,
+    "end": 99381,
+    "page": null,
+    "conf": 0.0010018997661674874
+   },
+   {
+    "text": "M&I hereby grants to Customer a non-exclusive, non-transferable license, through the end of the Term, to use the source code (including the right to make modifications thereto)",
+    "start": 99380,
+    "end": 99556,
+    "page": null,
+    "conf": 0.0009298457301926516
+   },
+   {
+    "text": "or\n\n     B.   A voluntary or involuntary petition is commenced by or against M&I under any federal or state bankruptcy law, or a trustee in bankruptcy fails to timely assume this Agreement as an executory contract, or a substantial part of M&I's property or assets become subject to levy or seizure by any creditor and, in the case of an involuntary petition, the same is not dismissed within sixty (60) days after filing.",
+    "start": 99790,
+    "end": 100212,
+    "page": null,
+    "conf": 0.0006795368580320058
+   },
+   {
+    "text": ".",
+    "start": 100211,
+    "end": 100212,
+    "page": null,
+    "conf": 0.0006046572154964278
+   },
+   {
+    "text": "Customer may terminate this Agreement during the Term upon at least one (1) years' written notice to M&I, provided that Customer pays M&I an early termination fee (\"Termination for Convenience Fee\") in an amount equal to REDACTED of the Estimated Remaining Value.",
+    "start": 50579,
+    "end": 50842,
+    "page": null,
+    "conf": 0.0005798313207101757
+   },
+   {
+    "text": "M&I shall make reasonable efforts to deliver ACH Entries to Customer or to an ACH Operator, as appropriate, prior to any applicable deadline for such delivery.  M",
+    "start": 31187,
+    "end": 31349,
+    "page": null,
+    "conf": 0.0005027122637086997
+   },
+   {
+    "text": "M&I shall be responsible for the cost of maintaining and updating the source code escrow including any fees to be\n\n\n\n\n\npaid to DSI.  M&I shall have the right to change escrow agents and shall promptly notify Customer of such change during the Term.\n\n     23.4 Customer's Right to Obtain the Source Code.  M&I hereby grants to Customer a non-exclusive, non-transferable license, through the end of the Term, to use the source code (including the right to make modifications thereto) on the terms and conditions set forth in this Article 23, upon payment of the then current license fees and the occurrence of the following events:\n\n     A.   M&I ceases to do business or refuses to provide the Services to Customer; or\n\n     B.   A voluntary or involuntary petition is commenced by or against M&I under any federal or state bankruptcy law, or a trustee in bankruptcy fails to timely assume this Agreement as an executory contract, or a substantial part of M&I's property or assets become subject to levy or seizure by any creditor and, in the case of an involuntary petition, the same is not dismissed within sixty (60) days after filing.",
+    "start": 99075,
+    "end": 100212,
+    "page": null,
+    "conf": 0.00043160349152533337
+   },
+   {
+    "text": "M&I shall make reasonable efforts to deliver ACH Entries to Customer or to an ACH Operator, as appropriate, prior to any applicable deadline for such delivery.  M&I does not guarantee timely delivery",
+    "start": 31187,
+    "end": 31386,
+    "page": null,
+    "conf": 0.00040121745180429156
+   },
+   {
+    "text": "upon payment of the then current license fees and the occurrence of the following events:\n\n     A.   M&I ceases to do business or refuses to provide the Services to Customer; or\n\n     B.   A voluntary or involuntary petition is commenced by or against M&I under any federal or state bankruptcy law, or a trustee in bankruptcy fails to timely assume this Agreement as an executory contract, or a substantial part of M&I's property or assets become subject to levy or seizure by any creditor and, in the case of an involuntary petition, the same is not dismissed within sixty (60) days after filing.",
+    "start": 99615,
+    "end": 100212,
+    "page": null,
+    "conf": 0.00037108813287380993
+   }
+  ],
+  "Confidentiality": [
+   {
+    "text": "All such Confidential Information shall be distributed only to persons having a need to know such information to perform their duties in conjunction with this Agreement.",
+    "start": 72400,
+    "end": 72569,
+    "page": null,
+    "conf": 0.22706061338078426
+   },
+   {
+    "text": "Each party shall instruct its employees, agents, and contractors of its confidentiality obligations hereunder and not to attempt to circumvent any such security procedures and devices.  Each party's obligation under the preceding sentence may be satisfied by the use of its standard form of confidentiality agreement, if the same reasonably accomplishes the purposes here intended.  All such Confidential Information shall be distributed only to persons having a need to know such information to perform their duties in conjunction with this Agreement.",
+    "start": 72017,
+    "end": 72569,
+    "page": null,
+    "conf": 0.22488318190482945
+   },
+   {
+    "text": "Each party shall instruct its employees, agents, and contractors of its confidentiality obligations hereunder and not to attempt to circumvent any such security procedures and devices.",
+    "start": 72017,
+    "end": 72201,
+    "page": null,
+    "conf": 0.1665163591143757
+   },
+   {
+    "text": "M&I and Customer shall hold the Confidential Information of the other party in confidence and shall not disclose or use such Confidential Information other than for the purposes contemplated by this Agreement, and shall instruct their employees, agents, and contractors to use the same care and discretion with respect to the Confidential Information of the other party or of any third party utilized hereunder that M&I and Customer each require with respect to their own most confidential information, but in no event less than a reasonable standard of care, including but not limited to, the utilization of security devices or procedures designed to prevent unauthorized access to such materials.",
+    "start": 71317,
+    "end": 72015,
+    "page": null,
+    "conf": 0.1509794259950992
+   },
+   {
+    "text": "Each party's obligation under the preceding sentence may be satisfied by the use of its standard form of confidentiality agreement, if the same reasonably accomplishes the purposes here intended.  All such Confidential Information shall be distributed only to persons having a need to know such information to perform their duties in conjunction with this Agreement.",
+    "start": 72203,
+    "end": 72569,
+    "page": null,
+    "conf": 0.08525596261660778
+   },
+   {
+    "text": "Each party shall instruct its employees, agents, and contractors of its confidentiality obligations hereunder and not to attempt to circumvent any such security procedures and devices.  Each party's obligation under the preceding sentence may be satisfied by the use of its standard form of confidentiality agreement, if the same reasonably accomplishes the purposes here intended.",
+    "start": 72017,
+    "end": 72398,
+    "page": null,
+    "conf": 0.0636148934307409
+   },
+   {
+    "text": "Each party's obligation under the preceding sentence may be satisfied by the use of its standard form of confidentiality agreement, if the same reasonably accomplishes the purposes here intended.",
+    "start": 72203,
+    "end": 72398,
+    "page": null,
+    "conf": 0.02411722955385154
+   },
+   {
+    "text": "M&I and Customer shall hold the Confidential Information of the other party in confidence and shall not disclose or use such Confidential Information other than for the purposes contemplated by this Agreement, and shall instruct their employees, agents, and contractors to use the same care and discretion with respect to the Confidential Information of the other party or of any third party utilized hereunder that M&I and Customer each require with respect to their own most confidential information, but in no event less than a reasonable standard of care, including but not limited to, the utilization of security devices or procedures designed to prevent unauthorized access to such materials.  Each party shall instruct its employees, agents, and contractors of its confidentiality obligations hereunder and not to attempt to circumvent any such security procedures and devices.",
+    "start": 71317,
+    "end": 72201,
+    "page": null,
+    "conf": 0.015891457948500852
+   },
+   {
+    "text": "All such Customer Data and other Confidential Information shall, however, be subject to regulation and examination by the appropriate auditors and regulatory agencies to the same extent as if such information were on Customer's premises.  \"Customer Data\" means any and all data and information of any kind or nature submitted to M&I by Customer, or received by M&I on behalf of Customer, in connection with the Services.\n\n     17.2 M&I Systems.  Customer acknowledges that it has no rights in any software, systems, documentation, guidelines, procedures and similar related materials or any modifications thereof provided by M&I, except with respect to Customer's use of the same during the Term to process its data.        17.3 Confidential Information.  \"Confidential Information\" of a party\n\n\n\n\n\nshall mean all confidential or proprietary information and documentation of such party, whether or not marked as such, including without limitation with respect to Customer, all Customer Data.  Confidential Information shall not include: (i) information which is or becomes publicly available (other than by the person or entity having the obligation of confidentiality) without breach of this Agreement; (ii) information independently developed by the receiving party; (iii) information received from a third party not under a confidentiality obligation to the disclosing party; or (iv) information already in the possession of the receiving party without obligation of confidence at the time first disclosed by the disclosing party.  The parties acknowledge and agree that the substance of the negotiations of this Agreement, and the terms of this Agreement are considered Confidential Information subject to the restrictions contained herein.  Neither party shall use, copy, sell, transfer, publish, disclose, display, or otherwise make any of the other party's Confidential Information available to any third party without the prior written consent of the other.\n\n     17.4 Obligations of the Parties.  M&I and Customer shall hold the Confidential Information of the other party in confidence and shall not disclose or use such Confidential Information other than for the purposes contemplated by this Agreement, and shall instruct their employees, agents, and contractors to use the same care and discretion with respect to the Confidential Information of the other party or of any third party utilized hereunder that M&I and Customer each require with respect to their own most confidential information, but in no event less than a reasonable standard of care, including but not limited to, the utilization of security devices or procedures designed to prevent unauthorized access to such materials.",
+    "start": 69311,
+    "end": 72015,
+    "page": null,
+    "conf": 0.007735547661710549
+   },
+   {
+    "text": "Customer shall remain the sole and exclusive owner of all Customer Data and other Confidential Information (as hereinafter defined), regardless of whether such data is maintained on magnetic tape, magnetic disk, or any other storage or processing device.",
+    "start": 69055,
+    "end": 69309,
+    "page": null,
+    "conf": 0.006415159653531039
+   },
+   {
+    "text": "M&I and Customer shall hold the Confidential Information of the other party in confidence and shall not disclose or use such Confidential Information other than for the purposes contemplated by this Agreement, and shall instruct their employees, agents, and contractors to use the same care and discretion with respect to the Confidential Information of the other party or of any third party utilized hereunder that M&I and Customer each require with respect to their own most confidential information, but in no event less than a reasonable standard of care, including but not limited to, the utilization of security devices or procedures designed to prevent unauthorized access to such materials.  Each party shall instruct its employees, agents, and contractors of its confidentiality obligations hereunder and not to attempt to circumvent any such security procedures and devices.  Each party's obligation under the preceding sentence may be satisfied by the use of its standard form of confidentiality agreement, if the same reasonably accomplishes the purposes here intended.  All such Confidential Information shall be distributed only to persons having a need to know such information to perform their duties in conjunction with this Agreement.",
+    "start": 71317,
+    "end": 72569,
+    "page": null,
+    "conf": 0.006064316839034223
+   },
+   {
+    "text": "Neither party shall use, copy, sell, transfer, publish, disclose, display, or otherwise make any of the other party's Confidential Information available to any third party without the prior written consent of the other.\n\n     17.4 Obligations of the Parties.  M&I and Customer shall hold the Confidential Information of the other party in confidence and shall not disclose or use such Confidential Information other than for the purposes contemplated by this Agreement, and shall instruct their employees, agents, and contractors to use the same care and discretion with respect to the Confidential Information of the other party or of any third party utilized hereunder that M&I and Customer each require with respect to their own most confidential information, but in no event less than a reasonable standard of care, including but not limited to, the utilization of security devices or procedures designed to prevent unauthorized access to such materials.",
+    "start": 71057,
+    "end": 72015,
+    "page": null,
+    "conf": 0.004721183453843422
+   },
+   {
+    "text": "Confidential Information shall not include: (i) information which is or becomes publicly available (other than by the person or entity having the obligation of confidentiality) without breach of this Agreement; (ii) information independently developed by the receiving party; (iii) information received from a third party not under a confidentiality obligation to the disclosing party; or (iv) information already in the possession of the receiving party without obligation of confidence at the time first disclosed by the disclosing party.  The parties acknowledge and agree that the substance of the negotiations of this Agreement, and the terms of this Agreement are considered Confidential Information subject to the restrictions contained herein.  Neither party shall use, copy, sell, transfer, publish, disclose, display, or otherwise make any of the other party's Confidential Information available to any third party without the prior written consent of the other.\n\n     17.4 Obligations of the Parties.  M&I and Customer shall hold the Confidential Information of the other party in confidence and shall not disclose or use such Confidential Information other than for the purposes contemplated by this Agreement, and shall instruct their employees, agents, and contractors to use the same care and discretion with respect to the Confidential Information of the other party or of any third party utilized hereunder that M&I and Customer each require with respect to their own most confidential information, but in no event less than a reasonable standard of care, including but not limited to, the utilization of security devices or procedures designed to prevent unauthorized access to such materials.",
+    "start": 70304,
+    "end": 72015,
+    "page": null,
+    "conf": 0.003922316326645278
+   },
+   {
+    "text": "The parties acknowledge and agree that the substance of the negotiations of this Agreement, and the terms of this Agreement are considered Confidential Information subject to the restrictions contained herein.  Neither party shall use, copy, sell, transfer, publish, disclose, display, or otherwise make any of the other party's Confidential Information available to any third party without the prior written consent of the other.\n\n     17.4 Obligations of the Parties.  M&I and Customer shall hold the Confidential Information of the other party in confidence and shall not disclose or use such Confidential Information other than for the purposes contemplated by this Agreement, and shall instruct their employees, agents, and contractors to use the same care and discretion with respect to the Confidential Information of the other party or of any third party utilized hereunder that M&I and Customer each require with respect to their own most confidential information, but in no event less than a reasonable standard of care, including but not limited to, the utilization of security devices or procedures designed to prevent unauthorized access to such materials.",
+    "start": 70846,
+    "end": 72015,
+    "page": null,
+    "conf": 0.003796009445632504
+   },
+   {
+    "text": "M&I and Customer shall hold the Confidential Information of the other party in confidence and shall not disclose or use such Confidential Information other than for the purposes contemplated by this Agreement, and shall instruct their employees, agents, and contractors to use the same care and discretion with respect to the Confidential Information of the other party or of any third party utilized hereunder that M&I and Customer each require with respect to their own most confidential information, but in no event less than a reasonable standard of care, including but not limited to, the utilization of security devices or procedures designed to prevent unauthorized access to such materials.  Each party shall instruct its employees, agents, and contractors of its confidentiality obligations hereunder and not to attempt to circumvent any such security procedures and devices.  Each party's obligation under the preceding sentence may be satisfied by the use of its standard form of confidentiality agreement, if the same reasonably accomplishes the purposes here intended.",
+    "start": 71317,
+    "end": 72398,
+    "page": null,
+    "conf": 0.0029483051797224743
+   },
+   {
+    "text": "Customer shall remain the sole and exclusive owner of all Customer Data and other Confidential Information (as hereinafter defined), regardless of whether such data is maintained on magnetic tape, magnetic disk, or any other storage or processing device.  All such Customer Data and other Confidential Information shall, however, be subject to regulation and examination by the appropriate auditors and regulatory agencies to the same extent as if such information were on Customer's premises.  \"Customer Data\" means any and all data and information of any kind or nature submitted to M&I by Customer, or received by M&I on behalf of Customer, in connection with the Services.\n\n     17.2 M&I Systems.  Customer acknowledges that it has no rights in any software, systems, documentation, guidelines, procedures and similar related materials or any modifications thereof provided by M&I, except with respect to Customer's use of the same during the Term to process its data.        17.3 Confidential Information.  \"Confidential Information\" of a party\n\n\n\n\n\nshall mean all confidential or proprietary information and documentation of such party, whether or not marked as such, including without limitation with respect to Customer, all Customer Data.  Confidential Information shall not include: (i) information which is or becomes publicly available (other than by the person or entity having the obligation of confidentiality) without breach of this Agreement; (ii) information independently developed by the receiving party; (iii) information received from a third party not under a confidentiality obligation to the disclosing party; or (iv) information already in the possession of the receiving party without obligation of confidence at the time first disclosed by the disclosing party.  The parties acknowledge and agree that the substance of the negotiations of this Agreement, and the terms of this Agreement are considered Confidential Information subject to the restrictions contained herein.  Neither party shall use, copy, sell, transfer, publish, disclose, display, or otherwise make any of the other party's Confidential Information available to any third party without the prior written consent of the other.",
+    "start": 69055,
+    "end": 71276,
+    "page": null,
+    "conf": 0.0017614169435151727
+   },
+   {
+    "text": "Customer shall remain the sole and exclusive owner of all Customer Data and other Confidential Information (as hereinafter defined), regardless of whether such data is maintained on magnetic tape, magnetic disk, or any other storage or processing device.  All such Customer Data and other Confidential Information shall, however, be subject to regulation and examination by the appropriate auditors and regulatory agencies to the same extent as if such information were on Customer's premises.",
+    "start": 69055,
+    "end": 69548,
+    "page": null,
+    "conf": 0.0014718733406688489
+   },
+   {
+    "text": "\"Confidential Information\" of a party\n\n\n\n\n\nshall mean all confidential or proprietary information and documentation of such party, whether or not marked as such, including without limitation with respect to Customer, all Customer Data.  Confidential Information shall not include: (i) information which is or becomes publicly available (other than by the person or entity having the obligation of confidentiality) without breach of this Agreement; (ii) information independently developed by the receiving party; (iii) information received from a third party not under a confidentiality obligation to the disclosing party; or (iv) information already in the possession of the receiving party without obligation of confidence at the time first disclosed by the disclosing party.  The parties acknowledge and agree that the substance of the negotiations of this Agreement, and the terms of this Agreement are considered Confidential Information subject to the restrictions contained herein.  Neither party shall use, copy, sell, transfer, publish, disclose, display, or otherwise make any of the other party's Confidential Information available to any third party without the prior written consent of the other.\n\n     17.4 Obligations of the Parties.  M&I and Customer shall hold the Confidential Information of the other party in confidence and shall not disclose or use such Confidential Information other than for the purposes contemplated by this Agreement, and shall instruct their employees, agents, and contractors to use the same care and discretion with respect to the Confidential Information of the other party or of any third party utilized hereunder that M&I and Customer each require with respect to their own most confidential information, but in no event less than a reasonable standard of care, including but not limited to, the utilization of security devices or procedures designed to prevent unauthorized access to such materials.",
+    "start": 70067,
+    "end": 72015,
+    "page": null,
+    "conf": 0.0011392601374501166
+   },
+   {
+    "text": "Customer shall remain the sole and exclusive owner of all Customer Data and other Confidential Information (as hereinafter defined), regardless of whether such data is maintained on magnetic tape, magnetic disk, or any other storage or processing device.  All such Customer Data and other Confidential Information shall, however, be subject to regulation and examination by the appropriate auditors and regulatory agencies to the same extent as if such information were on Customer's premises.  \"Customer Data\" means any and all data and information of any kind or nature submitted to M&I by Customer, or received by M&I on behalf of Customer, in connection with the Services.\n\n     17.2 M&I Systems.  Customer acknowledges that it has no rights in any software, systems, documentation, guidelines, procedures and similar related materials or any modifications thereof provided by M&I, except with respect to Customer's use of the same during the Term to process its data.        17.3 Confidential Information.  \"Confidential Information\" of a party\n\n\n\n\n\nshall mean all confidential or proprietary information and documentation of such party, whether or not marked as such, including without limitation with respect to Customer, all Customer Data.  Confidential Information shall not include: (i) information which is or becomes publicly available (other than by the person or entity having the obligation of confidentiality) without breach of this Agreement; (ii) information independently developed by the receiving party; (iii) information received from a third party not under a confidentiality obligation to the disclosing party; or (iv) information already in the possession of the receiving party without obligation of confidence at the time first disclosed by the disclosing party.",
+    "start": 69055,
+    "end": 70844,
+    "page": null,
+    "conf": 0.0009193056367547072
+   },
+   {
+    "text": ".",
+    "start": 72014,
+    "end": 72015,
+    "page": null,
+    "conf": 0.0007561598054122806
+   }
+  ],
+  "Indemnification": [
+   {
+    "text": "Each party shall indemnify the other and hold it harmless from any and all liabilities, claims, costs, expenses and damages of any nature (including but not limited to reasonable attorney's fees, allocated costs of staff counsel, expenses of litigation and any fees and expenses incurred in enforcing this provision) arising out of or related to any dispute or legal action by any party alleging a violation of Applicable Law by the indemnifying party.",
+    "start": 29286,
+    "end": 29738,
+    "page": null,
+    "conf": 0.2833395051950694
+   },
+   {
+    "text": "M&I shall indemnify Customer from, and defend Customer against, any liability or expenses arising out of or relating to (i) any claim by a third party that the Services or M&I's software infringe upon any United States patent, copyright or trademark of a third party, (ii) any claim by a third party in respect of services or systems provided by M&I to a third party, (iii) the inaccuracy or untruthfulness of any representation or warranty made by M&I to Customer, (iv) a violation of Federal, state, or other laws or regulations for the protection of persons or members of a protected class or category of persons by M&I or its employees or agents (v) sexual discrimination or harassment by M&I, its employees, or agents, (vi) work-related injury or death caused by M&I, its employees, or agents, and (vii) tangible personal or real property damage or financial or monetary loss incurred by Customer resulting from M&I's acts or omissions or those of its employees or agents.",
+    "start": 61245,
+    "end": 62222,
+    "page": null,
+    "conf": 0.2521222779898144
+   },
+   {
+    "text": "Customer will indemnify and hold M&I harmless from any cost, claim, damage, or liability (including attorneys' fees) whatsoever arising out of such data, information or instructions, or any inaccuracy or inadequacy therein.",
+    "start": 82334,
+    "end": 82557,
+    "page": null,
+    "conf": 0.1583133737110313
+   },
+   {
+    "text": "Customer shall indemnify M&I from, and defend M&I against, any liability or expenses arising out of or relating to (i) the inaccuracy  or untruthfulness of any representation or warranty made by Customer to M&I, (ii) a violation of Federal, state, or other laws or regulations for the protection of persons or members of a protected class or category of persons by Customer or its employees or agents, (iii) sexual discrimination or harassment by Customer or its employees or agents, (iv) work-related injury or death caused by Customer or its employees or agents, (v) tangible personal or real property damage or financial or monetary loss incurred by M&I resulting from Customer's acts or omissions, or those of its employees or agents and (vi) those matters included in Section 6.6(B) above.",
+    "start": 60295,
+    "end": 61089,
+    "page": null,
+    "conf": 0.06016271882280771
+   },
+   {
+    "text": "M&I shall indemnify Customer from, and defend Customer against, any liability or expenses arising out of or relating to (i) any claim by a third party that the Services or M&I's software infringe upon any United States patent, copyright or trademark of a third party, (ii) any claim by a third party in respect of services or systems provided by M&I to a third party, (iii) the inaccuracy or untruthfulness of any representation or warranty made by M&I to Customer, (iv) a violation of Federal, state, or other laws or regulations for the protection of persons or members of a protected class or category of persons by M&I or its employees or agents (v) sexual discrimination or harassment by M&I, its employees, or agents, (vi) work-related injury or death caused by M&I, its employees, or agents, and (vii) tangible personal or real property damage or financial or monetary loss incurred by Customer resulting from M&I's acts or omissions or those of its employees or agents.  M&I shall be responsible for any costs and Expenses incurred by Customer in connection with the enforcement of this Paragraph B.",
+    "start": 61245,
+    "end": 62352,
+    "page": null,
+    "conf": 0.051389671577500164
+   },
+   {
+    "text": "M&I shall indemnify Customer from, and defend Customer against, any liability or expenses arising out of or relating to (i) any claim by a third party that the Services or M&I's software infringe upon any United States patent, copyright or trademark of a third party, (ii) any claim by a third party in respect of services or systems provided by M&I to a third party, (iii) the inaccuracy or untruthfulness of any representation or warranty made by M&I to Customer, (iv) a violation of Federal, state, or other laws or regulations for the protection of persons or members of a protected class or category of persons by M&I or its employees or agents (v) sexual discrimination or harassment by M&I, its employees, or agents, (vi) work-related injury or death caused by M&I, its employees, or agents, and (vii) tangible personal or real property damage or financial or monetary loss incurred by Customer resulting from M&I's acts or omissions or those of its employees or agents.  M&I shall be responsible for any costs and Expenses incurred by Customer in connection with the enforcement of this Paragraph B.\n\n     14.3 Indemnification Procedures.  If any third party makes a claim covered by this Section against an indemnitee with respect to which such indemnitee intends to seek indemnification under this Section, such indemnitee shall give notice of such claim to the indemnifying party, including a brief description of the amount and basis therefor, if known.  Upon giving such notice, the indemnifying party shall be obligated to defend such indemnitee against such claim, and shall be entitled to assume control of the defense of the claim with counsel chosen by the indemnifying party, reasonably satisfactory to the indemnitee.",
+    "start": 61245,
+    "end": 62982,
+    "page": null,
+    "conf": 0.03621609328516038
+   },
+   {
+    "text": "Until both (a) the indemnitee receives notice from indemnifying party that it will defend, and (b) the indemnifying party assumes such defense, the indemnitee may, at any time after ten (10) days from the date notice of claim is given to the indemnifying party by the indemnitee, resist or otherwise defend the claim or, after consultation with and consent of the indemnifying party, settle or otherwise compromise or pay the claim.",
+    "start": 64452,
+    "end": 64884,
+    "page": null,
+    "conf": 0.03239894530214608
+   },
+   {
+    "text": "M&I shall indemnify Customer from, and defend Customer against, any liability or expenses arising out of or relating to (i) any claim by a third party that the Services or M&I's software infringe upon any United States patent, copyright or trademark of a third party, (ii) any claim by a third party in respect of services or systems provided by M&I to a third party, (iii) the inaccuracy or untruthfulness of any representation or warranty made by M&I to Customer, (iv) a violation of Federal, state, or other laws or regulations for the protection of persons or members of a protected class or category of persons by M&I or its employees or agents (v) sexual discrimination or harassment by M&I, its employees, or agents, (vi) work-related injury or death caused by M&I, its employees, or agents, and (vii) tangible personal or real property damage or financial or monetary loss incurred by Customer resulting from M&I's acts or omissions or those of its employees or agents.  M&I shall be responsible for any costs and Expenses incurred by Customer in connection with the enforcement of this Paragraph B.\n\n     14.3 Indemnification Procedures.  If any third party makes a claim covered by this Section against an indemnitee with respect to which such indemnitee intends to seek indemnification under this Section, such indemnitee shall give notice of such claim to the indemnifying party, including a brief description of the amount and basis therefor, if known.  Upon giving such notice, the indemnifying party shall be obligated to defend such indemnitee against such claim, and shall be entitled to assume control of the defense of the claim with counsel chosen by the indemnifying party, reasonably satisfactory to the indemnitee.  Indemnitee shall cooperate fully with, and assist, the indemnifying party in its defense against such claim in all reasonable respects.",
+    "start": 61245,
+    "end": 63119,
+    "page": null,
+    "conf": 0.02347837042711385
+   },
+   {
+    "text": "M&I shall indemnify Customer from, and defend Customer against, any liability or expenses arising out of or relating to (i) any claim by a third party that the Services or M&I's software infringe upon any United States patent, copyright or trademark of a third party, (ii) any claim by a third party in respect of services or systems provided by M&I to a third party, (iii) the inaccuracy or untruthfulness of any representation or warranty made by M&I to Customer, (iv) a violation of Federal, state, or other laws or regulations for the protection of persons or members of a protected class or category of persons by M&I or its employees or agents (v) sexual discrimination or harassment by M&I, its employees, or agents, (vi) work-related injury or death caused by M&I, its employees, or agents, and (vii) tangible personal or real property damage or financial or monetary loss incurred by Customer resulting from M&I's acts or omissions or those of its employees or agents.  M&I shall be responsible for any costs and Expenses incurred by Customer in connection with the enforcement of this Paragraph B.\n\n     14.3 Indemnification Procedures.  If any third party makes a claim covered by this Section against an indemnitee with respect to which such indemnitee intends to seek indemnification under this Section, such indemnitee shall give notice of such claim to the indemnifying party, including a brief description of the amount and basis therefor, if known.",
+    "start": 61245,
+    "end": 62710,
+    "page": null,
+    "conf": 0.01932903231581047
+   },
+   {
+    "text": "Until both (a) the indemnitee receives notice from indemnifying party that it will defend, and (b) the indemnifying party assumes such defense, the indemnitee may, at any time after ten (10) days from the date notice of claim is given to the indemnifying party by the indemnitee, resist or otherwise defend the claim or, after consultation with and consent of the indemnifying party, settle or otherwise compromise or pay the claim.  The indemnifying party shall pay all costs of indemnity arising out of or relating to that defense and any such settlement, compromise, or payment.  The indemnitee shall keep the indemnifying party fully apprised at all times as to the status of the defense.  Following indemnification as\n\n\n\n\n\nprovided in this Section, the indemnifying party shall be subrogated to all rights of the indemnitee with respect to the matters for which indemnification has been made.",
+    "start": 64452,
+    "end": 65349,
+    "page": null,
+    "conf": 0.01772179534855027
+   },
+   {
+    "text": "Following indemnification as\n\n\n\n\n\nprovided in this Section, the indemnifying party shall be subrogated to all rights of the indemnitee with respect to the matters for which indemnification has been made.",
+    "start": 65146,
+    "end": 65349,
+    "page": null,
+    "conf": 0.01608453221360762
+   },
+   {
+    "text": "B.   By M&I.  M&I shall indemnify Customer from, and defend Customer against, any liability or expenses arising out of or relating to (i) any claim by a third party that the Services or M&I's software infringe upon any United States patent, copyright or trademark of a third party, (ii) any claim by a third party in respect of services or systems provided by M&I to a third party, (iii) the inaccuracy or untruthfulness of any representation or warranty made by M&I to Customer, (iv) a violation of Federal, state, or other laws or regulations for the protection of persons or members of a protected class or category of persons by M&I or its employees or agents (v) sexual discrimination or harassment by M&I, its employees, or agents, (vi) work-related injury or death caused by M&I, its employees, or agents, and (vii) tangible personal or real property damage or financial or monetary loss incurred by Customer resulting from M&I's acts or omissions or those of its employees or agents.",
+    "start": 61231,
+    "end": 62222,
+    "page": null,
+    "conf": 0.0093638967809643
+   },
+   {
+    "text": "Upon giving such notice, the indemnifying party shall be obligated to defend such indemnitee against such claim, and shall be entitled to assume control of the defense of the claim with counsel chosen by the indemnifying party, reasonably satisfactory to the indemnitee.",
+    "start": 62712,
+    "end": 62982,
+    "page": null,
+    "conf": 0.006560398586179731
+   },
+   {
+    "text": "Customer shall be responsible for any costs and Expenses incurred by M&I in connection with the enforcement of this Paragraph A.\n\n          B.   By M&I.  M&I shall indemnify Customer from, and defend Customer against, any liability or expenses arising out of or relating to (i) any claim by a third party that the Services or M&I's software infringe upon any United States patent, copyright or trademark of a third party, (ii) any claim by a third party in respect of services or systems provided by M&I to a third party, (iii) the inaccuracy or untruthfulness of any representation or warranty made by M&I to Customer, (iv) a violation of Federal, state, or other laws or regulations for the protection of persons or members of a protected class or category of persons by M&I or its employees or agents (v) sexual discrimination or harassment by M&I, its employees, or agents, (vi) work-related injury or death caused by M&I, its employees, or agents, and (vii) tangible personal or real property damage or financial or monetary loss incurred by Customer resulting from M&I's acts or omissions or those of its employees or agents.",
+    "start": 61091,
+    "end": 62222,
+    "page": null,
+    "conf": 0.006210751140340751
+   },
+   {
+    "text": "If any third party makes a claim covered by this Section against an indemnitee with respect to which such indemnitee intends to seek indemnification under this Section, such indemnitee shall give notice of such claim to the indemnifying party, including a brief description of the amount and basis therefor, if known.  Upon giving such notice, the indemnifying party shall be obligated to defend such indemnitee against such claim, and shall be entitled to assume control of the defense of the claim with counsel chosen by the indemnifying party, reasonably satisfactory to the indemnitee.",
+    "start": 62393,
+    "end": 62982,
+    "page": null,
+    "conf": 0.005166936308307155
+   },
+   {
+    "text": "By M&I.  M&I shall indemnify Customer from, and defend Customer against, any liability or expenses arising out of or relating to (i) any claim by a third party that the Services or M&I's software infringe upon any United States patent, copyright or trademark of a third party, (ii) any claim by a third party in respect of services or systems provided by M&I to a third party, (iii) the inaccuracy or untruthfulness of any representation or warranty made by M&I to Customer, (iv) a violation of Federal, state, or other laws or regulations for the protection of persons or members of a protected class or category of persons by M&I or its employees or agents (v) sexual discrimination or harassment by M&I, its employees, or agents, (vi) work-related injury or death caused by M&I, its employees, or agents, and (vii) tangible personal or real property damage or financial or monetary loss incurred by Customer resulting from M&I's acts or omissions or those of its employees or agents.",
+    "start": 61236,
+    "end": 62222,
+    "page": null,
+    "conf": 0.004748053701866624
+   },
+   {
+    "text": "M&I shall indemnify Customer from, and defend Customer against, any liability or expenses arising out of or relating to (i) any claim by a third party that the Services or M&I's software infringe upon any United States patent, copyright or trademark of a third party, (ii) any claim by a third party in respect of services or systems provided by M&I to a third party, (iii) the inaccuracy or untruthfulness of any representation or warranty made by M&I to Customer, (iv) a violation of Federal, state, or other laws or regulations for the protection of persons or members of a protected class or category of persons by M&I or its employees or agents (v) sexual discrimination or harassment by M&I, its employees, or agents, (vi) work-related injury or death caused by M&I, its employees, or agents, and (vii) tangible personal or real property damage or financial or monetary loss incurred by Customer resulting from M&I's acts or omissions or those of its employees or agents.  M&I shall be responsible for any costs and Expenses incurred by Customer in connection with the enforcement of this Paragraph B.\n\n     14.3 Indemnification Procedures.  If any third party makes a claim covered by this Section against an indemnitee with respect to which such indemnitee intends to seek indemnification under this Section, such indemnitee shall give notice of such claim to the indemnifying party, including a brief description of the amount and basis therefor, if known.  Upon giving such notice, the indemnifying party shall be obligated to defend such indemnitee against such claim, and shall be entitled to assume control of the defense of the claim with counsel chosen by the indemnifying party, reasonably satisfactory to the indemnitee.  Indemnitee shall cooperate fully with, and assist, the indemnifying party in its defense against such claim in all reasonable respects.  The indemnifying party shall keep the indemnitee fully apprised at all times as to the status of the defense.",
+    "start": 61245,
+    "end": 63230,
+    "page": null,
+    "conf": 0.004415007315773383
+   },
+   {
+    "text": "Notwithstanding the foregoing, the indemnitee shall retain, assume, or reassume sole control over all expenses relating to every aspect of the defense that it believes is not the subject of the indemnification provided for in this section.  Until both (a) the indemnitee receives notice from indemnifying party that it will defend, and (b) the indemnifying party assumes such defense, the indemnitee may, at any time after ten (10) days from the date notice of claim is given to the indemnifying party by the indemnitee, resist or otherwise defend the claim or, after consultation with and consent of the indemnifying party, settle or otherwise compromise or pay the claim.",
+    "start": 64211,
+    "end": 64884,
+    "page": null,
+    "conf": 0.004382563266686937
+   },
+   {
+    "text": "Upon giving such notice, the indemnifying party shall be obligated to defend such indemnitee against such claim, and shall be entitled to assume control of the defense of the claim with counsel chosen by the indemnifying party, reasonably satisfactory to the indemnitee.  Indemnitee shall cooperate fully with, and assist, the indemnifying party in its defense against such claim in all reasonable respects.  The indemnifying party shall keep the indemnitee fully apprised at all times as to the status of the defense.  Notwithstanding the foregoing, the indemnitee shall have the right to employ its own separate counsel in any such action, but the fees and expenses of such counsel shall be at the expense of such indemnitee; provided, however (1) if the parties agree that it is advantageous to the defense for the indemnitee to employ its own counsel or (2) in the reasonable judgment of the indemnitee, based upon an opinion of counsel which shall be provided to the indemnifying party, representation of both indemnifying party and the indemnitee would be inappropriate under applicable standards of professional conduct due to actual or potential conflicts of interest between them, then reasonable fees and expenses of the indemnitee's counsel shall be at the expense of the indemnifying party, provided that the indemnifying party approves such counsel.",
+    "start": 62712,
+    "end": 64074,
+    "page": null,
+    "conf": 0.0043429955597910335
+   },
+   {
+    "text": "Upon giving such notice, the indemnifying party shall be obligated to defend such indemnitee against such claim, and shall be entitled to assume control of the defense of the claim with counsel chosen by the indemnifying party, reasonably satisfactory to the indemnitee.  Indemnitee shall cooperate fully with, and assist, the indemnifying party in its defense against such claim in all reasonable respects.",
+    "start": 62712,
+    "end": 63119,
+    "page": null,
+    "conf": 0.004253011691323282
+   }
+  ],
+  "Termination For Breach": [
+   {
+    "text": "If M&I terminates this Agreement following an Event of Default on the part of Customer, or if Customer terminates this Agreement in accordance with Section 11.1 above without complying with the notification requirements set forth in Section 11.1, then Customer shall pay M&I a termination fee (\"Termination for Cause Fee\") in an amount equal to REDACTED of the Estimated Remaining Value, payable as set forth in Section 11.1 above.",
+    "start": 51699,
+    "end": 52130,
+    "page": null,
+    "conf": 0.7480487544741703
+   },
+   {
+    "text": "If M&I terminates this Agreement following an Event of Default on the part of Customer, or if Customer terminates this Agreement in accordance with Section 11.1 above without complying with the notification requirements set forth in Section 11.1, then Customer shall pay M&I a termination fee (\"Termination for Cause Fee\") in an amount equal to REDACTED of the Estimated Remaining Value, payable as set forth in Section 11.1 above.  In addition to the foregoing, Customer shall pay to M&I, reasonable Expenses in connection with the disposition of equipment, facilities and contracts related to M&I's performance of the Services on behalf of Customer.  The Termination for Cause Fee shall not be subject to the limitations set forth in Section 13.4.\n\n          B.   If Customer terminates this Agreement following an Event of Default on the part of M&I, Customer shall not be responsible for any termination fees or charges as a result thereof.",
+    "start": 51699,
+    "end": 52643,
+    "page": null,
+    "conf": 0.09779566936327493
+   },
+   {
+    "text": "Customer may terminate this Agreement during the Term upon at least one (1) years' written notice to M&I, provided that Customer pays M&I an early termination fee (\"Termination for Convenience Fee\") in an amount equal to REDACTED of the Estimated Remaining Value.  The Termination for Convenience Fee shall apply to any early termination of this Agreement other than pursuant to an Event of Default on the part of Customer or M&I or pursuant to Section 11.3 below.  Fifty percent of the Termination for Convenience Fee shall be paid to M&I within thirty (30) days following the date of Customer's notice and the remaining 50% shall be paid to M&I within thirty (30) days prior to the Effective Date of Termination.  In addition to the foregoing, Customer shall pay to M&I, any unamortized Conversion or other costs, reasonable Expenses in connection with the disposition of equipment, facilities and contracts related to M&I's performance of the Services on behalf of Customer.  The Termination for Convenience Fee shall not be subject to the limitations set forth in Section 13.4.\n\n     11.2 For Cause.\n\n          A.   If M&I terminates this Agreement following an Event of Default on the part of Customer, or if Customer terminates this Agreement in accordance with Section 11.1 above without complying with the notification requirements set forth in Section 11.1, then Customer shall pay M&I a termination fee (\"Termination for Cause Fee\") in an amount equal to REDACTED of the Estimated Remaining Value, payable as set forth in Section 11.1 above.",
+    "start": 50579,
+    "end": 52130,
+    "page": null,
+    "conf": 0.08136530428131339
+   },
+   {
+    "text": "If Customer terminates this Agreement following an Event of Default on the part of M&I, Customer shall not be responsible for any termination fees or charges as a result thereof.",
+    "start": 52465,
+    "end": 52643,
+    "page": null,
+    "conf": 0.015010014648651641
+   },
+   {
+    "text": "Customer may terminate this Agreement during the Term upon at least one (1) years' written notice to M&I, provided that Customer pays M&I an early termination fee (\"Termination for Convenience Fee\") in an amount equal to REDACTED of the Estimated Remaining Value.  The Termination for Convenience Fee shall apply to any early termination of this Agreement other than pursuant to an Event of Default on the part of Customer or M&I or pursuant to Section 11.3 below.  Fifty percent of the Termination for Convenience Fee shall be paid to M&I within thirty (30) days following the date of Customer's notice and the remaining 50% shall be paid to M&I within thirty (30) days prior to the Effective Date of Termination.  In addition to the foregoing, Customer shall pay to M&I, any unamortized Conversion or other costs, reasonable Expenses in connection with the disposition of equipment, facilities and contracts related to M&I's performance of the Services on behalf of Customer.  The Termination for Convenience Fee shall not be subject to the limitations set forth in Section 13.4.\n\n     11.2 For Cause.\n\n          A.   If M&I terminates this Agreement following an Event of Default on the part of Customer, or if Customer terminates this Agreement in accordance with Section 11.1 above without complying with the notification requirements set forth in Section 11.1, then Customer shall pay M&I a termination fee (\"Termination for Cause Fee\") in an amount equal to REDACTED of the Estimated Remaining Value, payable as set forth in Section 11.1 above.  In addition to the foregoing, Customer shall pay to M&I, reasonable Expenses in connection with the disposition of equipment, facilities and contracts related to M&I's performance of the Services on behalf of Customer.  The Termination for Cause Fee shall not be subject to the limitations set forth in Section 13.4.\n\n          B.   If Customer terminates this Agreement following an Event of Default on the part of M&I, Customer shall not be responsible for any termination fees or charges as a result thereof.",
+    "start": 50579,
+    "end": 52643,
+    "page": null,
+    "conf": 0.010637220061464737
+   },
+   {
+    "text": "Customer may terminate this Agreement during the Term upon at least one (1) years' written notice to M&I, provided that Customer pays M&I an early termination fee (\"Termination for Convenience Fee\") in an amount equal to REDACTED of the Estimated Remaining Value.",
+    "start": 50579,
+    "end": 50842,
+    "page": null,
+    "conf": 0.009096605085207819
+   },
+   {
+    "text": "The Termination for Convenience Fee shall apply to any early termination of this Agreement other than pursuant to an Event of Default on the part of Customer or M&I or pursuant to Section 11.3 below.  Fifty percent of the Termination for Convenience Fee shall be paid to M&I within thirty (30) days following the date of Customer's notice and the remaining 50% shall be paid to M&I within thirty (30) days prior to the Effective Date of Termination.  In addition to the foregoing, Customer shall pay to M&I, any unamortized Conversion or other costs, reasonable Expenses in connection with the disposition of equipment, facilities and contracts related to M&I's performance of the Services on behalf of Customer.  The Termination for Convenience Fee shall not be subject to the limitations set forth in Section 13.4.\n\n     11.2 For Cause.\n\n          A.   If M&I terminates this Agreement following an Event of Default on the part of Customer, or if Customer terminates this Agreement in accordance with Section 11.1 above without complying with the notification requirements set forth in Section 11.1, then Customer shall pay M&I a termination fee (\"Termination for Cause Fee\") in an amount equal to REDACTED of the Estimated Remaining Value, payable as set forth in Section 11.1 above.",
+    "start": 50844,
+    "end": 52130,
+    "page": null,
+    "conf": 0.008651083745141605
+   },
+   {
+    "text": "If M&I terminates this Agreement following an Event of Default on the part of Customer, or if Customer terminates this Agreement in accordance with Section 11.1 above without complying with the notification requirements set forth in Section 11.1, then Customer shall pay M&I a termination fee (\"Termination for Cause Fee\") in an amount equal to REDACTED of the Estimated Remaining Value, payable as set forth in Section 11.1 above",
+    "start": 51699,
+    "end": 52129,
+    "page": null,
+    "conf": 0.004977412472796
+   },
+   {
+    "text": "Customer may terminate this Agreement during the Term upon at least one (1) years' written notice to M&I, provided that Customer pays M&I an early termination fee (\"Termination for Convenience Fee\") in an amount equal to REDACTED of the Estimated Remaining Value.  The Termination for Convenience Fee shall apply to any early termination of this Agreement other than pursuant to an Event of Default on the part of Customer or M&I or pursuant to Section 11.3 below.",
+    "start": 50579,
+    "end": 51043,
+    "page": null,
+    "conf": 0.004027473115756773
+   },
+   {
+    "text": "If M&I terminates this Agreement following an Event of Default on the part of Customer, or if Customer terminates this Agreement in accordance with Section 11.1 above without complying with the notification requirements set forth in Section 11.1, then Customer shall pay M&I a termination fee (\"Termination for Cause Fee\") in an amount equal to REDACTED of the Estimated Remaining Value, payable as set forth in Section 11.1 above.  In addition to the foregoing, Customer shall pay to M&I, reasonable Expenses in connection with the disposition of equipment, facilities and contracts related to M&I's performance of the Services on behalf of Customer.",
+    "start": 51699,
+    "end": 52350,
+    "page": null,
+    "conf": 0.0029117672335110026
+   },
+   {
+    "text": "Fifty percent of the Termination for Convenience Fee shall be paid to M&I within thirty (30) days following the date of Customer's notice and the remaining 50% shall be paid to M&I within thirty (30) days prior to the Effective Date of Termination.  In addition to the foregoing, Customer shall pay to M&I, any unamortized Conversion or other costs, reasonable Expenses in connection with the disposition of equipment, facilities and contracts related to M&I's performance of the Services on behalf of Customer.  The Termination for Convenience Fee shall not be subject to the limitations set forth in Section 13.4.\n\n     11.2 For Cause.\n\n          A.   If M&I terminates this Agreement following an Event of Default on the part of Customer, or if Customer terminates this Agreement in accordance with Section 11.1 above without complying with the notification requirements set forth in Section 11.1, then Customer shall pay M&I a termination fee (\"Termination for Cause Fee\") in an amount equal to REDACTED of the Estimated Remaining Value, payable as set forth in Section 11.1 above.",
+    "start": 51045,
+    "end": 52130,
+    "page": null,
+    "conf": 0.0027392627030689
+   },
+   {
+    "text": "If M&I terminates this Agreement following an Event of Default on the part of Customer, or if Customer terminates this Agreement in accordance with Section 11.1 above without complying with the notification requirements set forth in Section 11.1, then Customer shall pay M&I a termination fee (\"Termination for Cause Fee\") in an amount equal to REDACTED of the Estimated Remaining Value, payable as set forth in Section 11.1 above.  In addition to the foregoing, Customer shall pay to M&I, reasonable Expenses in connection with the disposition of equipment, facilities and contracts related to M&I's performance of the Services on behalf of Customer.  The Termination for Cause Fee shall not be subject to the limitations set forth in Section 13.4.",
+    "start": 51699,
+    "end": 52448,
+    "page": null,
+    "conf": 0.0021492396016820677
+   },
+   {
+    "text": "It shall be an Event of Default on the part of the Customer if: (i) Customer becomes insolvent, or a receiver of conservator shall be appointed with respect to the Customer; or (ii) Customer shall fail to pay any sum due M&I within the prescribed time period, and such failure continues for ten days after written notice thereof from M&I; or (iii) Customer shall fail to perform any of its other obligations under this Agreement which have a material adverse effect on M&I, and such failure is not cured within 30 days after written notice from M&I.",
+    "start": 54643,
+    "end": 55192,
+    "page": null,
+    "conf": 0.00195555795772573
+   },
+   {
+    "text": "Customer may terminate this Agreement during the Term upon at least one (1) years' written notice to M&I, provided that Customer pays M&I an early termination fee (\"Termination for Convenience Fee\") in an amount equal to REDACTED of the Estimated Remaining Value.  The Termination for Convenience Fee shall apply to any early termination of this Agreement other than pursuant to an Event of Default on the part of Customer or M&I or pursuant to Section 11.3 below.  Fifty percent of the Termination for Convenience Fee shall be paid to M&I within thirty (30) days following the date of Customer's notice and the remaining 50% shall be paid to M&I within thirty (30) days prior to the Effective Date of Termination.",
+    "start": 50579,
+    "end": 51293,
+    "page": null,
+    "conf": 0.001512758768682233
+   },
+   {
+    "text": "If M&I terminates this Agreement following an Event of Default on the part of Customer, or if Customer terminates this Agreement in accordance with Section 11.1 above without complying with the notification requirements set forth in Section 11.1, then Customer shall pay M&I a termination fee (\"Termination for Cause Fee\") in an amount equal to REDACTED of the Estimated Remaining Value, payable as set forth in Section 11.1 above.  In addition to the foregoing, Customer shall pay to M&I, reasonable Expenses in connection with the disposition of equipment, facilities and contracts related to M&I's performance of the Services on behalf of Customer.  The Termination for Cause Fee shall not be subject to the limitations set forth in Section 13.4.\n\n          B.   If Customer terminates this Agreement following an Event of Default on the part of M&I, Customer shall not be responsible for any termination fees or charges as a result thereof.\n\nREDACTED\n\n     11.4 Termination Assistance.  Commencing six (6) months prior to the expiration of the Term of this Agreement, or upon any termination of this Agreement for any reason, M&I shall provide Customer, at Customer's expense, all necessary assistance to allow the Services to continue without interruption or adverse affect to Customer and to facilitate the orderly transition of Services to Customer or its designee (\"Termination Assistance\").",
+    "start": 51699,
+    "end": 53098,
+    "page": null,
+    "conf": 0.001459558582398878
+   },
+   {
+    "text": "If M&I terminates this Agreement following an Event of Default on the part of Customer, or if Customer terminates this Agreement in accordance with Section 11.1 above without complying with the notification requirements set forth in Section 11.1, then Customer shall pay M&I a termination fee (\"Termination for Cause Fee\") in an amount equal to REDACTED of the Estimated Remaining Value, payable as set forth in Section 11.1 above.  In addition to the foregoing, Customer shall pay to M&I, reasonable Expenses in connection with the disposition of equipment, facilities and contracts related to M&I's performance of the Services on behalf of Customer.  The Termination for Cause Fee shall not be subject to the limitations set forth in Section 13.4.\n\n          B.   If",
+    "start": 51699,
+    "end": 52467,
+    "page": null,
+    "conf": 0.0014192390104272388
+   },
+   {
+    "text": "It shall be an Event of Default on the part of M&I if: (i) M&I becomes insolvent, or a receiver of conservator shall be appointed with respect to M&I; or (ii) M&I shall fail to perform any of its obligations under this Agreement which have a material adverse effect on Customer, and such failure is not cured within 30 days after written notice from Customer; or (iii) M&I fails to meet any Performance Standard and such failure is not cured within ninety (90) days after written notice from Customer.\n\n     12.2 By Customer.  It shall be an Event of Default on the part of the Customer if: (i) Customer becomes insolvent, or a receiver of conservator shall be appointed with respect to the Customer; or (ii) Customer shall fail to pay any sum due M&I within the prescribed time period, and such failure continues for ten days after written notice thereof from M&I; or (iii) Customer shall fail to perform any of its other obligations under this Agreement which have a material adverse effect on M&I, and such failure is not cured within 30 days after written notice from M&I.",
+    "start": 54116,
+    "end": 55192,
+    "page": null,
+    "conf": 0.0013250024485014075
+   },
+   {
+    "text": "If",
+    "start": 51699,
+    "end": 51701,
+    "page": null,
+    "conf": 0.0011993390340497997
+   },
+   {
+    "text": "The Termination for Convenience Fee shall apply to any early termination of this Agreement other than pursuant to an Event of Default on the part of Customer or M&I or pursuant to Section 11.3 below.  Fifty percent of the Termination for Convenience Fee shall be paid to M&I within thirty (30) days following the date of Customer's notice and the remaining 50% shall be paid to M&I within thirty (30) days prior to the Effective Date of Termination.  In addition to the foregoing, Customer shall pay to M&I, any unamortized Conversion or other costs, reasonable Expenses in connection with the disposition of equipment, facilities and contracts related to M&I's performance of the Services on behalf of Customer.  The Termination for Convenience Fee shall not be subject to the limitations set forth in Section 13.4.\n\n     11.2 For Cause.\n\n          A.   If M&I terminates this Agreement following an Event of Default on the part of Customer, or if Customer terminates this Agreement in accordance with Section 11.1 above without complying with the notification requirements set forth in Section 11.1, then Customer shall pay M&I a termination fee (\"Termination for Cause Fee\") in an amount equal to REDACTED of the Estimated Remaining Value, payable as set forth in Section 11.1 above.  In addition to the foregoing, Customer shall pay to M&I, reasonable Expenses in connection with the disposition of equipment, facilities and contracts related to M&I's performance of the Services on behalf of Customer.  The Termination for Cause Fee shall not be subject to the limitations set forth in Section 13.4.\n\n          B.   If Customer terminates this Agreement following an Event of Default on the part of M&I, Customer shall not be responsible for any termination fees or charges as a result thereof.",
+    "start": 50844,
+    "end": 52643,
+    "page": null,
+    "conf": 0.0011309916724340963
+   },
+   {
+    "text": "If M&I terminates this Agreement following an Event of Default on the part of Customer,",
+    "start": 51699,
+    "end": 51786,
+    "page": null,
+    "conf": 0.0011027459542618879
+   }
+  ],
+  "Force Majeure": [
+   {
+    "text": "M&I's performance under this Agreement shall be excused to the extent any delays are caused by the occurrence of an event of force majeure.",
+    "start": 41710,
+    "end": 41849,
+    "page": null,
+    "conf": 0.8285890925725374
+   },
+   {
+    "text": "If a Change in Control occurs with respect to Customer, M&I agrees to continue to provide Services under this Agreement; provided that (a) M&I's obligation to provide Services shall be limited to the entities comprising the Customer prior to such Change in Control and (b) M&I's obligation to provide Services shall be limited in any and all circumstances to the number of accounts and items processed in the 3-month period prior to such Change in Control occurring plus 25%.",
+    "start": 90687,
+    "end": 91162,
+    "page": null,
+    "conf": 0.15016915064823802
+   },
+   {
+    "text": "M&I's performance under this Agreement shall be excused to the extent any delays are caused by the occurrence of an event of force majeure.\n\n     9.2  Banking Applications.  Subject to the nonoccurrence of an event of force majeure as provided in Section 21.1 of this Agreement and the performance of Customer's obligations essential to M&I's performance of its obligations, M&I agrees that the Accounts DP Services will be provided in accordance with the following standards (the \"Performance Standards\").",
+    "start": 41710,
+    "end": 42216,
+    "page": null,
+    "conf": 0.013213605790330152
+   },
+   {
+    "text": "Except as otherwise specified in this Agreement, M&I agrees to perform the Services in accordance with the Performance Standards and, where there are no Performance Standards, in a commercially reasonable manner and with no other or higher degree of care.  M&I's performance under this Agreement shall be excused to the extent any delays are caused by the occurrence of an event of force majeure.",
+    "start": 41453,
+    "end": 41849,
+    "page": null,
+    "conf": 0.0027605769504607178
+   },
+   {
+    "text": "M&I's performance under this Agreement shall be excused to the extent any delays are caused by the occurrence of an event of force majeure",
+    "start": 41710,
+    "end": 41848,
+    "page": null,
+    "conf": 0.0015306248589123815
+   },
+   {
+    "text": "Subject to the nonoccurrence of an event of force majeure as provided in Section 21.1 of this Agreement and the performance of Customer's obligations essential to M&I's performance of its obligations, M&I agrees that the Accounts DP Services will be provided in accordance with the following standards (the \"Performance Standards\").",
+    "start": 41884,
+    "end": 42216,
+    "page": null,
+    "conf": 0.000979435449466941
+   },
+   {
+    "text": "M",
+    "start": 41710,
+    "end": 41711,
+    "page": null,
+    "conf": 0.000495943967573108
+   },
+   {
+    "text": "B.   Change in Control of Customer.  If a Change in Control occurs with respect to Customer, M&I agrees to continue to provide Services under this Agreement; provided that (a) M&I's obligation to provide Services shall be limited to the entities comprising the Customer prior to such Change in Control and (b) M&I's obligation to provide Services shall be limited in any and all circumstances to the number of accounts and items processed in the 3-month period prior to such Change in Control occurring plus 25%.",
+    "start": 90650,
+    "end": 91162,
+    "page": null,
+    "conf": 0.0004741292868564001
+   },
+   {
+    "text": "provided that (a) M&I's obligation to provide Services shall be limited to the entities comprising the Customer prior to such Change in Control and (b) M&I's obligation to provide Services shall be limited in any and all circumstances to the number of accounts and items processed in the 3-month period prior to such Change in Control occurring plus 25%.",
+    "start": 90808,
+    "end": 91162,
+    "page": null,
+    "conf": 0.0004019932337616708
+   },
+   {
+    "text": "If",
+    "start": 90687,
+    "end": 90689,
+    "page": null,
+    "conf": 0.00029799164375660336
+   },
+   {
+    "text": "M&I's performance under this Agreement shall be excused to the extent any delays are caused by the occurrence of an event of force majeure.\n\n     9.2  Banking Applications.  Subject to the nonoccurrence of an event of force majeure as provided in Section 21.1 of this Agreement and the performance of Customer's obligations essential to M&I's performance of its obligations, M&I agrees that the Accounts DP Services will be provided in accordance with the following standards (the \"Performance Standards\").\n\n          A.   Batch Processing. M&I will initiate batch processing and have bank operations reports available for transmission to Customer or make the processed item and reports available, within five (5) hours on all (but two) processing days in a calendar month [fifteen (15) hours at year end] provided M&I receives all input data from Customer at the Operations Center by 1:00 a.m. (local time of the Operations Center).",
+    "start": 41710,
+    "end": 42643,
+    "page": null,
+    "conf": 0.00021977304116160942
+   },
+   {
+    "text": ".",
+    "start": 41848,
+    "end": 41849,
+    "page": null,
+    "conf": 0.00019458746324311184
+   },
+   {
+    "text": "Notwithstanding any provision contained in this Agreement, neither party shall be liable to the other to the extent fulfillment or performance of any terms or provisions of this Agreement is delayed or prevented by revolution or other civil disorders; wars; acts of enemies; strikes; lack of available resources from persons other than parties to this Agreement; labor disputes; electrical equipment or availability failure; fires; floods; acts of God; federal, state or municipal action; statute; ordinance or regulation; or, without limiting the foregoing, any other causes not within its control, and which by the exercise of reasonable diligence it is unable to prevent, whether of the class of causes hereinbefore enumerated or not.",
+    "start": 79748,
+    "end": 80485,
+    "page": null,
+    "conf": 0.00016793055093987323
+   },
+   {
+    "text": "M&I's performance under this Agreement shall be excused to the extent any delays are caused by the occurrence of an event of force majeure.\n\n     9.2  Banking Applications.  Subject",
+    "start": 41710,
+    "end": 41891,
+    "page": null,
+    "conf": 0.00016779927841120668
+   },
+   {
+    "text": "Change in Control of Customer.  If a Change in Control occurs with respect to Customer, M&I agrees to continue to provide Services under this Agreement; provided that (a) M&I's obligation to provide Services shall be limited to the entities comprising the Customer prior to such Change in Control and (b) M&I's obligation to provide Services shall be limited in any and all circumstances to the number of accounts and items processed in the 3-month period prior to such Change in Control occurring plus 25%.",
+    "start": 90655,
+    "end": 91162,
+    "page": null,
+    "conf": 0.00007934550625607327
+   },
+   {
+    "text": "performance under this Agreement shall be excused to the extent any delays are caused by the occurrence of an event of force majeure.",
+    "start": 41716,
+    "end": 41849,
+    "page": null,
+    "conf": 0.00007850296408635651
+   },
+   {
+    "text": "M&I's performance under this Agreement shall be excused to the extent any delays are caused by the occurrence of an event of force majeure.\n\n     9.2  Banking Applications.  Subject to the nonoccurrence of an event of force majeure as provided in Section 21.",
+    "start": 41710,
+    "end": 41968,
+    "page": null,
+    "conf": 0.00004796447352070103
+   },
+   {
+    "text": "M&I's performance under this Agreement shall be excused to the extent any delays are caused by the occurrence of an event of force majeure.\n\n     9.2  Banking Applications.  Subject to the nonoccurrence of an event of force majeure as provided in Section 21.1",
+    "start": 41710,
+    "end": 41969,
+    "page": null,
+    "conf": 0.00004469919353237551
+   },
+   {
+    "text": "Except as otherwise specified in this Agreement, M&I agrees to perform the Services in accordance with the Performance Standards and, where there are no Performance Standards, in a commercially reasonable manner and with no other or higher degree of care.  M&I's performance under this Agreement shall be excused to the extent any delays are caused by the occurrence of an event of force majeure.\n\n     9.2  Banking Applications.  Subject to the nonoccurrence of an event of force majeure as provided in Section 21.1 of this Agreement and the performance of Customer's obligations essential to M&I's performance of its obligations, M&I agrees that the Accounts DP Services will be provided in accordance with the following standards (the \"Performance Standards\").",
+    "start": 41453,
+    "end": 42216,
+    "page": null,
+    "conf": 0.00004402323890603998
+   },
+   {
+    "text": "M&I's performance under this Agreement shall be excused to the extent any delays are caused by the occurrence of an event of force majeure.\n\n     9.2  Banking Applications.  Subject to the nonoccurrence of an event of force majeure as provided in Section 21.1 of this Agreement and the performance of Customer's obligations essential to M&I's performance of its obligations, M&I agrees that the Accounts DP Services will be provided in accordance with the following standards (the \"Performance Standards\").\n\n          A.   Batch Processing. M&I will initiate batch processing and have bank operations reports available for transmission to Customer or make the processed item and reports available, within five (5) hours on all (but two) processing days in a calendar month [fifteen (15) hours at year end] provided M&I receives all input data from Customer at the Operations Center by 1:00 a.m. (local time of the Operations Center).\n\n          B.   On-line Availability.  M&I will ensure that its on-line computing facilities are available for the processing of Customer's on-line transactions at a minimum of ninety-seven point five percent (97.5%) of the time, as prescribed by Customer, measured over a calendar month at the point of departure from M&I's communications controller.",
+    "start": 41710,
+    "end": 42995,
+    "page": null,
+    "conf": 0.00004264177521879086
+   }
+  ],
+  "Dispute Resolution": [
+   {
+    "text": "Accordingly, in the event of a dispute between Customer and M&I, during the pendency of the dispute resolution proceedings described in this Article 15, M&I shall continue to provide the Services and Customer shall continue to pay any undisputed amounts to M&I.",
+    "start": 66233,
+    "end": 66494,
+    "page": null,
+    "conf": 0.238297423246874
+   },
+   {
+    "text": "All disputes arising under or in connection with this Agreement shall initially be referred to the Account Representatives (as defined in Section 18.1).  If the Account Representatives are unable to resolve the dispute within five (5) business days after referral of the matter to them, the managers of the Account Representatives shall attempt to resolve the dispute.  If, after five (5) days they are unable to resolve the dispute, senior executives of the parties shall attempt to resolve the dispute.  If, after give (5) days they are unable to resolve the dispute, the parties shall submit the dispute to the chief executive officers of the parties for resolution.\n\n     15.2 Continuity of Performance.  M&I acknowledges that the provision of the Services is critical to the business and operations of Customer.  Accordingly, in the event of a dispute between Customer and M&I, during the pendency of the dispute resolution proceedings described in this Article 15, M&I shall continue to provide the Services and Customer shall continue to pay any undisputed amounts to M&I.",
+    "start": 65415,
+    "end": 66494,
+    "page": null,
+    "conf": 0.09592818438680846
+   },
+   {
+    "text": "If the Account Representatives are unable to resolve the dispute within five (5) business days after referral of the matter to them, the managers of the Account Representatives shall attempt to resolve the dispute.  If, after five (5) days they are unable to resolve the dispute, senior executives of the parties shall attempt to resolve the dispute.  If, after give (5) days they are unable to resolve the dispute, the parties shall submit the dispute to the chief executive officers of the parties for resolution.\n\n     15.2 Continuity of Performance.  M&I acknowledges that the provision of the Services is critical to the business and operations of Customer.  Accordingly, in the event of a dispute between Customer and M&I, during the pendency of the dispute resolution proceedings described in this Article 15, M&I shall continue to provide the Services and Customer shall continue to pay any undisputed amounts to M&I.",
+    "start": 65569,
+    "end": 66494,
+    "page": null,
+    "conf": 0.08725552167784596
+   },
+   {
+    "text": "If, after give (5) days they are unable to resolve the dispute, the parties shall submit the dispute to the chief executive officers of the parties for resolution.\n\n     15.2 Continuity of Performance.  M&I acknowledges that the provision of the Services is critical to the business and operations of Customer.  Accordingly, in the event of a dispute between Customer and M&I, during the pendency of the dispute resolution proceedings described in this Article 15, M&I shall continue to provide the Services and Customer shall continue to pay any undisputed amounts to M&I.",
+    "start": 65921,
+    "end": 66494,
+    "page": null,
+    "conf": 0.08659647704529352
+   },
+   {
+    "text": "If Customer disputes any charge or amount on any invoice and such dispute cannot be resolved promptly through good faith discussions between the parties, Customer shall pay the amounts due under this Agreement less the disputed amount, and the parties shall diligently proceed to resolve such disputed amount.",
+    "start": 38403,
+    "end": 38712,
+    "page": null,
+    "conf": 0.08545547085643089
+   },
+   {
+    "text": "If, after five (5) days they are unable to resolve the dispute, senior executives of the parties shall attempt to resolve the dispute.  If, after give (5) days they are unable to resolve the dispute, the parties shall submit the dispute to the chief executive officers of the parties for resolution.\n\n     15.2 Continuity of Performance.  M&I acknowledges that the provision of the Services is critical to the business and operations of Customer.  Accordingly, in the event of a dispute between Customer and M&I, during the pendency of the dispute resolution proceedings described in this Article 15, M&I shall continue to provide the Services and Customer shall continue to pay any undisputed amounts to M&I.",
+    "start": 65785,
+    "end": 66494,
+    "page": null,
+    "conf": 0.0814877628225385
+   },
+   {
+    "text": "Following an Event of Default, the non-defaulting party shall have the right to and commence the dispute resolution procedures set forth in Article 15 or to terminate this Agreement and collect its Damages.",
+    "start": 55215,
+    "end": 55421,
+    "page": null,
+    "conf": 0.04457128521626208
+   },
+   {
+    "text": "All disputes arising under or in connection with this Agreement shall initially be referred to the Account Representatives (as defined in Section 18.1).  If the Account Representatives are unable to resolve the dispute within five (5) business days after referral of the matter to them, the managers of the Account Representatives shall attempt to resolve the dispute.  If, after five (5) days they are unable to resolve the dispute, senior executives of the parties shall attempt to resolve the dispute.  If, after give (5) days they are unable to resolve the dispute, the parties shall submit the dispute to the chief executive officers of the parties for resolution.",
+    "start": 65415,
+    "end": 66084,
+    "page": null,
+    "conf": 0.03911496403429291
+   },
+   {
+    "text": "If the Account Representatives are unable to resolve the dispute within five (5) business days after referral of the matter to them, the managers of the Account Representatives shall attempt to resolve the dispute.  If, after five (5) days they are unable to resolve the dispute, senior executives of the parties shall attempt to resolve the dispute.  If, after give (5) days they are unable to resolve the dispute, the parties shall submit the dispute to the chief executive officers of the parties for resolution.",
+    "start": 65569,
+    "end": 66084,
+    "page": null,
+    "conf": 0.035578595636628886
+   },
+   {
+    "text": "If, after give (5) days they are unable to resolve the dispute, the parties shall submit the dispute to the chief executive officers of the parties for resolution.",
+    "start": 65921,
+    "end": 66084,
+    "page": null,
+    "conf": 0.03530993635264633
+   },
+   {
+    "text": "If, after five (5) days they are unable to resolve the dispute, senior executives of the parties shall attempt to resolve the dispute.  If, after give (5) days they are unable to resolve the dispute, the parties shall submit the dispute to the chief executive officers of the parties for resolution.",
+    "start": 65785,
+    "end": 66084,
+    "page": null,
+    "conf": 0.033226781607022644
+   },
+   {
+    "text": "All disputes arising under or in connection with this Agreement shall initially be referred to the Account Representatives (as defined in Section 18.1).",
+    "start": 65415,
+    "end": 65567,
+    "page": null,
+    "conf": 0.029117158684884716
+   },
+   {
+    "text": "All disputes arising under or in connection with this Agreement shall initially be referred to the Account Representatives (as defined in Section 18.1).  If the Account Representatives are unable to resolve the dispute within five (5) business days after referral of the matter to them, the managers of the Account Representatives shall attempt to resolve the dispute.",
+    "start": 65415,
+    "end": 65783,
+    "page": null,
+    "conf": 0.02304868628933171
+   },
+   {
+    "text": "If the Account Representatives are unable to resolve the dispute within five (5) business days after referral of the matter to them, the managers of the Account Representatives shall attempt to resolve the dispute.",
+    "start": 65569,
+    "end": 65783,
+    "page": null,
+    "conf": 0.02096490368310581
+   },
+   {
+    "text": "All disputes arising under or in connection with this Agreement shall initially be referred to the Account Representatives (as defined in Section 18.1).  If the Account Representatives are unable to resolve the dispute within five (5) business days after referral of the matter to them, the managers of the Account Representatives shall attempt to resolve the dispute.  If, after five (5) days they are unable to resolve the dispute, senior executives of the parties shall attempt to resolve the dispute.",
+    "start": 65415,
+    "end": 65919,
+    "page": null,
+    "conf": 0.017332546562662317
+   },
+   {
+    "text": "If the Account Representatives are unable to resolve the dispute within five (5) business days after referral of the matter to them, the managers of the Account Representatives shall attempt to resolve the dispute.  If, after five (5) days they are unable to resolve the dispute, senior executives of the parties shall attempt to resolve the dispute.",
+    "start": 65569,
+    "end": 65919,
+    "page": null,
+    "conf": 0.015765547966929187
+   },
+   {
+    "text": "If, after five (5) days they are unable to resolve the dispute, senior executives of the parties shall attempt to resolve the dispute.",
+    "start": 65785,
+    "end": 65919,
+    "page": null,
+    "conf": 0.01472341473402322
+   },
+   {
+    "text": "M&I acknowledges that the provision of the Services is critical to the business and operations of Customer.  Accordingly, in the event of a dispute between Customer and M&I, during the pendency of the dispute resolution proceedings described in this Article 15, M&I shall continue to provide the Services and Customer shall continue to pay any undisputed amounts to M&I.",
+    "start": 66124,
+    "end": 66494,
+    "page": null,
+    "conf": 0.012436252841712233
+   },
+   {
+    "text": "If agreement with respect to the disputed amount is not reached within thirty (30) days after the date on which payment was due, Customer shall pay the disputed amount into an interest-bearing independent escrow account for the benefit of the prevailing party, pending resolution of the dispute.",
+    "start": 39356,
+    "end": 39651,
+    "page": null,
+    "conf": 0.002296442215959396
+   },
+   {
+    "text": "If Customer disputes any charge or amount on any invoice and such dispute cannot be resolved promptly through good faith discussions between the parties, Customer shall pay the amounts due under this Agreement less the disputed amount, and the parties shall diligently proceed to resolve such disputed amount.  An amount will be considered disputed in good faith if (i) Customer delivers a written statement to M&I on or before the due date of the invoice, describing in detail the basis of the dispute and the amount being withheld by Customer, (ii) such written statement represents that the amount in dispute has been determined after due investigation of the facts and that such disputed amount has been determined in good faith, (iii) such dispute has been submitted by Customer for resolution to the proper party, and (iv) all other amounts due from Customer that are not in dispute have been paid in accordance with the terms of this Agreement.",
+    "start": 38403,
+    "end": 39354,
+    "page": null,
+    "conf": 0.001489071240532016
+   }
+  ],
+  "Data Protection": [
+   {
+    "text": "M&I shall be responsible for, and shall establish and maintain safeguards against, a disaster, loss or alteration of the Customer Data in the possession of M&I.  Such safeguard shall be no less rigorous than that M&I uses to protect its own data of a similar nature.",
+    "start": 72592,
+    "end": 72858,
+    "page": null,
+    "conf": 0.3413812931087956
+   },
+   {
+    "text": "M&I shall be responsible for, and shall establish and maintain safeguards against, a disaster, loss or alteration of the Customer Data in the possession of M&I.",
+    "start": 72592,
+    "end": 72752,
+    "page": null,
+    "conf": 0.2993599321632758
+   },
+   {
+    "text": "Such safeguard shall be no less rigorous than that M&I uses to protect its own data of a similar nature.",
+    "start": 72754,
+    "end": 72858,
+    "page": null,
+    "conf": 0.24762582897512314
+   },
+   {
+    "text": "M&I shall be responsible for, and shall establish and maintain safeguards against, a disaster, loss or alteration of the Customer Data in the possession of M&I",
+    "start": 72592,
+    "end": 72751,
+    "page": null,
+    "conf": 0.012010330994401061
+   },
+   {
+    "text": "Throughout the Term of this Agreement, M&I shall maintain at all times at its own cost and expense:\n\n               1.   Commercial General Liability Insurance covering its premises, including bodily injury, property damage, broad form contractual\n\n\n\n\n\nliability and independent contractors, with primary limits of not less than two million dollars ($2,000,000).",
+    "start": 58759,
+    "end": 59121,
+    "page": null,
+    "conf": 0.002938888271896406
+   },
+   {
+    "text": "Throughout the Term of this Agreement, M&I shall maintain at all times at its own cost and expense:\n\n               1.   Commercial General Liability Insurance covering its premises, including bodily injury, property damage, broad form contractual\n\n\n\n\n\nliability and independent contractors, with primary limits of not less than two million dollars ($2,000,000).\n\n               2.   Fidelity Insurance covering employee dishonesty with respect to all aspects of the Services, in an amount not less than ten million dollars ($10,000,000).",
+    "start": 58759,
+    "end": 59297,
+    "page": null,
+    "conf": 0.0023954137416444454
+   },
+   {
+    "text": "Throughout the Term of this Agreement, M&I shall maintain at all times at its own cost and expense:\n\n               1.   Commercial General Liability Insurance covering its premises, including bodily injury, property damage, broad form contractual\n\n\n\n\n\nliability and independent contractors, with primary limits of not less than two million dollars ($2,000,000).\n\n               2.   Fidelity Insurance covering employee dishonesty with respect to all aspects of the Services, in an amount not less than ten million dollars ($10,000,000).\n\n               3.   Workers' Compensation Insurance as mandated or allowed by the state in which the Services are being performed, including at least five hundred thousand dollars ($500,000) coverage for Employer's Liability.\n\n               4.   All Risk Property Insurance in an amount adequate to cover the cost of replacement of all equipment, improvements, and betterments at M&I locations in the event of loss or damage.\n\n          B.   All  policies of such insurance shall be written by a carrier or carriers rated \"A\" or above by Best, shall contain a clause requiring the carrier to give Customer at least thirty (30) days' prior written notice of any material change or cancellation of coverage for any reason, and simultaneously with M&I's execution of this Agreement, and annually thereafter, at Customer's request, M&I shall deliver to Customer original Certificates of Insurance evidencing the coverage required by this Section.",
+    "start": 58759,
+    "end": 60242,
+    "page": null,
+    "conf": 0.0021030345623191454
+   },
+   {
+    "text": "Customer Data in the possession of M&I.  Such safeguard shall be no less rigorous than that M&I uses to protect its own data of a similar nature.",
+    "start": 72713,
+    "end": 72858,
+    "page": null,
+    "conf": 0.0016632486053772767
+   },
+   {
+    "text": "Throughout the Term of this Agreement, M&I shall maintain at all times at its own cost and expense:\n\n               1.   Commercial General Liability Insurance covering its premises, including bodily injury, property damage, broad form contractual\n\n\n\n\n\nliability and independent contractors, with primary limits of not less than two million dollars ($2,000,000).\n\n               2.   Fidelity Insurance covering employee dishonesty with respect to all aspects of the Services, in an amount not less than ten million dollars ($10,000,000).\n\n               3.   Workers' Compensation Insurance as mandated or allowed by the state in which the Services are being performed, including at least five hundred thousand dollars ($500,000) coverage for Employer's Liability.\n\n               4.   All Risk Property Insurance in an amount adequate to cover the cost of replacement of all equipment, improvements, and betterments at M&I locations in the event of loss or damage.",
+    "start": 58759,
+    "end": 59725,
+    "page": null,
+    "conf": 0.0016567436735376692
+   },
+   {
+    "text": "M&I shall be responsible for, and shall establish and maintain safeguards against, a disaster, loss or alteration of the Customer Data in the possession of M&I.  Such",
+    "start": 72592,
+    "end": 72758,
+    "page": null,
+    "conf": 0.001655742260183749
+   },
+   {
+    "text": "Customer Data in the possession of M&I.",
+    "start": 72713,
+    "end": 72752,
+    "page": null,
+    "conf": 0.0014585157409832776
+   },
+   {
+    "text": "Such",
+    "start": 72754,
+    "end": 72758,
+    "page": null,
+    "conf": 0.0012010175983119104
+   },
+   {
+    "text": "Customer may terminate this Agreement during the Term upon at least one (1) years' written notice to M&I, provided that Customer pays M&I an early termination fee (\"Termination for Convenience Fee\") in an amount equal to REDACTED of the Estimated Remaining Value.",
+    "start": 50579,
+    "end": 50842,
+    "page": null,
+    "conf": 0.0011222346763055755
+   },
+   {
+    "text": "Throughout the Term of this Agreement, M&I shall maintain at all times at its own cost and expense:\n\n               1.   Commercial General Liability Insurance covering its premises, including bodily injury, property damage, broad form contractual\n\n\n\n\n\nliability and independent contractors, with primary limits of not less than two million dollars ($2,000,000).\n\n               2.   Fidelity Insurance covering employee dishonesty with respect to all aspects of the Services, in an amount not less than ten million dollars ($10,000,000).\n\n               3.   Workers' Compensation Insurance as mandated or allowed by the state in which the Services are being performed, including at least five hundred thousand dollars ($500,000) coverage for Employer's Liability.",
+    "start": 58759,
+    "end": 59524,
+    "page": null,
+    "conf": 0.0009131415697795586
+   },
+   {
+    "text": "Throughout the Term of this Agreement, M&I shall maintain at all times at its own cost and expense:",
+    "start": 58759,
+    "end": 58858,
+    "page": null,
+    "conf": 0.0008991938368752792
+   },
+   {
+    "text": "Workers' Compensation Insurance as mandated or allowed by the state in which the Services are being performed, including at least five hundred thousand dollars ($500,000) coverage for Employer's Liability.\n\n               4.   All Risk Property Insurance in an amount adequate to cover the cost of replacement of all equipment, improvements, and betterments at M&I locations in the event of loss or damage.\n\n          B.   All  policies of such insurance shall be written by a carrier or carriers rated \"A\" or above by Best, shall contain a clause requiring the carrier to give Customer at least thirty (30) days' prior written notice of any material change or cancellation of coverage for any reason, and simultaneously with M&I's execution of this Agreement, and annually thereafter, at Customer's request, M&I shall deliver to Customer original Certificates of Insurance evidencing the coverage required by this Section.",
+    "start": 59319,
+    "end": 60242,
+    "page": null,
+    "conf": 0.0007652800421011223
+   },
+   {
+    "text": ".",
+    "start": 72857,
+    "end": 72858,
+    "page": null,
+    "conf": 0.0006577971373923973
+   },
+   {
+    "text": "Workers' Compensation Insurance as mandated or allowed by the state in which the Services are being performed, including at least five hundred thousand dollars ($500,000) coverage for Employer's Liability.\n\n               4.   All Risk Property Insurance in an amount adequate to cover the cost of replacement of all equipment, improvements, and betterments at M&I locations in the event of loss or damage.",
+    "start": 59319,
+    "end": 59725,
+    "page": null,
+    "conf": 0.0006028778085499052
+   },
+   {
+    "text": "M",
+    "start": 72592,
+    "end": 72593,
+    "page": null,
+    "conf": 0.00047971457066257374
+   },
+   {
+    "text": "Commercial General Liability Insurance covering its premises, including bodily injury, property damage, broad form contractual\n\n\n\n\n\nliability and independent contractors, with primary limits of not less than two million dollars ($2,000,000).",
+    "start": 58880,
+    "end": 59121,
+    "page": null,
+    "conf": 0.000363434677752528
+   }
   ]
  },
  "timing": {
-  "extract_s": 184.1
+  "extract_s": 220.3
  }
 }

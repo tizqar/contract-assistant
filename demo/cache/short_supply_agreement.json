@@ -5842,9 +5842,1145 @@
     "page": null,
     "conf": 1.6361659673633039e-9
    }
+  ],
+  "Payment Terms": [
+   {
+    "text": "Unless separate payment terms are agreed to outside of this Agreement by both parties in writing, payment terms will be as follows: (i) 50% of the Total Order Cost must be paid on placement of the customer's order. (ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer.",
+    "start": 7061,
+    "end": 7397,
+    "page": null,
+    "conf": 0.4357872300768379
+   },
+   {
+    "text": "Unless separate payment terms are agreed to outside of this Agreement by both parties in writing, payment terms will be as follows: (i) 50% of the Total Order Cost must be paid on placement of the customer's order.",
+    "start": 7061,
+    "end": 7275,
+    "page": null,
+    "conf": 0.21978139612850664
+   },
+   {
+    "text": "(ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer.",
+    "start": 7276,
+    "end": 7397,
+    "page": null,
+    "conf": 0.099686640205382
+   },
+   {
+    "text": "The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer.",
+    "start": 7281,
+    "end": 7397,
+    "page": null,
+    "conf": 0.0760718547440851
+   },
+   {
+    "text": "Unless separate payment terms are agreed to outside of this Agreement by both parties in writing, payment terms will be as follows:",
+    "start": 7061,
+    "end": 7192,
+    "page": null,
+    "conf": 0.06377487018228734
+   },
+   {
+    "text": "50% of the Total Order Cost must be paid on placement of the customer's order. (ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer.",
+    "start": 7197,
+    "end": 7397,
+    "page": null,
+    "conf": 0.036809668241401826
+   },
+   {
+    "text": "50% of the Total Order Cost must be paid on placement of the customer's order.",
+    "start": 7197,
+    "end": 7275,
+    "page": null,
+    "conf": 0.020994168874337915
+   },
+   {
+    "text": "Unless separate payment terms are agreed to outside of this Agreement by both parties in writing, payment terms will be as follows: (i) 50% of the Total Order Cost must be paid on placement of the customer's order. (ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer. The Manufacturer will notify the Customer when the goods are ready for shipment prior to the goods leaving the warehouse.",
+    "start": 7061,
+    "end": 7519,
+    "page": null,
+    "conf": 0.014343893568712063
+   },
+   {
+    "text": "(ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer. The Manufacturer will notify the Customer when the goods are ready for shipment prior to the goods leaving the warehouse.",
+    "start": 7276,
+    "end": 7519,
+    "page": null,
+    "conf": 0.006859053747772745
+   },
+   {
+    "text": "The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer. The Manufacturer will notify the Customer when the goods are ready for shipment prior to the goods leaving the warehouse.",
+    "start": 7281,
+    "end": 7519,
+    "page": null,
+    "conf": 0.005234211317659298
+   },
+   {
+    "text": "(i) 50% of the Total Order Cost must be paid on placement of the customer's order. (ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer.",
+    "start": 7193,
+    "end": 7397,
+    "page": null,
+    "conf": 0.004375074282345709
+   },
+   {
+    "text": "50% of the Total Order Cost must be paid on placement of the customer's order. (ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer. The Manufacturer will notify the Customer when the goods are ready for shipment prior to the goods leaving the warehouse.",
+    "start": 7197,
+    "end": 7519,
+    "page": null,
+    "conf": 0.0025327363220603587
+   },
+   {
+    "text": "(i) 50% of the Total Order Cost must be paid on placement of the customer's order.",
+    "start": 7193,
+    "end": 7275,
+    "page": null,
+    "conf": 0.002495292066398593
+   },
+   {
+    "text": "Unless separate payment terms are agreed to outside of this Agreement by both parties in writing, payment terms will be as follows: (i) 50% of the Total Order Cost must be paid on placement of the customer's order. (ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer. The",
+    "start": 7061,
+    "end": 7401,
+    "page": null,
+    "conf": 0.0024056335507054148
+   },
+   {
+    "text": "(ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer",
+    "start": 7276,
+    "end": 7396,
+    "page": null,
+    "conf": 0.002267171238597987
+   },
+   {
+    "text": "Unless separate payment terms are agreed to outside of this Agreement by both parties in writing, payment terms will be as follows: (i) 50% of the Total Order Cost must be paid on placement of the customer's order. (ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer",
+    "start": 7061,
+    "end": 7396,
+    "page": null,
+    "conf": 0.0018887977433536837
+   },
+   {
+    "text": "The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer",
+    "start": 7281,
+    "end": 7396,
+    "page": null,
+    "conf": 0.001730097351371486
+   },
+   {
+    "text": "payment terms will be as follows: (i) 50% of the Total Order Cost must be paid on placement of the customer's order. (ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer.",
+    "start": 7159,
+    "end": 7397,
+    "page": null,
+    "conf": 0.0011192015682659094
+   },
+   {
+    "text": "Unless",
+    "start": 7061,
+    "end": 7067,
+    "page": null,
+    "conf": 0.0009765592766644676
+   },
+   {
+    "text": "(ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer. The",
+    "start": 7276,
+    "end": 7401,
+    "page": null,
+    "conf": 0.0008637342515052751
+   }
+  ],
+  "Delivery": [
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works.",
+    "start": 5347,
+    "end": 5618,
+    "page": null,
+    "conf": 0.6835448393891438
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works",
+    "start": 5347,
+    "end": 5617,
+    "page": null,
+    "conf": 0.13870643210597688
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment. 5.3 Rejection of defective products The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer. Products not rejected within the foregoing time periods shall be deemed accepted by the Customer. In the event that the Manufacturer determines that the returned Product is defective and properly rejected by the Customer, the Manufacturer shall credit to the Customer the value of the defective product and the associated shipping costs. 5.4 Payment terms Unless separate payment terms are agreed to outside of this Agreement by both parties in writing, payment terms will be as follows: (i) 50% of the Total Order Cost must be paid on placement of the customer's order. (ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer. The Manufacturer will notify the Customer when the goods are ready for shipment prior to the goods leaving the warehouse.",
+    "start": 5347,
+    "end": 7519,
+    "page": null,
+    "conf": 0.013630532619408171
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer.",
+    "start": 5347,
+    "end": 5886,
+    "page": null,
+    "conf": 0.005862676212887316
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The",
+    "start": 5347,
+    "end": 5622,
+    "page": null,
+    "conf": 0.005563463582228339
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses.",
+    "start": 5347,
+    "end": 5693,
+    "page": null,
+    "conf": 0.005073810468920956
+   },
+   {
+    "text": "Products",
+    "start": 5347,
+    "end": 5355,
+    "page": null,
+    "conf": 0.005025787041277381
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories.",
+    "start": 5347,
+    "end": 5803,
+    "page": null,
+    "conf": 0.004755588509865113
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment. 5.3 Rejection of defective products The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer. Products not rejected within the foregoing time periods shall be deemed accepted by the Customer. In the event that the Manufacturer determines that the returned Product is defective and properly rejected by the Customer, the Manufacturer shall credit to the Customer the value of the defective product and the associated shipping costs. 5.4 Payment terms Unless separate payment terms are agreed to outside of this Agreement by both parties in writing, payment terms will be as follows: (i) 50% of the Total Order Cost must be paid on placement of the customer's order. (ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer.",
+    "start": 5347,
+    "end": 7397,
+    "page": null,
+    "conf": 0.002880199106096011
+   },
+   {
+    "text": "Shipping Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works.",
+    "start": 5338,
+    "end": 5618,
+    "page": null,
+    "conf": 0.0028466139078026725
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment. 5.3 Rejection of defective products The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer.",
+    "start": 5347,
+    "end": 6704,
+    "page": null,
+    "conf": 0.0024705926249781055
+   },
+   {
+    "text": "The Manufacturer covenants not to sell any product listed in this agreement, or product name (as listed in schedule A of this agreement) to any other party without prior written consent of the Customer. 4. COVENANTS BY THE CUSTOMER 4.1 Compliance with Local Laws and Regulations The Customer covenants that it is and will remain for the term of this agreement in compliance with any and all Local Laws and Regulations. This includes without limitation laws relating to business practice, workplace relations, safety and taxation. 4.2 Ability to Perform The Customer covenants that it is and will remain for the term of this agreement willing and able to perform any and all of its obligations under this agreement. 4.3 Market Penetration The Customer covenants to give its best endeavours to establish and develop a market for the Products in the Territories with maximum market penetration. ODM Supply Agreement 4 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n5. SHIPPING AND PAYMENT TERMS 5.1 Shipping Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works.",
+    "start": 4273,
+    "end": 5618,
+    "page": null,
+    "conf": 0.0016041840496737595
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment. 5.3 Rejection of defective products The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer. Products not rejected within the foregoing time periods shall be deemed accepted by the Customer. In the event that the Manufacturer determines that the returned Product is defective and properly rejected by the Customer, the Manufacturer shall credit to the Customer the value of the defective product and the associated shipping costs. 5.4 Payment terms Unless separate payment terms are agreed to outside of this Agreement by both parties in writing, payment terms will be as follows: (i) 50% of the Total Order Cost must be paid on placement of the customer's order. (ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer. The",
+    "start": 5347,
+    "end": 7401,
+    "page": null,
+    "conf": 0.0014457131911998257
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment. 5.3 Rejection of defective products The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer. Products not rejected within the foregoing time periods shall be deemed accepted by the Customer.",
+    "start": 5347,
+    "end": 6802,
+    "page": null,
+    "conf": 0.0011197888169620243
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment. 5.3 Rejection of defective products The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer. Products not rejected within the foregoing time periods shall be deemed accepted by the Customer. In the event that the Manufacturer determines that the returned Product is defective and properly rejected by the Customer, the Manufacturer shall credit to the Customer the value of the defective product and the associated shipping costs. 5.4 Payment terms Unless separate payment terms are agreed to outside of this Agreement by both parties in writing, payment terms will be as follows: (i) 50% of the Total Order Cost must be paid on placement of the customer's order.",
+    "start": 5347,
+    "end": 7275,
+    "page": null,
+    "conf": 0.0010142879753155458
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The",
+    "start": 5347,
+    "end": 5697,
+    "page": null,
+    "conf": 0.0009141594362099478
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment. 5.3 Rejection of defective products The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer. Products not rejected within the foregoing time periods shall be deemed accepted by the Customer. In the event that the Manufacturer determines that the returned Product is defective and properly rejected by the Customer, the Manufacturer shall credit to the Customer the value of the defective product and the associated shipping costs. 5.4 Payment terms Unless separate payment terms are agreed to outside of this Agreement by both parties in writing, payment terms will be as follows:",
+    "start": 5347,
+    "end": 7192,
+    "page": null,
+    "conf": 0.0008582026694799972
+   },
+   {
+    "text": "delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works.",
+    "start": 5356,
+    "end": 5618,
+    "page": null,
+    "conf": 0.0007936948525145143
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories",
+    "start": 5347,
+    "end": 5802,
+    "page": null,
+    "conf": 0.0007752024658903661
+   },
+   {
+    "text": "Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment. 5.3 Rejection of defective products The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer. Products not rejected within the foregoing time periods shall be deemed accepted by the Customer. In the event that the Manufacturer determines that the returned Product is defective and properly rejected by the Customer, the Manufacturer shall credit to the Customer the value of the defective product and the associated shipping costs. 5.4 Payment terms Unless separate payment terms are agreed to outside of this Agreement by both parties in writing, payment terms will be as follows: (i) 50% of the Total Order Cost must be paid on placement of the customer's order. (ii) The remaining 50% of the total order cost must be paid prior to the goods leaving the warehouse of the manufacturer",
+    "start": 5347,
+    "end": 7396,
+    "page": null,
+    "conf": 0.0006389272612580672
+   }
+  ],
+  "Confidentiality": [
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement:",
+    "start": 8841,
+    "end": 9041,
+    "page": null,
+    "conf": 0.0005994730728850718
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays).",
+    "start": 8841,
+    "end": 9556,
+    "page": null,
+    "conf": 0.00006976291277995678
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party.",
+    "start": 8841,
+    "end": 9870,
+    "page": null,
+    "conf": 0.00006895787698913164
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice.",
+    "start": 8841,
+    "end": 9304,
+    "page": null,
+    "conf": 0.00005012813262750377
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement.",
+    "start": 8841,
+    "end": 9747,
+    "page": null,
+    "conf": 0.00003605671620493754
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party. ODM Supply Agreement 6 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n(e) If control of either party shall pass from the present shareholders or owners or controllers to other persons whom the other party shall in their absolute discretion regard as unsuitable. (f) Either parties voting stock is transferred to any third party to such extent as to result in a change in effective control of the company or its ownership or active management is changed in any other manner. The termination of this agreement shall be without prejudice to the rights of either party to payment or other claims due or accrued up to the termination of this agreement. For termination to be effective, written notice of termination must be served on the other party. Where valid, termination takes effect immediately upon service. 8. ARBITRATION 8.1 Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland.",
+    "start": 8841,
+    "end": 11149,
+    "page": null,
+    "conf": 0.00003143823656965811
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement",
+    "start": 8841,
+    "end": 9040,
+    "page": null,
+    "conf": 0.000028295074237627133
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party. ODM Supply Agreement 6 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n(e) If control of either party shall pass from the present shareholders or owners or controllers to other persons whom the other party shall in their absolute discretion regard as unsuitable.",
+    "start": 8841,
+    "end": 10201,
+    "page": null,
+    "conf": 0.00002156183570411523
+   },
+   {
+    "text": "The Manufacturer covenants not to sell any product listed in this agreement, or product name (as listed in schedule A of this agreement) to any other party without prior written consent of the Customer. 4. COVENANTS BY THE CUSTOMER 4.1 Compliance with Local Laws and Regulations The Customer covenants that it is and will remain for the term of this agreement in compliance with any and all Local Laws and Regulations. This includes without limitation laws relating to business practice, workplace relations, safety and taxation. 4.2 Ability to Perform The Customer covenants that it is and will remain for the term of this agreement willing and able to perform any and all of its obligations under this agreement. 4.3 Market Penetration The Customer covenants to give its best endeavours to establish and develop a market for the Products in the Territories with maximum market penetration. ODM Supply Agreement 4 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n5. SHIPPING AND PAYMENT TERMS 5.1 Shipping Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment. 5.3 Rejection of defective products The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer.",
+    "start": 4273,
+    "end": 6704,
+    "page": null,
+    "conf": 0.000019906808620565383
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party. ODM Supply Agreement 6 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n(e) If control of either party shall pass from the present shareholders or owners or controllers to other persons whom the other party shall in their absolute discretion regard as unsuitable. (f) Either parties voting stock is transferred to any third party to such extent as to result in a change in effective control of the company or its ownership or active management is changed in any other manner.",
+    "start": 8841,
+    "end": 10413,
+    "page": null,
+    "conf": 0.0000198770250821073
+   },
+   {
+    "text": "The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer.",
+    "start": 6118,
+    "end": 6704,
+    "page": null,
+    "conf": 0.000019426974421370337
+   },
+   {
+    "text": "Where the breach is rectifiable, the breaching party has 21 days from the date of notification of its breach to rectify. Following the expiry of this period, the non-breaching party may execute any rights it may have both in law and under this agreement. 7.3 Rights to termination Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement:",
+    "start": 8560,
+    "end": 9041,
+    "page": null,
+    "conf": 0.000011466709455310316
+   },
+   {
+    "text": "The Manufacturer covenants not to sell any product listed in this agreement, or product name (as listed in schedule A of this agreement) to any other party without prior written consent of the Customer.",
+    "start": 4273,
+    "end": 4475,
+    "page": null,
+    "conf": 0.00001131544997260741
+   },
+   {
+    "text": "The Manufacturing Companies utilised by the Agent to manufacture the products listed in Schedule A of this agreement shall maintain throughout the term of this agreement product liability insurance issued by a reputable insurance company under standard terms and conditions in the industry to cover the liability of the Customer and to indemnity the Customer from any costs, expenses, loss or damages resulting from any act, neglect or default of the company. 6.2 The Customer shall at all times during the term of this agreement maintain product liability insurance, covering all products sold by the Manufacturer to the Customer and which policy shall name the Manufacturer as Additional Insured. 7. BREACH / TERMINATION 7.1 Notice of Breach Each party has an obligation to notify immediately the other party of any breach of this agreement. 7.2 Rectification of Breach Where the breach is rectifiable, the breaching party has 21 days from the date of notification of its breach to rectify. Following the expiry of this period, the non-breaching party may execute any rights it may have both in law and under this agreement. 7.3 Rights to termination Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement:",
+    "start": 7688,
+    "end": 9041,
+    "page": null,
+    "conf": 7.156616088582918e-6
+   },
+   {
+    "text": "The Manufacturer covenants not to sell any product listed in this agreement, or product name (as listed in schedule A of this agreement) to any other party without prior written consent of the Customer. 4. COVENANTS BY THE CUSTOMER 4.1 Compliance with Local Laws and Regulations The Customer covenants that it is and will remain for the term of this agreement in compliance with any and all Local Laws and Regulations. This includes without limitation laws relating to business practice, workplace relations, safety and taxation. 4.2 Ability to Perform The Customer covenants that it is and will remain for the term of this agreement willing and able to perform any and all of its obligations under this agreement. 4.3 Market Penetration The Customer covenants to give its best endeavours to establish and develop a market for the Products in the Territories with maximum market penetration. ODM Supply Agreement 4 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n5. SHIPPING AND PAYMENT TERMS 5.1 Shipping Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment. 5.3 Rejection of defective products The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer. Products not rejected within the foregoing time periods shall be deemed accepted by the Customer.",
+    "start": 4273,
+    "end": 6802,
+    "page": null,
+    "conf": 7.136302817957274e-6
+   },
+   {
+    "text": "The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer. Products not rejected within the foregoing time periods shall be deemed accepted by the Customer.",
+    "start": 6118,
+    "end": 6802,
+    "page": null,
+    "conf": 6.9642892012527695e-6
+   },
+   {
+    "text": "The Customer shall at all times during the term of this agreement maintain product liability insurance, covering all products sold by the Manufacturer to the Customer and which policy shall name the Manufacturer as Additional Insured. 7. BREACH / TERMINATION 7.1 Notice of Breach Each party has an obligation to notify immediately the other party of any breach of this agreement. 7.2 Rectification of Breach Where the breach is rectifiable, the breaching party has 21 days from the date of notification of its breach to rectify. Following the expiry of this period, the non-breaching party may execute any rights it may have both in law and under this agreement. 7.3 Rights to termination Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement:",
+    "start": 8152,
+    "end": 9041,
+    "page": null,
+    "conf": 5.82192880294931e-6
+   },
+   {
+    "text": "The Customer covenants to give its best endeavours to establish and develop a market for the Products in the Territories with maximum market penetration. ODM Supply Agreement 4 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n5. SHIPPING AND PAYMENT TERMS 5.1 Shipping Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment. 5.3 Rejection of defective products The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer.",
+    "start": 5011,
+    "end": 6704,
+    "page": null,
+    "conf": 5.675363740720237e-6
+   },
+   {
+    "text": "The Manufacturer covenants not to sell any product listed in this agreement, or product name (as listed in schedule A of this agreement) to any other party without prior written consent of the Customer. 4. COVENANTS BY THE CUSTOMER 4.1 Compliance with Local Laws and Regulations The Customer covenants that it is and will remain for the term of this agreement in compliance with any and all Local Laws and Regulations. This includes without limitation laws relating to business practice, workplace relations, safety and taxation. 4.2 Ability to Perform The Customer covenants that it is and will remain for the term of this agreement willing and able to perform any and all of its obligations under this agreement. 4.3 Market Penetration The Customer covenants to give its best endeavours to establish and develop a market for the Products in the Territories with maximum market penetration.",
+    "start": 4273,
+    "end": 5164,
+    "page": null,
+    "conf": 5.658847377261886e-6
+   },
+   {
+    "text": "The Manufacturer covenants not to sell any product listed in this agreement, or product name (as listed in schedule A of this agreement) to any other party without prior written consent of the Customer. 4. COVENANTS BY THE CUSTOMER 4.1 Compliance with Local Laws and Regulations The Customer covenants that it is and will remain for the term of this agreement in compliance with any and all Local Laws and Regulations. This includes without limitation laws relating to business practice, workplace relations, safety and taxation. 4.2 Ability to Perform The Customer covenants that it is and will remain for the term of this agreement willing and able to perform any and all of its obligations under this agreement. 4.3 Market Penetration The Customer covenants to give its best endeavours to establish and develop a market for the Products in the Territories with maximum market penetration. ODM Supply Agreement 4 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n5. SHIPPING AND PAYMENT TERMS 5.1 Shipping Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment.",
+    "start": 4273,
+    "end": 6081,
+    "page": null,
+    "conf": 4.467886454806816e-6
+   }
+  ],
+  "Indemnification": [
+   {
+    "text": "The Manufacturer indemnifies the Customer for the same.",
+    "start": 3489,
+    "end": 3544,
+    "page": null,
+    "conf": 0.8601183405240886
+   },
+   {
+    "text": "The Manufacturing Companies utilised by the Agent to manufacture the products listed in Schedule A of this agreement shall maintain throughout the term of this agreement product liability insurance issued by a reputable insurance company under standard terms and conditions in the industry to cover the liability of the Customer and to indemnity the Customer from any costs, expenses, loss or damages resulting from any act, neglect or default of the company.",
+    "start": 7688,
+    "end": 8147,
+    "page": null,
+    "conf": 0.11926986278223008
+   },
+   {
+    "text": "The Manufacturer indemnifies the Customer for the same",
+    "start": 3489,
+    "end": 3543,
+    "page": null,
+    "conf": 0.011244781479281677
+   },
+   {
+    "text": "The",
+    "start": 3489,
+    "end": 3492,
+    "page": null,
+    "conf": 0.0052516287260212825
+   },
+   {
+    "text": "The Manufacturer covenants that the Products are clear of any Intellectual Property claims by third parties and that the Customer has full rights to sell and market the Products worldwide. The Manufacturer indemnifies the Customer for the same.",
+    "start": 3300,
+    "end": 3544,
+    "page": null,
+    "conf": 0.000813338111208181
+   },
+   {
+    "text": "The Manufacturing Companies utilised by the Agent to manufacture the products listed in Schedule A of this agreement shall maintain throughout the term of this agreement product liability insurance issued by a reputable insurance company under standard terms and conditions in the industry to cover the liability of the Customer and to indemnity the Customer from any costs, expenses, loss or damages resulting from any act, neglect or default of the company. 6.2 The Customer shall at all times during the term of this agreement maintain product liability insurance, covering all products sold by the Manufacturer to the Customer and which policy shall name the Manufacturer as Additional Insured. 7. BREACH / TERMINATION 7.1 Notice of Breach Each party has an obligation to notify immediately the other party of any breach of this agreement. 7.2 Rectification of Breach Where the breach is rectifiable, the breaching party has 21 days from the date of notification of its breach to rectify. Following the expiry of this period, the non-breaching party may execute any rights it may have both in law and under this agreement. 7.3 Rights to termination Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement:",
+    "start": 7688,
+    "end": 9041,
+    "page": null,
+    "conf": 0.00045158396387499504
+   },
+   {
+    "text": ".",
+    "start": 3543,
+    "end": 3544,
+    "page": null,
+    "conf": 0.0004234211562069572
+   },
+   {
+    "text": "Manufacturer indemnifies the Customer for the same.",
+    "start": 3493,
+    "end": 3544,
+    "page": null,
+    "conf": 0.0004140842542015944
+   },
+   {
+    "text": "The Manufacturing Companies utilised by the Agent to manufacture the products listed in Schedule A of this agreement shall maintain throughout the term of this agreement product liability insurance issued by a reputable insurance company under standard terms and conditions in the industry to cover the liability of the Customer and to indemnity the Customer from any costs, expenses, loss or damages resulting from any act, neglect or default of the company",
+    "start": 7688,
+    "end": 8146,
+    "page": null,
+    "conf": 0.0004105899860493257
+   },
+   {
+    "text": "The Manufacturing Companies utilised by the Agent to manufacture the products listed in Schedule A of this agreement shall maintain throughout the term of this agreement product liability insurance issued by a reputable insurance company under standard terms and conditions in the industry to cover the liability of the Customer and to indemnity the Customer from any costs, expenses, loss or damages resulting from any act, neglect or default of the company. 6.2 The Customer shall at all times during the term of this agreement maintain product liability insurance, covering all products sold by the Manufacturer to the Customer and which policy shall name the Manufacturer as Additional Insured.",
+    "start": 7688,
+    "end": 8386,
+    "page": null,
+    "conf": 0.00033749386514868475
+   },
+   {
+    "text": "The Manufacturer indemnifies the Customer for the same. ODM Supply Agreement 3 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n3.5 (b) The composition of the below individuals is also relevant and related to the Intellectual Property of the Manufacturer. The following names listed as Medical Team members, and any subsequent consultations in that capacity, are considered the Intellectual Property of The Manufacturer:",
+    "start": 3489,
+    "end": 3976,
+    "page": null,
+    "conf": 0.00030038030024902556
+   },
+   {
+    "text": "(a) The Manufacturer covenants that the Products are clear of any Intellectual Property claims by third parties and that the Customer has full rights to sell and market the Products worldwide. The Manufacturer indemnifies the Customer for the same.",
+    "start": 3296,
+    "end": 3544,
+    "page": null,
+    "conf": 0.00021237922344721755
+   },
+   {
+    "text": "same.",
+    "start": 3539,
+    "end": 3544,
+    "page": null,
+    "conf": 0.00012724021923744277
+   },
+   {
+    "text": "a) The Manufacturer covenants that the Products are clear of any Intellectual Property claims by third parties and that the Customer has full rights to sell and market the Products worldwide. The Manufacturer indemnifies the Customer for the same.",
+    "start": 3297,
+    "end": 3544,
+    "page": null,
+    "conf": 0.00010606901648196104
+   },
+   {
+    "text": "The Manufacturer indemnifies the Customer for the",
+    "start": 3489,
+    "end": 3538,
+    "page": null,
+    "conf": 0.00010599691727077376
+   },
+   {
+    "text": "The Manufacturing Companies utilised by the Agent to manufacture the products listed in Schedule A of this agreement shall maintain throughout the term of this agreement product liability insurance issued by a reputable insurance company under standard terms and conditions in the industry to cover the liability of the Customer and to indemnity the Customer from any costs, expenses, loss or damages resulting from any act, neglect or default of the company. 6.2 The Customer shall at all times during the term of this agreement maintain product liability insurance, covering all products sold by the Manufacturer to the Customer and which policy shall name the Manufacturer as Additional Insured. 7. BREACH / TERMINATION 7.1 Notice of Breach Each party has an obligation to notify immediately the other party of any breach of this agreement. 7.2 Rectification of Breach Where the breach is rectifiable, the breaching party has 21 days from the date of notification of its breach to rectify. Following the expiry of this period, the non-breaching party may execute any rights it may have both in law and under this agreement. 7.3 Rights to termination Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays).",
+    "start": 7688,
+    "end": 9556,
+    "page": null,
+    "conf": 0.00008645179036424268
+   },
+   {
+    "text": "The Manufacturing Companies utilised by the Agent to manufacture the products listed in Schedule A of this agreement shall maintain throughout the term of this agreement product liability insurance issued by a reputable insurance company under standard terms and conditions in the industry to cover the liability of the Customer and to indemnity the Customer from any costs, expenses, loss or damages resulting from any act, neglect or default of the company. 6.2 The Customer shall at all times during the term of this agreement maintain product liability insurance, covering all products sold by the Manufacturer to the Customer and which policy shall name the Manufacturer as Additional Insured. 7. BREACH / TERMINATION 7.1 Notice of Breach Each party has an obligation to notify immediately the other party of any breach of this agreement. 7.2 Rectification of Breach Where the breach is rectifiable, the breaching party has 21 days from the date of notification of its breach to rectify. Following the expiry of this period, the non-breaching party may execute any rights it may have both in law and under this agreement. 7.3 Rights to termination Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party.",
+    "start": 7688,
+    "end": 9870,
+    "page": null,
+    "conf": 0.00008359878862822439
+   },
+   {
+    "text": "6. INDEMNITY / INSURANCE 6.1 The Manufacturing Companies utilised by the Agent to manufacture the products listed in Schedule A of this agreement shall maintain throughout the term of this agreement product liability insurance issued by a reputable insurance company under standard terms and conditions in the industry to cover the liability of the Customer and to indemnity the Customer from any costs, expenses, loss or damages resulting from any act, neglect or default of the company.",
+    "start": 7659,
+    "end": 8147,
+    "page": null,
+    "conf": 0.00006759945921655417
+   },
+   {
+    "text": "The Manufacturing Companies utilised by the Agent to manufacture the products listed in Schedule A of this agreement shall maintain throughout the term of this agreement product liability insurance issued by a reputable insurance company under standard terms and conditions in the industry to cover the liability of the Customer and to indemnity the Customer from any costs, expenses, loss or damages resulting from any act, neglect or default of the company. 6.2 The Customer shall at all times during the term of this agreement maintain product liability insurance, covering all products sold by the Manufacturer to the Customer and which policy shall name the Manufacturer as Additional Insured. 7. BREACH / TERMINATION 7.1 Notice of Breach Each party has an obligation to notify immediately the other party of any breach of this agreement. 7.2 Rectification of Breach Where the breach is rectifiable, the breaching party has 21 days from the date of notification of its breach to rectify. Following the expiry of this period, the non-breaching party may execute any rights it may have both in law and under this agreement. 7.3 Rights to termination Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice.",
+    "start": 7688,
+    "end": 9304,
+    "page": null,
+    "conf": 0.00006351580742693196
+   },
+   {
+    "text": "The Manufacturer indemnifies the Customer for the same. O",
+    "start": 3489,
+    "end": 3546,
+    "page": null,
+    "conf": 0.00005702861599894718
+   }
+  ],
+  "Termination For Breach": [
+   {
+    "text": "A six (6) months notice must be given by either party of their intention to terminate relations due to any reason other than breach of this agreement.",
+    "start": 1394,
+    "end": 1544,
+    "page": null,
+    "conf": 0.9358441982029309
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement:",
+    "start": 8841,
+    "end": 9041,
+    "page": null,
+    "conf": 0.02206396483046308
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party.",
+    "start": 8841,
+    "end": 9870,
+    "page": null,
+    "conf": 0.01208761105244489
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice.",
+    "start": 8841,
+    "end": 9304,
+    "page": null,
+    "conf": 0.006421910669960125
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays).",
+    "start": 8841,
+    "end": 9556,
+    "page": null,
+    "conf": 0.005297796139783862
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement.",
+    "start": 8841,
+    "end": 9747,
+    "page": null,
+    "conf": 0.005290444990888
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party. ODM Supply Agreement 6 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n(e) If control of either party shall pass from the present shareholders or owners or controllers to other persons whom the other party shall in their absolute discretion regard as unsuitable.",
+    "start": 8841,
+    "end": 10201,
+    "page": null,
+    "conf": 0.0021231489649087007
+   },
+   {
+    "text": "(c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party.",
+    "start": 9557,
+    "end": 9870,
+    "page": null,
+    "conf": 0.0016555865929072544
+   },
+   {
+    "text": "(b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party.",
+    "start": 9305,
+    "end": 9870,
+    "page": null,
+    "conf": 0.001451810707662294
+   },
+   {
+    "text": "(d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party.",
+    "start": 9748,
+    "end": 9870,
+    "page": null,
+    "conf": 0.0013150861321632311
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party. ODM Supply Agreement 6 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n(e) If control of either party shall pass from the present shareholders or owners or controllers to other persons whom the other party shall in their absolute discretion regard as unsuitable. (f) Either parties voting stock is transferred to any third party to such extent as to result in a change in effective control of the company or its ownership or active management is changed in any other manner.",
+    "start": 8841,
+    "end": 10413,
+    "page": null,
+    "conf": 0.0010630267430149453
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement",
+    "start": 8841,
+    "end": 9040,
+    "page": null,
+    "conf": 0.0009763258007632336
+   },
+   {
+    "text": "A",
+    "start": 1394,
+    "end": 1395,
+    "page": null,
+    "conf": 0.0007717011536110683
+   },
+   {
+    "text": "(c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement.",
+    "start": 9557,
+    "end": 9747,
+    "page": null,
+    "conf": 0.0007246088378775165
+   },
+   {
+    "text": "Where the breach is rectifiable, the breaching party has 21 days from the date of notification of its breach to rectify. Following the expiry of this period, the non-breaching party may execute any rights it may have both in law and under this agreement. 7.3 Rights to termination Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement:",
+    "start": 8560,
+    "end": 9041,
+    "page": null,
+    "conf": 0.0006808888003843646
+   },
+   {
+    "text": "(b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays).",
+    "start": 9305,
+    "end": 9556,
+    "page": null,
+    "conf": 0.0006363041571555602
+   },
+   {
+    "text": "(b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement.",
+    "start": 9305,
+    "end": 9747,
+    "page": null,
+    "conf": 0.0006354212302782536
+   },
+   {
+    "text": "Where the breach is rectifiable, the breaching party has 21 days from the date of notification of its breach to rectify. Following the expiry of this period, the non-breaching party may execute any rights it may have both in law and under this agreement. 7.3 Rights to termination Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party.",
+    "start": 8560,
+    "end": 9870,
+    "page": null,
+    "conf": 0.00037302085333496476
+   },
+   {
+    "text": "(a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party.",
+    "start": 9042,
+    "end": 9870,
+    "page": null,
+    "conf": 0.0002953946271639993
+   },
+   {
+    "text": "(c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party. ODM Supply Agreement 6 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n(e) If control of either party shall pass from the present shareholders or owners or controllers to other persons whom the other party shall in their absolute discretion regard as unsuitable.",
+    "start": 9557,
+    "end": 10201,
+    "page": null,
+    "conf": 0.0002907983178642061
+   }
+  ],
+  "Force Majeure": [
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement:",
+    "start": 8841,
+    "end": 9041,
+    "page": null,
+    "conf": 0.08820078251550438
+   },
+   {
+    "text": "Neither party to this agreement is liable to the other for a breach of this agreement when the breach is as a result of the occurrence of one of the events below: (i) The outbreak of hostilities (whether or not accompanied by any formal declaration of war), riot, civil disturbance, or acts of terrorism; or (ii) The act of any government or competent authority (including the cancellation or revocation of any approval, authority or permit); or (iii) Fire, explosion, flood, inclement weather, or natural disaster; or (iv) The declaration of a state of emergency or the invocation of martial law having an effect on commerce generally; or (v) Industrial action (including strikes and lock-outs) that is of a widespread nature affecting the Principal solely or the industry or sector of which the Principal is a part (whether in a vertical sense or horizontal sense); or (vi) Any other cause, impediment or circumstance beyond the reasonable control of any party.",
+    "start": 15405,
+    "end": 16368,
+    "page": null,
+    "conf": 0.03682236754719912
+   },
+   {
+    "text": "Neither party to this agreement is liable to the other for a breach of this agreement when the breach is as a result of the occurrence of one of the events below:",
+    "start": 15405,
+    "end": 15567,
+    "page": null,
+    "conf": 0.03297441564533774
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays).",
+    "start": 8841,
+    "end": 9556,
+    "page": null,
+    "conf": 0.015319121274020022
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party.",
+    "start": 8841,
+    "end": 9870,
+    "page": null,
+    "conf": 0.012308449786688283
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement.",
+    "start": 8841,
+    "end": 9747,
+    "page": null,
+    "conf": 0.009566642723345196
+   },
+   {
+    "text": "Neither party to this agreement is liable to the other for a breach of this agreement when the breach is as a result of the occurrence of one of the events below: (i) The outbreak of hostilities (whether or not accompanied by any formal declaration of war), riot, civil disturbance, or acts of terrorism; or (ii) The act of any government or competent authority (including the cancellation or revocation of any approval, authority or permit); or (iii) Fire, explosion, flood, inclement weather, or natural disaster; or (iv) The declaration of a state of emergency or the invocation of martial law having an effect on commerce generally; or (v) Industrial action (including strikes and lock-outs) that is of a widespread nature affecting the Principal solely or the industry or sector of which the Principal is a part (whether in a vertical sense or horizontal sense); or (vi) Any other cause, impediment or circumstance beyond the reasonable control of any party. Where the occurrence of one of the above events is to any extent as a result of an act or omission of the breaching party, this section will not apply.",
+    "start": 15405,
+    "end": 16520,
+    "page": null,
+    "conf": 0.007258357491406036
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice.",
+    "start": 8841,
+    "end": 9304,
+    "page": null,
+    "conf": 0.007150455830905899
+   },
+   {
+    "text": "Neither party to this agreement is liable to the other for a breach of this agreement when the breach is as a result of the occurrence of one of the events below: (i) The outbreak of hostilities (whether or not accompanied by any formal declaration of war), riot, civil disturbance, or acts of terrorism; or (ii) The act of any government or competent authority (including the cancellation or revocation of any approval, authority or permit); or (iii) Fire, explosion, flood, inclement weather, or natural disaster; or (iv) The declaration of a state of emergency or the invocation of martial law having an effect on commerce generally; or (v) Industrial action (including strikes and lock-outs) that is of a widespread nature affecting the Principal solely or the industry or sector of which the Principal is a part (whether in a vertical sense or horizontal sense);",
+    "start": 15405,
+    "end": 16272,
+    "page": null,
+    "conf": 0.00551654576747413
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement",
+    "start": 8841,
+    "end": 9040,
+    "page": null,
+    "conf": 0.005502191455976758
+   },
+   {
+    "text": "Neither party to this agreement is liable to the other for a breach of this agreement when the breach is as a result of the occurrence of one of the events below: (i) The outbreak of hostilities (whether or not accompanied by any formal declaration of war), riot, civil disturbance, or acts of terrorism; or (ii) The act of any government or competent authority (including the cancellation or revocation of any approval, authority or permit); or (iii) Fire, explosion, flood, inclement weather, or natural disaster; or (iv) The declaration of a state of emergency or the invocation of martial law having an effect on commerce generally; or (v) Industrial action (including strikes and lock-outs) that is of a widespread nature affecting the Principal solely or the industry or sector of which the Principal is a part (whether in a vertical sense or horizontal sense); or (vi) Any other cause, impediment or circumstance beyond the reasonable control of any party. Where the occurrence of one of the above events is to any extent as a result of an act or omission of the breaching party, this section will not apply. 14.8 New Products Designed, Formulated and Supplied by the Manufacturer The Manufacturer agrees to maintain its focus on the design and formulation of new products and agrees to provide the Customer with one new product each quarter for a minimum of four (4) new products per year.",
+    "start": 15405,
+    "end": 16802,
+    "page": null,
+    "conf": 0.004219046680606681
+   },
+   {
+    "text": "Any other cause, impediment or circumstance beyond the reasonable control of any party.",
+    "start": 16281,
+    "end": 16368,
+    "page": null,
+    "conf": 0.0036633154597514555
+   },
+   {
+    "text": "Minimum Annual Product Performance Requirements are listed below: Product Name: Agreed Quantity of Units to be purchased per Annum: ATP 1 S Survivor Select 150gm packaged 15,000 ATP 2 Energized Mineral Concentrate 29.5mL packaged 20,000 ATP 3 Ionized Cal-Mag 114gm packaged 15,000 ATP 4 Omega Blend 250mL packaged 15,000 ATP 5 BetaMaxx 150gm packaged 15,000 AGP 1 Iron 29.5mL packaged 1000 YFA Young Formula 450gm packaged 3000 ORYC Organic Soap 150gm packaged 2500",
+    "start": 19846,
+    "end": 20311,
+    "page": null,
+    "conf": 0.0036101428525479864
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party. ODM Supply Agreement 6 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n(e) If control of either party shall pass from the present shareholders or owners or controllers to other persons whom the other party shall in their absolute discretion regard as unsuitable.",
+    "start": 8841,
+    "end": 10201,
+    "page": null,
+    "conf": 0.0034966236196557893
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party. ODM Supply Agreement 6 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n(e) If control of either party shall pass from the present shareholders or owners or controllers to other persons whom the other party shall in their absolute discretion regard as unsuitable. (f) Either parties voting stock is transferred to any third party to such extent as to result in a change in effective control of the company or its ownership or active management is changed in any other manner.",
+    "start": 8841,
+    "end": 10413,
+    "page": null,
+    "conf": 0.0033465540961621553
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party. ODM Supply Agreement 6 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n(e) If control of either party shall pass from the present shareholders or owners or controllers to other persons whom the other party shall in their absolute discretion regard as unsuitable. (f) Either parties voting stock is transferred to any third party to such extent as to result in a change in effective control of the company or its ownership or active management is changed in any other manner. The termination of this agreement shall be without prejudice to the rights of either party to payment or other claims due or accrued up to the termination of this agreement. For termination to be effective, written notice of termination must be served on the other party. Where valid, termination takes effect immediately upon service. 8. ARBITRATION 8.1 Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland.",
+    "start": 8841,
+    "end": 11149,
+    "page": null,
+    "conf": 0.003101083864305034
+   },
+   {
+    "text": "Neither party to this agreement is liable to the other for a breach of this agreement when the breach is as a result of the occurrence of one of the events below: (i) The outbreak of hostilities (whether or not accompanied by any formal declaration of war), riot, civil disturbance, or acts of terrorism; or (ii) The act of any government or competent authority (including the cancellation or revocation of any approval, authority or permit); or (iii) Fire, explosion, flood, inclement weather, or natural disaster; or (iv) The declaration of a state of emergency or the invocation of martial law having an effect on commerce generally; or (v) Industrial action (including strikes and lock-outs) that is of a widespread nature affecting the Principal solely or the industry or sector of which the Principal is a part (whether in a vertical sense or horizontal sense); or (vi) Any other cause, impediment or circumstance beyond the reasonable control of any party. Where the occurrence of one of the above events is to any extent as a result of an act or omission of the breaching party, this section will not apply. 14.8 New Products Designed, Formulated and Supplied by the Manufacturer The Manufacturer agrees to maintain its focus on the design and formulation of new products and agrees to provide the Customer with one new product each quarter for a minimum of four (4) new products per year. The Manufacturer agrees to give the Customer exclusive rights to the marketing, promotion and sales of the new products should the Customer decide to take on the new products. ODM Supply Agreement 9 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n14.9 Other products outside of the product range listed in schedule A of this document The Manufacturer agrees that the Customer has the right under this agreement to consider, source, promote, market and sell other product outside of the products listed in Schedule A of this agreement in line with the following assumptions: That they are non-competing products to the range of products or those products listed in schedule A of this agreement.",
+    "start": 15405,
+    "end": 17564,
+    "page": null,
+    "conf": 0.002312655009041841
+   },
+   {
+    "text": "Performance targets have been discussed between the Manufacturer and the Customer to determine fair and reasonable performance targets. Minimum Annual Product Performance Requirements are listed below: Product Name: Agreed Quantity of Units to be purchased per Annum: ATP 1 S Survivor Select 150gm packaged 15,000 ATP 2 Energized Mineral Concentrate 29.5mL packaged 20,000 ATP 3 Ionized Cal-Mag 114gm packaged 15,000 ATP 4 Omega Blend 250mL packaged 15,000 ATP 5 BetaMaxx 150gm packaged 15,000 AGP 1 Iron 29.5mL packaged 1000 YFA Young Formula 450gm packaged 3000 ORYC Organic Soap 150gm packaged 2500",
+    "start": 19710,
+    "end": 20311,
+    "page": null,
+    "conf": 0.002132993824810022
+   },
+   {
+    "text": "Neither party to this agreement is liable to the other for a breach of this agreement when the breach is as a result of the occurrence of one of the events below: (i) The outbreak of hostilities (whether or not accompanied by any formal declaration of war), riot, civil disturbance, or acts of terrorism;",
+    "start": 15405,
+    "end": 15709,
+    "page": null,
+    "conf": 0.0015323299657338096
+   },
+   {
+    "text": "(vi) Any other cause, impediment or circumstance beyond the reasonable control of any party.",
+    "start": 16276,
+    "end": 16368,
+    "page": null,
+    "conf": 0.001251923348149639
+   }
+  ],
+  "Dispute Resolution": [
+   {
+    "text": "Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland.",
+    "start": 10769,
+    "end": 11149,
+    "page": null,
+    "conf": 0.9936692396067368
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party. ODM Supply Agreement 6 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n(e) If control of either party shall pass from the present shareholders or owners or controllers to other persons whom the other party shall in their absolute discretion regard as unsuitable. (f) Either parties voting stock is transferred to any third party to such extent as to result in a change in effective control of the company or its ownership or active management is changed in any other manner. The termination of this agreement shall be without prejudice to the rights of either party to payment or other claims due or accrued up to the termination of this agreement. For termination to be effective, written notice of termination must be served on the other party. Where valid, termination takes effect immediately upon service. 8. ARBITRATION 8.1 Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland.",
+    "start": 8841,
+    "end": 11149,
+    "page": null,
+    "conf": 0.0029243645680489243
+   },
+   {
+    "text": "Any",
+    "start": 10769,
+    "end": 10772,
+    "page": null,
+    "conf": 0.0011235381272760247
+   },
+   {
+    "text": "Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland",
+    "start": 10769,
+    "end": 11148,
+    "page": null,
+    "conf": 0.0007687671923086963
+   },
+   {
+    "text": "Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland. 8.2 The language to be used in the Arbitration proceedings shall be English. 8.3 The award/decision of the Arbitration Committee shall be final and binding on both the parties and enforceable in any jurisdiction. 9. COSTS Each of the parties shall bare its own legal costs and expenses incurred by it in connection with this agreement and any stamp duty payable under this agreement shall be borne by equally by both parties. 10. GOVERNING LAW This agreement shall be governed by the Laws of England (English common and statutory Law). 11. INTELLECTUAL PROPERTY The Manufacturer is the owner of the intellectual Property pertaining to the products listed in schedule A of this agreement as well as to the book 'How to Achieve Super Health beyond 2000 - Advanced Edition' ODM Supply Agreement 7 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n12. TRANSFER OF INTELLECTUAL PROPERTY The Manufacturer agrees to offer the Customer the first right of refusal to purchase the intellectual property for the products listed in Schedule A of this agreement based upon agreed terms.",
+    "start": 10769,
+    "end": 12289,
+    "page": null,
+    "conf": 0.000459304091427694
+   },
+   {
+    "text": ".",
+    "start": 11148,
+    "end": 11149,
+    "page": null,
+    "conf": 0.0002138126793121963
+   },
+   {
+    "text": "Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland. 8.2 The language to be used in the Arbitration proceedings shall be English. 8.3 The award/decision of the Arbitration Committee shall be final and binding on both the parties and enforceable in any jurisdiction.",
+    "start": 10769,
+    "end": 11362,
+    "page": null,
+    "conf": 0.00011620869862227274
+   },
+   {
+    "text": "ARBITRATION 8.1 Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland.",
+    "start": 10753,
+    "end": 11149,
+    "page": null,
+    "conf": 0.00010600435725548076
+   },
+   {
+    "text": "Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce",
+    "start": 10769,
+    "end": 11125,
+    "page": null,
+    "conf": 0.00010262954400925108
+   },
+   {
+    "text": "(e) If control of either party shall pass from the present shareholders or owners or controllers to other persons whom the other party shall in their absolute discretion regard as unsuitable. (f) Either parties voting stock is transferred to any third party to such extent as to result in a change in effective control of the company or its ownership or active management is changed in any other manner. The termination of this agreement shall be without prejudice to the rights of either party to payment or other claims due or accrued up to the termination of this agreement. For termination to be effective, written notice of termination must be served on the other party. Where valid, termination takes effect immediately upon service. 8. ARBITRATION 8.1 Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland.",
+    "start": 10010,
+    "end": 11149,
+    "page": null,
+    "conf": 0.00007556322221247242
+   },
+   {
+    "text": "failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland.",
+    "start": 10990,
+    "end": 11149,
+    "page": null,
+    "conf": 0.0000617252728902667
+   },
+   {
+    "text": "Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland. 8.2 The language to be used in the Arbitration proceedings shall be English.",
+    "start": 10769,
+    "end": 11226,
+    "page": null,
+    "conf": 0.00005722128469355124
+   },
+   {
+    "text": "Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located",
+    "start": 10769,
+    "end": 11133,
+    "page": null,
+    "conf": 0.000055695363434695886
+   },
+   {
+    "text": "Arbitration Committee of the International Chamber of Commerce located in Switzerland.",
+    "start": 11063,
+    "end": 11149,
+    "page": null,
+    "conf": 0.00005250079025245205
+   },
+   {
+    "text": "8.1 Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland.",
+    "start": 10765,
+    "end": 11149,
+    "page": null,
+    "conf": 0.00004186430558829304
+   },
+   {
+    "text": "as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland.",
+    "start": 10962,
+    "end": 11149,
+    "page": null,
+    "conf": 0.000038698809730690344
+   },
+   {
+    "text": "in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland.",
+    "start": 10948,
+    "end": 11149,
+    "page": null,
+    "conf": 0.00003721195181335378
+   },
+   {
+    "text": "(c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party. ODM Supply Agreement 6 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n(e) If control of either party shall pass from the present shareholders or owners or controllers to other persons whom the other party shall in their absolute discretion regard as unsuitable. (f) Either parties voting stock is transferred to any third party to such extent as to result in a change in effective control of the company or its ownership or active management is changed in any other manner. The termination of this agreement shall be without prejudice to the rights of either party to payment or other claims due or accrued up to the termination of this agreement. For termination to be effective, written notice of termination must be served on the other party. Where valid, termination takes effect immediately upon service. 8. ARBITRATION 8.1 Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland.",
+    "start": 9557,
+    "end": 11149,
+    "page": null,
+    "conf": 0.000034131587911329404
+   },
+   {
+    "text": "parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland.",
+    "start": 10940,
+    "end": 11149,
+    "page": null,
+    "conf": 0.00003129928729047474
+   },
+   {
+    "text": "Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee",
+    "start": 10769,
+    "end": 11084,
+    "page": null,
+    "conf": 0.000028789686554876564
+   }
+  ],
+  "Data Protection": [
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement:",
+    "start": 8841,
+    "end": 9041,
+    "page": null,
+    "conf": 0.00002253047776879829
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party.",
+    "start": 8841,
+    "end": 9870,
+    "page": null,
+    "conf": 2.8992249151566185e-6
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays).",
+    "start": 8841,
+    "end": 9556,
+    "page": null,
+    "conf": 2.695053899675616e-6
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice.",
+    "start": 8841,
+    "end": 9304,
+    "page": null,
+    "conf": 2.003397651874451e-6
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement.",
+    "start": 8841,
+    "end": 9747,
+    "page": null,
+    "conf": 1.5312514074840208e-6
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party. ODM Supply Agreement 6 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n(e) If control of either party shall pass from the present shareholders or owners or controllers to other persons whom the other party shall in their absolute discretion regard as unsuitable. (f) Either parties voting stock is transferred to any third party to such extent as to result in a change in effective control of the company or its ownership or active management is changed in any other manner. The termination of this agreement shall be without prejudice to the rights of either party to payment or other claims due or accrued up to the termination of this agreement. For termination to be effective, written notice of termination must be served on the other party. Where valid, termination takes effect immediately upon service. 8. ARBITRATION 8.1 Any and all disputes, claims or differences arising out of or relating to this agreement or the alleged breach thereto shall be settled by mutual consultation between the parties in good faith as promptly as possible but failing such amicable settlement, shall be decided by Arbitration by the Arbitration Committee of the International Chamber of Commerce located in Switzerland.",
+    "start": 8841,
+    "end": 11149,
+    "page": null,
+    "conf": 1.2357562312693669e-6
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement",
+    "start": 8841,
+    "end": 9040,
+    "page": null,
+    "conf": 1.199291620737608e-6
+   },
+   {
+    "text": "Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement: (a) On the committing of a material breach of this agreement providing that where the breach is capable of rectification the breaching party has been advised in writing of the breach and has not rectified it within twenty-one (21) days of receipt of such advice. (b) On the commencement of the winding up or bankruptcy of either party or on the appointment of a receiver of the distributor's assets or on either party ceasing to do business at any time for thirty consecutive days (other than for annual holidays). (c) On either party for any reason (other than a default of the other party) being substantially prevented from performing or becoming unable to perform its obligations under this agreement. (d) On either party assigning or attempting to assign this agreement without the prior written consent of the other party. ODM Supply Agreement 6 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n(e) If control of either party shall pass from the present shareholders or owners or controllers to other persons whom the other party shall in their absolute discretion regard as unsuitable.",
+    "start": 8841,
+    "end": 10201,
+    "page": null,
+    "conf": 8.356431037979505e-7
+   },
+   {
+    "text": "The Manufacturer covenants not to sell any product listed in this agreement, or product name (as listed in schedule A of this agreement) to any other party without prior written consent of the Customer. 4. COVENANTS BY THE CUSTOMER 4.1 Compliance with Local Laws and Regulations The Customer covenants that it is and will remain for the term of this agreement in compliance with any and all Local Laws and Regulations. This includes without limitation laws relating to business practice, workplace relations, safety and taxation. 4.2 Ability to Perform The Customer covenants that it is and will remain for the term of this agreement willing and able to perform any and all of its obligations under this agreement. 4.3 Market Penetration The Customer covenants to give its best endeavours to establish and develop a market for the Products in the Territories with maximum market penetration. ODM Supply Agreement 4 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n5. SHIPPING AND PAYMENT TERMS 5.1 Shipping Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment. 5.3 Rejection of defective products The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer.",
+    "start": 4273,
+    "end": 6704,
+    "page": null,
+    "conf": 7.193046372430128e-7
+   },
+   {
+    "text": "The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer.",
+    "start": 6118,
+    "end": 6704,
+    "page": null,
+    "conf": 6.786222074671865e-7
+   },
+   {
+    "text": "The Manufacturing Companies utilised by the Agent to manufacture the products listed in Schedule A of this agreement shall maintain throughout the term of this agreement product liability insurance issued by a reputable insurance company under standard terms and conditions in the industry to cover the liability of the Customer and to indemnity the Customer from any costs, expenses, loss or damages resulting from any act, neglect or default of the company. 6.2 The Customer shall at all times during the term of this agreement maintain product liability insurance, covering all products sold by the Manufacturer to the Customer and which policy shall name the Manufacturer as Additional Insured. 7. BREACH / TERMINATION 7.1 Notice of Breach Each party has an obligation to notify immediately the other party of any breach of this agreement. 7.2 Rectification of Breach Where the breach is rectifiable, the breaching party has 21 days from the date of notification of its breach to rectify. Following the expiry of this period, the non-breaching party may execute any rights it may have both in law and under this agreement. 7.3 Rights to termination Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement:",
+    "start": 7688,
+    "end": 9041,
+    "page": null,
+    "conf": 5.7649832880867e-7
+   },
+   {
+    "text": "The Customer shall at all times during the term of this agreement maintain product liability insurance, covering all products sold by the Manufacturer to the Customer and which policy shall name the Manufacturer as Additional Insured. 7. BREACH / TERMINATION 7.1 Notice of Breach Each party has an obligation to notify immediately the other party of any breach of this agreement. 7.2 Rectification of Breach Where the breach is rectifiable, the breaching party has 21 days from the date of notification of its breach to rectify. Following the expiry of this period, the non-breaching party may execute any rights it may have both in law and under this agreement. 7.3 Rights to termination Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement:",
+    "start": 8152,
+    "end": 9041,
+    "page": null,
+    "conf": 5.49111323101074e-7
+   },
+   {
+    "text": "Where the breach is rectifiable, the breaching party has 21 days from the date of notification of its breach to rectify. Following the expiry of this period, the non-breaching party may execute any rights it may have both in law and under this agreement. 7.3 Rights to termination Without prejudice to any right or remedy both parties may have against each other for breach or non-performance of this Agreement each party shall have the right to summarily terminate this Agreement:",
+    "start": 8560,
+    "end": 9041,
+    "page": null,
+    "conf": 4.0776903603035364e-7
+   },
+   {
+    "text": "The Manufacturer covenants not to sell any product listed in this agreement, or product name (as listed in schedule A of this agreement) to any other party without prior written consent of the Customer.",
+    "start": 4273,
+    "end": 4475,
+    "page": null,
+    "conf": 3.9772371237453897e-7
+   },
+   {
+    "text": "The Manufacturing Companies utilised by the Agent to manufacture the products listed in Schedule A of this agreement shall maintain throughout the term of this agreement product liability insurance issued by a reputable insurance company under standard terms and conditions in the industry to cover the liability of the Customer and to indemnity the Customer from any costs, expenses, loss or damages resulting from any act, neglect or default of the company. 6.2 The Customer shall at all times during the term of this agreement maintain product liability insurance, covering all products sold by the Manufacturer to the Customer and which policy shall name the Manufacturer as Additional Insured.",
+    "start": 7688,
+    "end": 8386,
+    "page": null,
+    "conf": 3.225111067821519e-7
+   },
+   {
+    "text": "The Manufacturer covenants not to sell any product listed in this agreement, or product name (as listed in schedule A of this agreement) to any other party without prior written consent of the Customer. 4. COVENANTS BY THE CUSTOMER 4.1 Compliance with Local Laws and Regulations The Customer covenants that it is and will remain for the term of this agreement in compliance with any and all Local Laws and Regulations. This includes without limitation laws relating to business practice, workplace relations, safety and taxation. 4.2 Ability to Perform The Customer covenants that it is and will remain for the term of this agreement willing and able to perform any and all of its obligations under this agreement. 4.3 Market Penetration The Customer covenants to give its best endeavours to establish and develop a market for the Products in the Territories with maximum market penetration. ODM Supply Agreement 4 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n5. SHIPPING AND PAYMENT TERMS 5.1 Shipping Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment.",
+    "start": 4273,
+    "end": 6081,
+    "page": null,
+    "conf": 3.131088154398292e-7
+   },
+   {
+    "text": "The Customer shall at all times during the term of this agreement maintain product liability insurance, covering all products sold by the Manufacturer to the Customer and which policy shall name the Manufacturer as Additional Insured.",
+    "start": 8152,
+    "end": 8386,
+    "page": null,
+    "conf": 3.0718981697776196e-7
+   },
+   {
+    "text": "The Manufacturer is the owner of the intellectual Property pertaining to the products listed in schedule A of this agreement as well as to the book 'How to Achieve Super Health beyond 2000 - Advanced Edition'",
+    "start": 11712,
+    "end": 11920,
+    "page": null,
+    "conf": 2.9150235881231763e-7
+   },
+   {
+    "text": "The Manufacturer covenants not to sell any product listed in this agreement, or product name (as listed in schedule A of this agreement) to any other party without prior written consent of the Customer. 4. COVENANTS BY THE CUSTOMER 4.1 Compliance with Local Laws and Regulations The Customer covenants that it is and will remain for the term of this agreement in compliance with any and all Local Laws and Regulations. This includes without limitation laws relating to business practice, workplace relations, safety and taxation. 4.2 Ability to Perform The Customer covenants that it is and will remain for the term of this agreement willing and able to perform any and all of its obligations under this agreement. 4.3 Market Penetration The Customer covenants to give its best endeavours to establish and develop a market for the Products in the Territories with maximum market penetration. ODM Supply Agreement 4 Organic Preparations INC. & Agape ATP International Holding Limited\n\nSource: AGAPE ATP CORP, 10-K/A, 12/2/2019\n\n\n\n\n\n5. SHIPPING AND PAYMENT TERMS 5.1 Shipping Products delivered pursuant to the terms of this Agreement shall be suitably packed for shipment in the Manufacturer's standard shipping cartons, marked for shipment to the destination specified in the Customer's Purchase Order, and delivered to the destination Ex Works. The Customer agrees to pay freight, insurance and any associated expenses. The Customer agrees to help the Manufacturer select the most appropriate carrier for each of the Territories. All freight, insurance, and other shipping expenses shall be paid by the Customer. 5.2 Guarantee of packaging quality The Manufacturer further guarantees that the Products, when shipped, are packaged in such a way as to be protected from any foreseeable damage during shipment. 5.3 Rejection of defective products The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer. Products not rejected within the foregoing time periods shall be deemed accepted by the Customer.",
+    "start": 4273,
+    "end": 6802,
+    "page": null,
+    "conf": 2.7057825803326495e-7
+   },
+   {
+    "text": "The Customer shall inspect all Products promptly upon receipt thereof and may reject any defective Product, provided that the Customer shall within seven (7) days after receipt of such alleged defective Product, notify the Manufacturer of its rejection and either: (i) request to destroy in field for credit of the value of the defective product and the associated shipping costs (with approval), or (ii) request a Return Material Authorization (\"RMA\") number and within seven (7) days of receipt of the RMA number from the Manufacturer return such rejected Product to the Manufacturer. Products not rejected within the foregoing time periods shall be deemed accepted by the Customer.",
+    "start": 6118,
+    "end": 6802,
+    "page": null,
+    "conf": 2.552748936291441e-7
+   }
   ]
  },
  "timing": {
-  "extract_s": 35.8
+  "extract_s": 121.6
  }
 }
