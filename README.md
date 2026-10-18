@@ -8,9 +8,16 @@ The expensive model (a fine-tuned 150M-parameter encoder, trained in the compani
 `diplomski` repo) runs **once at upload** and extracts all 41 CUAD clause types with
 character offsets. Every later question is a cache lookup: a router only maps the question
 to clause types and never writes legal content. The router is Qwen3-1.7B served by Ollama,
-constrained to the 41 clause type names; without Ollama an embedding router
+constrained to the clause type names; without Ollama an embedding router
 (bge-base-en-v1.5) routes instead. Quotes are verified against the source text before they
 are shown.
+
+The app also checks eight common clause types that CUAD does not have (Payment Terms,
+Delivery, Confidentiality, Indemnification, Termination For Breach, Force Majeure, Dispute
+Resolution, Data Protection). They are asked with CUAD's question template and the same
+extractor, without retraining, and are never marked Found because no gold data exists to
+validate their thresholds. A question that matches no clause type gets up to three related
+passages of the contract, shown verbatim and labelled as not a clause match.
 
 **Status:** built are the inference core, the extractor and cache, three-tier answers with
 the verbatim guard, the embedding and LLM routers, the Gradio app, and the router,
@@ -64,7 +71,9 @@ make router-eval  # router-eval --router llm --split test
 make e2e          # e2e-eval --router llm
 ```
 
-The first `make demo` loads the embedding model and downloads it if it is not cached.
+The first `make demo` loads the embedding model and downloads it if it is not cached. With
+Ollama, the app loads the router model at start-up (up to 120 s) and keeps it loaded for 30
+minutes, because a cold load takes longer than the 10 s limit per question.
 `make ui-dev` is meant for the VS Code Simple Browser.
 
 `ask` answers a question about a document, a cache file or a `sha256:` document id:
@@ -77,9 +86,11 @@ contract-assistant ask demo/short_supply_agreement.txt --types "Governing Law,Ex
 
 With a question, the router picks the clause types; `--router embedding|llm` asks for one
 router and fails if it is not available. `--types` names the clause types and loads no
-model. `--json` prints the answer as JSON.
+model. `--json` prints the answer as JSON. A question that matches no clause type prints
+related passages instead.
 
-The evaluations are described in PLAN.md, sections 4 to 6:
+The evaluations are described in PLAN.md, sections 4 to 6. They use the 41 CUAD clause
+types only:
 
 ```bash
 contract-assistant router-tune                                 # embedding threshold, on dev
@@ -90,6 +101,7 @@ contract-assistant phrase-eval                                 # LLM paragraphs 
 ```
 
 The other commands are `contract-assistant import-demo | extract | show | check | serve`.
+`extract` adds the extra clause types to an existing cache without re-extracting the 41.
 
 ## How answers read
 
@@ -101,6 +113,12 @@ Each requested clause type gets one of three tiers, from the extractor's confide
 | found | confidence at or above τ_high; the quote is shown with page and confidence |
 | possible, verify | between τ_low and τ_high; the quote is shown, to be checked by the reader |
 | not found | below τ_low; only the best candidate score is reported |
+
+The eight extra clause types (see the introduction) are capped at *possible, verify*: their
+thresholds were not validated, so the chat adds "Not validated on test data" and the clause
+checklist lists them under "Other common clauses". A cache that was extracted without them
+does not answer for them; `extract`, or uploading the contract again with *Analyze
+contract*, adds the missing types and leaves the 41 CUAD types unchanged.
 
 A quote is shown only if it matches the source text exactly; otherwise it is withheld.
 Three answers on the short demo contract:
@@ -115,11 +133,18 @@ Three answers on the short demo contract:
 **Source Code Escrow** — not found (checked; best candidate 0.00)
 ```
 
+When a question matches no clause type, the assistant searches the passages of the contract
+(groups of sentences of 200 to 600 characters) with the embedding model and shows up to
+three of them, labelled *Related*, with a note that they are not a clause match. A passage
+is shown only if its cosine similarity to the question is at least 0.55. Each passage is a
+slice of the document text, so the quotes stay verbatim. If no passage reaches the value,
+the reply says that the question does not match a clause.
+
 That is the command-line template. The demo documents are plain text, so there are no page
 numbers (`p. n/a`); a PDF gives the page.
 
 The web app labels the same tiers Found, Verify and Not found, shows each passage
-highlighted in the contract, and lists all 41 clause types by topic in a clause checklist.
+highlighted in the contract, and lists all 49 clause types by topic in a clause checklist.
 The thresholds and the model details are in their own tabs.
 
 | | |

@@ -73,12 +73,13 @@ These are the only things that cross the repo boundary. Everything else is indep
 contract-assistant/
   contract_assistant/
     config.py            model id, decode settings, τ, device, LLM backend -- all env-overridable
-    clause_types.py      the 41 clause types with CUAD's exact questions
+    clause_types.py      the 41 clause types with CUAD's exact questions; the 8 extra types
     pdf.py               pdfplumber -> text, page_starts; page_of(offset); txt passthrough
     extract/
       qa_core.py         vendored QAModel + n-best WITH offsets; device auto (cuda > mps > cpu)
       windowing.py       vendored sliding-window guard
-      extractor.py       run 41 questions over a document -> DocumentCache; progress callback
+      extractor.py       run the questions over a document -> DocumentCache; progress callback;
+                         extend(): add missing types to an older cache
     store.py             cache schema; cache/<sha256>.json + demo/cache/ read/write; harness import
     cuad_match.py        CUAD's span match rule (Jaccard >= 0.5, Parties relaxed)
     router/
@@ -88,6 +89,7 @@ contract-assistant/
       clients.py         OllamaClient (native, format=schema, think=False) | OpenAICompatClient
       factory.py         build_router(settings): the router that LLM_BACKEND selects
     answer.py            tiers, one citation per type, exact quote guard, Markdown template
+    search.py            related passages for questions outside the clause types (section 4)
     phrase.py            LLM paragraph from the verified quotes; check of its quoted spans
     evaluation/
       questions.py       loads data/router_eval.jsonl
@@ -102,6 +104,8 @@ contract-assistant/
   data/
     clause_types.json          41 entries, generated from the training repo
     router_descriptions.json   2-3 hand-written paraphrases per clause type
+    extra_clause_types.json    8 clause types CUAD does not have, with CUAD's question template
+    extra_router_descriptions.json   router paraphrases of the 8 extra types
     router_eval.jsonl          60 questions with gold clause-type sets (section 5)
   eval/results/          results JSON and markdown tables, committed
   tests/
@@ -167,7 +171,8 @@ just the top one, so the τ slider in the UI works without re-running the model.
     {"clause_type": "Termination For Convenience", "status": "not_found", "best_conf": 0.03,
      "citation": null, "withheld": false}
   ],
-  "dropped_quotes": 0
+  "dropped_quotes": 0,
+  "passages": []
 }
 ```
 
@@ -180,6 +185,10 @@ below τ_low, or when the type has no candidate (`best_conf` 0).
   The other candidates are in the sources view.
 - **`withheld`** is true when the citation failed the guard of section 4: `citation` is
   then null, the item keeps its tier, and `dropped_quotes` counts it.
+- **`passages`** holds the related passages of a question that routed to no clause type
+  (section 4); it is empty otherwise. A passage has a quote, a page and the offsets.
+- **`restrict_to_cache`** drops the routed types the cache has no entry for, so a cache
+  extracted before the extra types existed does not answer for them.
 - **`route.kind`** is `explicit` (types given to `ask --types`), `oracle` (the gold types,
   in the evaluations), `embedding`, `llm` or `llm_fallback`. `raw` is the LLM's reply, or
   the error class on a fallback.
@@ -192,6 +201,11 @@ dedupe to 20 unique texts, softmax — **identical to the evaluation harness**, 
 numbers measured in the thesis are the numbers the assistant runs on. The only addition
 is returning character offsets alongside each candidate.
 
+The 8 extra clause types (`data/extra_clause_types.json`) are asked the same way, with
+CUAD's question template, and cost about 0.8 s per type on a contract of about 3,300
+words. `Extractor.extend` adds the types a cache lacks and leaves the others untouched;
+`extract` uses it on older caches, and so does the app when such a contract is uploaded again. The timings below are for the 41 types.
+
 Cost is the same 41 × windows forward passes the harness pays. Measured (eval harness,
 same windows):
 
@@ -201,7 +215,7 @@ same windows):
 | **M4, MPS fp32** | **~50 s** | ~4 min |
 | Ettin-400M | ×2.7 | ×2.7 |
 
-The UI shows a progress bar over 41 types; the result is cached by content hash, so a
+The UI shows a progress bar over the types; the result is cached by content hash, so a
 re-upload of the same file costs nothing.
 
 **Measured with the app's extractor** (seed-3407 weights, M4, MPS fp32, 2026-10-16;
@@ -255,8 +269,10 @@ demo can use real PDFs.
 
 ## 3. Router
 
-Input: a free-form question. Output: a **set** of clause types from the closed list of
-41, possibly empty. Two implementations behind one interface, both evaluated. A route
+Input: a free-form question. Output: a **set** of clause types from the closed list,
+possibly empty. The app routes over 49 types, the 41 of CUAD and 8 extra ones; the
+evaluations (`router-tune`, `router-eval`, `e2e-eval`) route over the 41 only, so their
+questions and results do not depend on the extra types. Two implementations behind one interface, both evaluated. A route
 carries the types, how they were chosen (`kind`), the latency and, for the LLM, the `raw`
 reply.
 
@@ -271,20 +287,23 @@ Expected to handle single-intent questions and fail on compound or abstract ones
 important dates").
 
 **`LLMRouter` (default).** Qwen3-1.7B through Ollama (`qwen3:4b` for the comparison row)
-with `format=` the JSON schema of `{"clause_types": [<enum of 41>]}` — constrained
+with `format=` the JSON schema of `{"clause_types": [<enum of the clause type names>]}` — constrained
 decoding, so an invalid label cannot be emitted — `think=False` for latency, temperature 0
-and a 10 s timeout. The prompt has the task in two sentences, the 41 names with one-line
-descriptions and three worked examples (single, compound, out of scope). The examples are
+and a 10 s timeout. The prompt has the task in two sentences, the names with one-line
+descriptions and three worked examples (single, compound, out of scope). The out-of-scope
+example is "How many pages does this contract have?"; it was "Is there a force majeure
+clause?" until Force Majeure became a clause type. The examples are
 not in the evaluation set; a test enforces it. The reply is validated with Pydantic (only
-the 41 names, no other keys) and duplicates are removed, keeping order. `[]` is a valid
+the clause type names, no other keys) and duplicates are removed, keeping order. `[]` is a valid
 answer, not a failure: it means out of scope. On an LLM error, malformed JSON or an
 invalid name, the embedding router's route is returned with kind `llm_fallback` and the
 error class in `raw`, and a warning is logged. A failed call is not retried; the router
 falls back instead.
 
-**Closed-world behaviour.** Questions outside the 41 types ("what about data privacy?")
-route to the empty set and the assistant says so, listing what it *can* answer. This is
-a feature: the system never pretends.
+**Closed-world behaviour.** Questions outside the clause types ("how many pages does this
+have?") route to the empty set. The assistant then shows related passages if there are any
+(section 4) and otherwise says so, listing what it *can* answer. The system never
+pretends that a passage is a clause match.
 
 **Backends.** `clients.py` has `OllamaClient` (native library) and `OpenAICompatClient`
 (any OpenAI-compatible endpoint, including a hosted model behind an API key).
@@ -296,6 +315,13 @@ a feature: the system never pretends.
 | `openai` | `LLMRouter` over `OpenAICompatClient` (`OPENAI_BASE_URL`, `OPENAI_API_KEY`, `LLM_MODEL`; needs the `api` extra), with the embedding router as fallback |
 | `none` | the embedding router |
 
+With `ollama`, the factory also loads the model at start-up (up to 120 s) and every request
+sets a keep-alive of 30 minutes. A cold load takes longer than the 10 s timeout and made
+the first questions fall back to the embedding router. On the development machine (M4,
+16 GB) a warm route over 49 types takes 0.2 to 0.9 s; the first question after loading
+takes a few seconds. The embedding model (bge-base) is loaded once and shared by the
+embedding router and the passage search.
+
 The demo runs `ollama`; the API path exists for the comparison row and for anyone without
 a capable laptop.
 
@@ -305,7 +331,9 @@ a capable laptop.
 
 1. For each routed type, take the top candidate in the cache and tier its confidence:
    `found` at τ_high (0.91) or above, `check` from τ_low (0.06), `not_found` below. One
-   citation per type (section 2.1).
+   citation per type (section 2.1). The 8 extra types are capped: their thresholds were not
+   validated (CUAD has no gold data for them), so they are never `found`, at most `check`.
+   The chat adds "Not validated on test data" to them.
 2. **Verify** every citation: it is shown only if `text[start:end] == quote`, exactly. The
    extractor's offsets make this exact, so there is no whitespace normalisation and no
    fuzzy matching (`rapidfuzz` is not a dependency). A citation that fails is withheld: the
@@ -326,9 +354,22 @@ a capable laptop.
 
 The status word is always printed. Quotes are Markdown-escaped, blockquoted and cut at 400
 characters with "…". An empty route answers "I can only answer about these clause types:"
-followed by the 41 names.
+followed by the clause type names. If passages were found for the question (point 4), they
+are shown instead.
 
-4. LLM phrasing is measured offline only (`phrase.py`, `phrase-eval`); the app always shows
+4. **Related passages.** When a question routes to no clause type, `search.py` splits the
+   contract into passages and ranks them against the question with the embedding router's
+   bge-base model, loaded once and shared. A passage is a group of sentences of 200 to 600
+   characters that never crosses a blank line. Up to three passages are shown, in order of
+   cosine similarity, but only those with a similarity of at least 0.55. The value was chosen
+   by hand on the demo contracts: unrelated questions scored at most 0.51, answerable ones
+   0.58 to 0.73. The passages are labelled *Related*, with the explanation that they are not
+   a clause match. Each one is a slice of the document text, so the verbatim guarantee holds.
+   Indexing a contract takes about 1 to 3 s the first time it is searched; later searches
+   take about 10 ms. Without a passage at the threshold, the reply of an empty route stays.
+   No text is generated: a generated answer to a question outside the clause types would
+   break the rule that the system writes no legal content.
+5. LLM phrasing is measured offline only (`phrase.py`, `phrase-eval`); the app always shows
    the template and there is no `ANSWER_STYLE` setting. The LLM writes one paragraph from
    the verified items. Every span in double quotes, straight or curly, must occur word for
    word in one of the verified quotes, compared with whitespace collapsed; any other span
@@ -468,12 +509,12 @@ p90) in the router table.
 
 | component | Gradio | notes |
 |---|---|---|
-| upload | `gr.File` (pdf, txt) + `gr.Button("Extract")` | content hash → cache hit skips extraction; demo documents open without the extractor model, uploads then say the model is needed |
+| upload | `gr.File` (pdf, txt) + `gr.Button("Analyze contract")` in an "Add a contract" accordion | content hash → cache hit skips extraction; demo documents open without the extractor model, uploads then say the model is needed |
 | progress | `gr.Progress` driven by the extractor's per-type callback | shows type name and elapsed time |
-| chat | `gr.Chatbot` + `gr.Textbox` | messages format (no `type=` in Gradio 6); each assistant turn is the rendered template |
-| document view | `gr.HighlightedText` | PDF: the citation's page. TXT: a window of 1,500 characters either side of the citation, widened to line breaks and labelled with its character range. The cited span is highlighted; never the whole contract |
-| citation picker | `gr.Radio` | picks which citation of a compound answer is in view |
-| clause table | `gr.Dataframe` | all types, status word on every row (found / verify / not found, styled by CSS class), best candidate, conf, page; clicking a row shows that type's top candidate |
+| chat | `gr.Chatbot` + `gr.Textbox` | messages format (no `type=` in Gradio 6); each assistant turn is the rendered template. A question outside the clause types shows up to three passages labelled Related, with a note that they are not a clause match; extra types carry "Not validated on test data" |
+| document view | `gr.HighlightedText` | PDF: the citation's page. TXT: a window of 1,500 characters either side of the citation, widened to line breaks and labelled "Excerpt around the highlighted passage". The cited span is highlighted; never the whole contract. A related passage is shown the same way, labelled "Related passage" |
+| citation picker | `gr.Radio` | picks which citation of a compound answer is in view; for related passages it picks the passage |
+| clause table | `gr.Dataframe` | all 49 types in six topics, the sixth being "Other common clauses" (the 8 extra types, Verify at most); status word on every row (found / verify / not found, styled by CSS class), best candidate, conf, page; clicking a row shows that type's top candidate |
 | thresholds | two `gr.Slider`, τ_low and τ_high, and a Reset button | defaults 0.06 / 0.91; τ_low is clamped to ≤ τ_high; filters the cached n-best live, no re-run |
 | sources | `gr.Accordion` | the answer JSON and the other n-best candidates |
 | export | `gr.DownloadButton` | the cache JSON |
@@ -563,6 +604,15 @@ Serbian.
 | build order | answers and guard before routers, so the core is tested without an LLM |
 | end-to-end evaluation | reuses the thesis test predictions (imported as caches; parity-tested) — no new inference |
 
+### Decisions taken 2026-10-18
+
+| point | decision |
+|---|---|
+| extra clause types | 8 common types CUAD lacks, asked with CUAD's question template and the same extractor, no retraining. About 0.8 s per type on a contract of about 3,300 words. Capped at Verify, since there is no gold data to validate their thresholds |
+| unmatched questions | related passages, verbatim, instead of a generated answer; shown only at cosine similarity 0.55 or more |
+| evaluations | unchanged on the 41 CUAD types; the app routes over 49 |
+| older caches | extended with the missing types only (`Extractor.extend`); the demo caches were extended this way and their 41 CUAD types are unchanged |
+
 ## 12. Demo documents (`demo/`)
 
 Chosen by data: the split's short / median-ish / p90 length, maximising the number of
@@ -578,7 +628,8 @@ against ground truth live.
 
 `demo/demo_documents.json` holds titles, lengths, present clause types and gold spans.
 M1 produces `demo/cache/<slug>.json` for all three (≈ 40 s + 100 s + 200 s on the M4) and
-they are committed, so `contract-assistant serve` opens with three ready documents. The
+they are committed (later extended with the 8 extra types; their 41 CUAD types are
+unchanged), so `contract-assistant serve` opens with three ready documents. The
 PDFs with real page numbers come from CUAD's full release (`CUAD_v1.zip →
 full_contract_pdf/`, same titles) — an M6 nicety; the `.txt` demo works without them.
 
