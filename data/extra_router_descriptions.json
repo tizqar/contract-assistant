@@ -1,0 +1,42 @@
+{
+  "Payment Terms": [
+    "when and how must the invoices be paid",
+    "the price, the payment schedule and late payment interest",
+    "how many days does the buyer have to pay"
+  ],
+  "Delivery": [
+    "when and where will the goods or services be delivered",
+    "who pays for shipping and who carries the risk in transit",
+    "delivery deadlines and acceptance of the delivered goods"
+  ],
+  "Confidentiality": [
+    "what information must be kept secret",
+    "is there a non-disclosure obligation between the parties",
+    "how long does the duty of confidentiality last"
+  ],
+  "Indemnification": [
+    "who has to compensate the other party for losses or third-party claims",
+    "one party holds the other harmless against damages",
+    "who indemnifies whom"
+  ],
+  "Termination For Breach": [
+    "can a party end the contract if the other party breaks it",
+    "termination for material breach and the time to cure it",
+    "what happens when one side fails to perform its obligations"
+  ],
+  "Force Majeure": [
+    "events beyond the parties' control that excuse performance",
+    "relief from liability for natural disasters, war or other extraordinary events",
+    "what happens if performance is prevented by circumstances nobody could foresee"
+  ],
+  "Dispute Resolution": [
+    "how are disagreements between the parties settled",
+    "arbitration, mediation or court proceedings for disputes",
+    "the steps the parties must follow before going to court"
+  ],
+  "Data Protection": [
+    "how is personal data handled and protected",
+    "obligations under privacy and data protection law such as GDPR",
+    "who processes personal data and for what purposes"
+  ]
+}

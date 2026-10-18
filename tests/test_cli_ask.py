@@ -3,15 +3,15 @@ import dataclasses
 import pytest
 
 from contract_assistant import cli
-from contract_assistant.answer import STATUS_WORDS, Answer
-from contract_assistant.clause_types import load_clause_types
+from contract_assistant.answer import EMPTY_ROUTE_MESSAGE, STATUS_WORDS, Answer
+from contract_assistant.clause_types import app_clause_types
 from contract_assistant.cli import main
 from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.router.base import RouteResult
 from contract_assistant.router.factory import UnknownBackendError
 from contract_assistant.store import Store
 from tests.support.caches import make_cache
-from tests.support.fakes import FixedRouter
+from tests.support.fakes import FakeEncoder, FixedRouter
 
 DEMO_TEXT = ROOT / "demo" / "short_supply_agreement.txt"
 DEMO_CACHE = ROOT / "demo" / "cache" / "short_supply_agreement.json"
@@ -20,7 +20,7 @@ QUESTION = "who are the parties and which law governs?"
 LATENCY_MS = 12.6
 
 
-def refuse_router(settings):
+def refuse_router(*arguments):
     raise AssertionError("no router may be built")
 
 
@@ -50,7 +50,7 @@ def fixed_router(kind: str) -> FixedRouter:
 def install_router(monkeypatch, router) -> list[Settings]:
     received = []
 
-    def build(settings):
+    def build(settings, clause_types):
         received.append(settings)
         return router
 
@@ -59,7 +59,7 @@ def install_router(monkeypatch, router) -> list[Settings]:
 
 
 def clause_names() -> list[str]:
-    return [c.name for c in load_clause_types(load_settings().clause_types_path)]
+    return [c.name for c in app_clause_types(load_settings())]
 
 
 def headings(output: str) -> list[str]:
@@ -209,7 +209,7 @@ def test_router_llm_with_another_kind_of_router_exits_one_naming_the_settings(
 
 
 def test_unknown_llm_backend_exits_one_with_the_error(monkeypatch, capsys):
-    def reject(settings):
+    def reject(settings, clause_types):
         raise UnknownBackendError("unknown LLM_BACKEND 'olama'")
 
     monkeypatch.setattr(cli, "build_router", reject)
@@ -248,3 +248,91 @@ def test_cache_written_with_other_settings_exits_one(contract, tmp_path, capsys)
     Store(tmp_path / "cache", settings.demo_cache_dir).save(stale)
     assert main(["ask", str(contract), "--types", "Parties"]) == 1
     assert "other settings" in capsys.readouterr().err
+
+
+PAYMENT_CLAUSE = "Invoices are payable within sixty days of receipt."
+PAYMENT_TEXT = (
+    f"{PAYMENT_CLAUSE} The buyer pays every invoice by bank transfer to the supplier."
+)
+PAYMENT_QUESTION = "invoices are payable within sixty days of receipt"
+PAYMENT_PASSAGE_LINE = "> Invoices are payable within sixty days of receipt. The buyer pays"
+
+
+def save_cache(tmp_path, text, clauses, page_starts=None) -> str:
+    settings = load_settings()
+    cache = make_cache(text, settings, clauses)
+    cache.page_starts = page_starts or []
+    Store(tmp_path / "cache", settings.demo_cache_dir).save(cache)
+    return cache.doc_id
+
+
+def install_empty_router(monkeypatch, question) -> None:
+    route = RouteResult(clause_types=[], kind="embedding", latency_ms=LATENCY_MS)
+    router = FixedRouter({question: route})
+    router.kind = "embedding"
+    install_router(monkeypatch, router)
+    monkeypatch.setattr(cli, "load_encoder", lambda model_id: FakeEncoder())
+
+
+def test_app_commands_build_the_router_over_the_49_app_types(monkeypatch):
+    seen = []
+    router = fixed_router("embedding")
+    monkeypatch.setattr(
+        cli, "build_router", lambda settings, types: seen.append(types) or router
+    )
+    assert main(["ask", str(DEMO_TEXT), QUESTION]) == 0
+    assert [[t.name for t in types] for types in seen] == [clause_names()]
+    assert len(seen[0]) == 49
+
+
+def test_explicit_extra_type_is_capped_at_check(tmp_path, capsys):
+    doc_id = save_cache(tmp_path, PAYMENT_TEXT, {"Payment Terms": [(PAYMENT_CLAUSE, 0.99)]})
+    assert main(["ask", doc_id, "--types", "Payment Terms", "--json"]) == 0
+    result = Answer.model_validate_json(capsys.readouterr().out)
+    assert result.items[0].status == "check"
+
+
+def test_cuad_type_is_not_capped_at_check(tmp_path, capsys):
+    doc_id = save_cache(tmp_path, PAYMENT_TEXT, {"Parties": [(PAYMENT_CLAUSE, 0.99)]})
+    assert main(["ask", doc_id, "--types", "Parties", "--json"]) == 0
+    assert Answer.model_validate_json(capsys.readouterr().out).items[0].status == "found"
+
+
+def test_types_missing_from_an_older_cache_are_dropped_from_the_answer(tmp_path, capsys):
+    doc_id = save_cache(tmp_path, PAYMENT_TEXT, {"Parties": []})
+    assert main(["ask", doc_id, "--types", "Parties,Payment Terms", "--json"]) == 0
+    result = Answer.model_validate_json(capsys.readouterr().out)
+    assert [item.clause_type for item in result.items] == ["Parties"]
+
+
+def test_empty_route_shows_the_closest_passages_after_the_message(
+    tmp_path, monkeypatch, capsys
+):
+    doc_id = save_cache(tmp_path, PAYMENT_TEXT, {"Parties": []})
+    install_empty_router(monkeypatch, PAYMENT_QUESTION)
+    assert main(["ask", doc_id, PAYMENT_QUESTION]) == 0
+    output = capsys.readouterr().out
+    assert output.index(EMPTY_ROUTE_MESSAGE) < output.index(cli.PASSAGES_MESSAGE)
+    assert PAYMENT_PASSAGE_LINE in output
+
+
+def test_passage_is_preceded_by_its_page(tmp_path, monkeypatch, capsys):
+    doc_id = save_cache(tmp_path, PAYMENT_TEXT, {"Parties": []}, page_starts=[0])
+    install_empty_router(monkeypatch, PAYMENT_QUESTION)
+    assert main(["ask", doc_id, PAYMENT_QUESTION]) == 0
+    assert f"p. 1\n{PAYMENT_PASSAGE_LINE}" in capsys.readouterr().out
+
+
+def test_empty_route_puts_the_passages_in_the_json_answer(tmp_path, monkeypatch, capsys):
+    doc_id = save_cache(tmp_path, PAYMENT_TEXT, {"Parties": []})
+    install_empty_router(monkeypatch, PAYMENT_QUESTION)
+    assert main(["ask", doc_id, PAYMENT_QUESTION, "--json"]) == 0
+    result = Answer.model_validate_json(capsys.readouterr().out)
+    assert [passage.quote for passage in result.passages] == [PAYMENT_TEXT]
+
+
+def test_routed_question_searches_no_passages(monkeypatch, capsys):
+    install_router(monkeypatch, fixed_router("embedding"))
+    monkeypatch.setattr(cli, "load_encoder", refuse_router)
+    assert main(["ask", str(DEMO_TEXT), QUESTION, "--json"]) == 0
+    assert Answer.model_validate_json(capsys.readouterr().out).passages == []

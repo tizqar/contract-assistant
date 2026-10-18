@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from contract_assistant.answer import Citation, answer
+from contract_assistant.answer import Answer, Citation, Passage, answer
 from contract_assistant.config import ROOT, Settings
 from contract_assistant.router.base import RouteResult
 from contract_assistant.store import read_cache
@@ -14,16 +14,21 @@ from contract_assistant.ui.views import (
     CONTEXT_CHARS,
     EXCERPT_LABEL,
     NO_PAGE,
+    OTHER_TOPIC,
+    PASSAGE_PREFIX,
     STATUS_LABELS,
     SUGGESTED_QUESTIONS,
     TABLE_PASSAGE_CHARS,
     TEXT_START_LABEL,
     chat_reply,
+    checklist_intro,
     clause_rows,
     display_name,
     document_name,
     document_title,
     document_view,
+    passage_choices,
+    passage_citation,
     sources_json,
     technical_markdown,
     top_citation,
@@ -168,7 +173,7 @@ def test_status_filter_keeps_only_matching_rows_and_shows_topic(settings):
 def test_every_row_of_the_demo_cache_has_a_status_label(settings):
     cache = read_cache(DEMO_CACHE, settings)
     rows = clause_rows(cache, TAU_LOW, TAU_HIGH)
-    assert len(rows) == len(cache.clauses)
+    assert len(rows) == len(clause_types())
     assert all(any(word in row[2] for word in STATUS_LABELS.values()) for row in rows)
 
 
@@ -437,3 +442,89 @@ def test_demo_governing_law_view_highlights_top_citation(settings):
     _, segments = document_view(cache, "Governing Law", citation)
     highlighted = [part for part, label in segments if label == "Governing Law"]
     assert highlighted == [citation.quote]
+
+
+def passages_answer(passages: list[Passage]) -> Answer:
+    route = RouteResult(clause_types=[], kind="embedding", latency_ms=1.0)
+    return answer(
+        "question", route, make_cache("a b", Settings()), TAU_LOW, TAU_HIGH
+    ).model_copy(update={"passages": passages})
+
+
+def a_passage(quote="Invoices are payable <b>in sixty days", page=None) -> Passage:
+    return Passage(quote=quote, page=page, score=0.7, start=0, end=len(quote))
+
+
+def test_reply_with_passages_explains_and_shows_related_badges():
+    reply = chat_reply(passages_answer([a_passage(), a_passage("Second")]))
+    assert "does not match a clause I check" in reply
+    assert reply.count('<span class="tier tier-related">Related</span>') == 2
+    assert "The first passage is highlighted" in reply
+
+
+def test_reply_with_passages_escapes_the_quote_and_shows_the_page():
+    reply = chat_reply(passages_answer([a_passage(page=4)]))
+    assert "> Invoices are payable \\<b\\>in sixty days" in reply
+    assert "<small>Page 4</small>" in reply
+
+
+def test_reply_without_passages_keeps_the_empty_route_text():
+    assert chat_reply(passages_answer([])).startswith("This question does not match any")
+
+
+def test_passage_choices_number_the_related_passages():
+    choices = passage_choices([a_passage(), a_passage()])
+    assert choices == [
+        ("Related passage 1", f"{PASSAGE_PREFIX}0"),
+        ("Related passage 2", f"{PASSAGE_PREFIX}1"),
+    ]
+
+
+def test_passage_citation_uses_the_score_as_confidence():
+    assert passage_citation(a_passage()).conf == 0.7
+
+
+def test_unvalidated_type_meta_says_it_was_not_validated(settings):
+    cache = make_cache("a b c", settings, {"Payment Terms": [("b", 0.86)]})
+    reply = chat_reply(make_answer(cache, ["Payment Terms"]), {"Payment Terms"})
+    assert "<small>Not validated on test data · 86% confidence</small>" in reply
+
+
+def test_checklist_adds_a_topic_for_extra_types_present_in_the_cache(settings):
+    cache = make_cache("a b", settings, {"Payment Terms": [("a", 0.97)], "Delivery": []})
+    rows = clause_rows(cache, TAU_LOW, TAU_HIGH, unvalidated={"Payment Terms", "Delivery"})
+    extra = [row for row in rows if row[1] in ("Payment Terms", "Delivery")]
+    assert [row[0] for row in extra] == [OTHER_TOPIC, ""]
+    assert "tier-check" in extra[0][2]
+
+
+def test_checklist_leaves_out_extra_types_missing_from_the_cache(settings):
+    cache = make_cache("a b", settings)
+    rows = clause_rows(cache, TAU_LOW, TAU_HIGH, unvalidated={"Payment Terms"})
+    assert len(rows) == len(clause_types())
+
+
+def test_technical_details_list_the_unvalidated_types(settings):
+    text = technical_markdown(settings, "embedding", {"Payment Terms"})
+    assert "Not validated on test data:** Payment Terms" in text
+
+
+def test_checklist_intro_counts_the_types_listed_and_names_the_extras(settings):
+    cache = make_cache("a b", settings, {"Payment Terms": [], "Delivery": []})
+    intro = checklist_intro(cache, {"Payment Terms", "Delivery"})
+    assert intro.startswith(f"All {len(clause_types()) + 2} clauses")
+    assert "without validation data" in intro
+
+
+def test_checklist_intro_without_extra_types_does_not_mention_them(settings):
+    intro = checklist_intro(make_cache("a b", settings), {"Payment Terms"})
+    assert intro.startswith(f"All {len(clause_types())} clauses")
+    assert "validation" not in intro
+
+
+def test_empty_route_lists_the_extra_types_after_the_other_topics(settings):
+    cache = make_cache("a b c", settings)
+    reply = chat_reply(make_answer(cache, []), {"Payment Terms", "Delivery"})
+    lines = [line for line in reply.splitlines() if line.startswith("- **")]
+    assert lines[-1].startswith(f"- **{OTHER_TOPIC}:**")
+    assert "Payment Terms" in lines[-1] and "Delivery" in lines[-1]

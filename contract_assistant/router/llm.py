@@ -27,7 +27,7 @@ EXAMPLES = (
         "Who owns the IP developed under the contract, and is any of it owned jointly?",
         ["IP Ownership Assignment", "Joint IP Ownership"],
     ),
-    ("Is there a force majeure clause?", []),
+    ("How many pages does this contract have?", []),
 )
 
 

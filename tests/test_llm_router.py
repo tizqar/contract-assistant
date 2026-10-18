@@ -167,6 +167,10 @@ def test_worked_examples_only_use_clause_type_names(types):
     assert all(set(example) <= names for _, example in EXAMPLES)
 
 
+def test_out_of_scope_worked_example_is_not_a_clause_type_question(types):
+    assert ("How many pages does this contract have?", []) in EXAMPLES
+
+
 def test_worked_examples_are_not_evaluation_questions():
     evaluation = {normalised(q.question) for q in load_questions(Settings().router_eval_path)}
     assert not evaluation & {normalised(question) for question, _ in EXAMPLES}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from bisect import bisect_right
+from collections.abc import Collection
 from pathlib import Path
 
 from contract_assistant.answer import (
@@ -10,6 +11,7 @@ from contract_assistant.answer import (
     Answer,
     AnswerItem,
     Citation,
+    Passage,
     Status,
     blockquote,
     tier,
@@ -70,6 +72,7 @@ CLAUSE_GROUPS: dict[str, tuple[str, ...]] = {
         "Third Party Beneficiary",
     ),
 }
+OTHER_TOPIC = "Other common clauses"
 STATUS_LABELS: dict[Status, str] = {
     "found": "Found",
     "check": "Verify",
@@ -82,7 +85,7 @@ SUGGESTED_QUESTIONS = [
     "When does the agreement expire, and does it renew?",
     "Can either party terminate without cause?",
     "Is there a non-compete or exclusivity obligation?",
-    "Is liability capped?",
+    "What are the payment terms?",
 ]
 SMALL_WORDS = frozenset({"Of", "To", "On", "Or", "For"})
 DISPLAY_OVERRIDES = {
@@ -96,7 +99,21 @@ WITHHELD_TEXT = (
     "A matching passage was found but it could not be verified word for word "
     "against the contract, so it is not shown."
 )
+CHECKLIST_INTRO = (
+    "All {count} clauses the assistant checks, by topic. Select a row to see its passage."
+)
+CHECKLIST_EXTRA_INTRO = (
+    " The other common clauses are checked without validation data "
+    "and are shown as Verify at most."
+)
 EMPTY_ROUTE_TEXT = "This question does not match any of the clauses I check."
+PASSAGES_TEXT = (
+    "This question does not match a clause I check. These are the passages of the "
+    "contract closest to it; read them to find the answer."
+)
+UNVALIDATED_TEXT = "Not validated on test data"
+RELATED_LABEL = "Related passage"
+PASSAGE_PREFIX = "passage-"
 HIGHLIGHT_TEXT = {
     1: "The passage is highlighted in the document on the right.",
     2: (
@@ -153,18 +170,55 @@ def _percent(conf: float) -> str:
     return f"{conf:.0%}"
 
 
-def chat_reply(answer: Answer) -> str:
+def chat_reply(answer: Answer, unvalidated: Collection[str] = ()) -> str:
     """Return the Markdown shown in the chat for an answer."""
     if not answer.items:
-        return _empty_route_reply()
-    blocks = [_item_block(item) for item in answer.items]
+        return (
+            _passages_reply(answer.passages)
+            if answer.passages
+            else _empty_route_reply(unvalidated)
+        )
+    blocks = [_item_block(item, item.clause_type in unvalidated) for item in answer.items]
     shown = sum(item.citation is not None for item in answer.items)
     if shown:
         blocks.append(f"<small>{HIGHLIGHT_TEXT[min(shown, 2)]}</small>")
     return "\n\n".join(blocks)
 
 
-def _item_block(item: AnswerItem) -> str:
+def _passages_reply(passages: list[Passage]) -> str:
+    blocks = [PASSAGES_TEXT, *(_passage_block(i, p) for i, p in enumerate(passages, start=1))]
+    blocks.append(f"<small>{HIGHLIGHT_TEXT[min(len(passages), 2)]}</small>")
+    return "\n\n".join(blocks)
+
+
+def _passage_block(number: int, passage: Passage) -> str:
+    heading = f'<span class="tier tier-related">Related</span> **Passage {number}**'
+    block = f"{heading}\n{blockquote(passage.quote)}"
+    if passage.page is None:
+        return block
+    return f"{block}\n\n<small>Page {passage.page}</small>"
+
+
+def passage_choices(passages: list[Passage]) -> list[tuple[str, str]]:
+    """Return the (label, value) choices that select each related passage."""
+    return [
+        (f"{RELATED_LABEL} {number}", f"{PASSAGE_PREFIX}{number - 1}")
+        for number in range(1, len(passages) + 1)
+    ]
+
+
+def passage_citation(passage: Passage) -> Citation:
+    """Return a related passage as a citation, with its score as the confidence."""
+    return Citation(
+        quote=passage.quote,
+        page=passage.page,
+        conf=passage.score,
+        start=passage.start,
+        end=passage.end,
+    )
+
+
+def _item_block(item: AnswerItem, unvalidated: bool) -> str:
     heading = f"{_badge(item.status)} **{display_name(item.clause_type)}**"
     if item.withheld:
         return f"{heading}\n\n{WITHHELD_TEXT}"
@@ -172,36 +226,62 @@ def _item_block(item: AnswerItem) -> str:
         return f"{heading}\n\n{NOT_FOUND_TEXT}"
     citation = item.citation
     meta = f"{_percent(citation.conf)} confidence"
+    if unvalidated:
+        meta = f"{UNVALIDATED_TEXT} · {meta}"
     if citation.page is not None:
         meta = f"Page {citation.page} · {meta}"
     return f"{heading}\n{blockquote(citation.quote)}\n\n<small>{meta}</small>"
 
 
-def _empty_route_reply() -> str:
-    topics = "\n".join(
+def _empty_route_reply(unvalidated: Collection[str]) -> str:
+    topics = dict(CLAUSE_GROUPS)
+    if unvalidated:
+        topics[OTHER_TOPIC] = tuple(sorted(unvalidated))
+    lines = "\n".join(
         f"- **{topic}:** {', '.join(display_name(name) for name in names)}"
-        for topic, names in CLAUSE_GROUPS.items()
+        for topic, names in topics.items()
     )
     examples = " or ".join(f"\u201c{q}\u201d" for q in SUGGESTED_QUESTIONS[:EXAMPLE_QUESTIONS])
-    return f"{EMPTY_ROUTE_TEXT}\n\nI can answer questions about:\n\n{topics}\n\nFor example: {examples}"
+    return f"{EMPTY_ROUTE_TEXT}\n\nI can answer questions about:\n\n{lines}\n\nFor example: {examples}"
 
 
 def clause_rows(
-    cache: DocumentCache, tau_low: float, tau_high: float, status: Status | None = None
+    cache: DocumentCache,
+    tau_low: float,
+    tau_high: float,
+    status: Status | None = None,
+    unvalidated: Collection[str] = (),
 ) -> list[list[str]]:
     """Return one row per clause type in topic order, optionally only those with a status."""
     rows = []
-    for topic, names in CLAUSE_GROUPS.items():
+    for topic, names in _topics(cache, unvalidated).items():
         for position, name in enumerate(names):
             candidates = cache.clauses.get(name, [])
-            row_status = (
-                tier(candidates[0].conf, tau_low, tau_high) if candidates else "not_found"
-            )
+            row_status = _row_status(candidates, tau_low, tau_high, name in unvalidated)
             if status is not None and row_status != status:
                 continue
             label = topic if position == 0 or status is not None else ""
             rows.append(_row(label, name, row_status, candidates))
     return rows
+
+
+def checklist_intro(cache: DocumentCache, unvalidated: Collection[str] = ()) -> str:
+    """Return the line under the checklist tab, counting the clauses listed for cache."""
+    topics = _topics(cache, unvalidated)
+    intro = CHECKLIST_INTRO.format(count=sum(len(names) for names in topics.values()))
+    return intro + CHECKLIST_EXTRA_INTRO if OTHER_TOPIC in topics else intro
+
+
+def _topics(cache: DocumentCache, unvalidated: Collection[str]) -> dict[str, tuple[str, ...]]:
+    extra = tuple(name for name in cache.clauses if name in unvalidated)
+    return {**CLAUSE_GROUPS, OTHER_TOPIC: extra} if extra else CLAUSE_GROUPS
+
+
+def _row_status(candidates: list, tau_low: float, tau_high: float, capped: bool) -> Status:
+    if not candidates:
+        return "not_found"
+    status = tier(candidates[0].conf, tau_low, tau_high)
+    return "check" if capped and status == "found" else status
 
 
 def _row(topic: str, name: str, status: Status, candidates: list) -> list[str]:
@@ -295,16 +375,20 @@ def _segments(
     return [part for part in parts if part[0]]
 
 
-def technical_markdown(settings: Settings, route_kind: str) -> str:
+def technical_markdown(
+    settings: Settings, route_kind: str, unvalidated: Collection[str] = ()
+) -> str:
     """Return the technical facts behind the answers as a short Markdown list."""
-    return "\n".join(
-        [
-            f"- **Extraction model:** `{settings.extractor_name}`",
-            f"- **Question matching:** {_matching(settings, route_kind)}",
-            f"- **Found from:** {_percent(settings.tau_high)} confidence ({settings.tau_source})",
-            f"- **Verify from:** {_percent(settings.tau_low)} confidence ({settings.tau_source})",
-        ]
-    )
+    lines = [
+        f"- **Extraction model:** `{settings.extractor_name}`",
+        f"- **Question matching:** {_matching(settings, route_kind)}",
+        f"- **Found from:** {_percent(settings.tau_high)} confidence ({settings.tau_source})",
+        f"- **Verify from:** {_percent(settings.tau_low)} confidence ({settings.tau_source})",
+    ]
+    if unvalidated:
+        names = ", ".join(display_name(name) for name in sorted(unvalidated))
+        lines.append(f"- **Not validated on test data:** {names}")
+    return "\n".join(lines)
 
 
 def _matching(settings: Settings, route_kind: str) -> str:

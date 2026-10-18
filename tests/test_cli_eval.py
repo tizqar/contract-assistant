@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from contract_assistant import cli
+from contract_assistant.clause_types import load_clause_types
 from contract_assistant.cli import main
 from contract_assistant.config import Settings
 from contract_assistant.evaluation.e2e import E2EReport, OracleRouter
@@ -96,7 +97,7 @@ class FakeScorer:
         return self.prepared[question]
 
 
-def refuse_build(settings):
+def refuse_build(*arguments):
     raise AssertionError("no router or client may be built")
 
 
@@ -189,7 +190,7 @@ def mixed_client() -> FakeLLMClient:
 def install(monkeypatch, name: str, built) -> list[Settings]:
     received = []
 
-    def build(settings):
+    def build(settings, *clause_types):
         received.append(settings)
         return built
 
@@ -210,7 +211,7 @@ def use_settings(monkeypatch, settings: Settings) -> None:
 
 
 def reject_backend(monkeypatch, name: str) -> None:
-    def reject(settings):
+    def reject(settings, *clause_types):
         raise UnknownBackendError("unknown LLM_BACKEND 'olama'")
 
     monkeypatch.setattr(cli, name, reject)
@@ -239,7 +240,7 @@ def table_rows(text: str) -> list[list[str]]:
 
 def tune(monkeypatch) -> FakeScorer:
     scorer = FakeScorer(DEV_SCORES)
-    monkeypatch.setattr(cli, "build_embedding_router", lambda settings: scorer)
+    monkeypatch.setattr(cli, "build_embedding_router", lambda settings, clause_types: scorer)
     return scorer
 
 
@@ -746,3 +747,28 @@ def test_serve_with_an_unknown_backend_exits_one(monkeypatch, capsys):
     reject_backend(monkeypatch, "build_router")
     assert main(["serve"]) == 1
     assert capsys.readouterr().err.endswith("error: unknown LLM_BACKEND 'olama'\n")
+
+
+@pytest.mark.parametrize(
+    ("builder", "arguments", "built"),
+    [
+        ("build_embedding_router", ["router-tune"], FakeScorer(DEV_SCORES)),
+        ("build_router", ["router-eval", "--router", "llm"], fixed_router("llm")),
+        ("build_router", ["e2e-eval", "--router", "llm"], fixed_router("llm")),
+    ],
+    ids=["router-tune", "router-eval", "e2e-eval"],
+)
+def test_evaluation_commands_build_the_router_over_the_41_cuad_types(
+    builder, arguments, built, thesis, settings, monkeypatch
+):
+    received = []
+
+    def build(settings, clause_types):
+        received.append([clause_type.name for clause_type in clause_types])
+        return built
+
+    monkeypatch.setattr(cli, builder, build)
+    main(arguments)
+    expected = [c.name for c in load_clause_types(settings.clause_types_path)]
+    assert received == [expected]
+    assert len(expected) == 41

@@ -4,7 +4,7 @@ import zlib
 
 import numpy as np
 
-from contract_assistant.clause_types import load_clause_types
+from contract_assistant.clause_types import app_clause_types
 from contract_assistant.config import load_settings
 from contract_assistant.extract.qa_core import Candidate
 from contract_assistant.router.base import RouteResult
@@ -63,6 +63,14 @@ ROUTE_KEYWORDS: dict[str, list[str]] = {
     "dates": ["Agreement Date", "Effective Date", "Expiration Date", "Renewal Term"],
     "escrow": ["Source Code Escrow"],
     "exclusive": ["Exclusivity"],
+    "payment": ["Payment Terms"],
+    "deliver": ["Delivery"],
+    "confidential": ["Confidentiality"],
+    "indemn": ["Indemnification"],
+    "dispute": ["Dispute Resolution"],
+    "arbitration": ["Dispute Resolution"],
+    "force majeure": ["Force Majeure"],
+    "personal data": ["Data Protection"],
 }
 SLOW_QA_DELAY_S = 0.1
 LAW_CONFIDENCE = 0.95
@@ -75,7 +83,7 @@ class FakeRouter:
     kind = "explicit"
 
     def __init__(self):
-        self.names = [c.name for c in load_clause_types(load_settings().clause_types_path)]
+        self.names = [c.name for c in app_clause_types(load_settings())]
 
     def route(self, question: str) -> RouteResult:
         started = time.perf_counter()
@@ -146,6 +154,6 @@ class _SlowQA(FakeQA):
 
 def slow_fake_qa(delay_s: float = SLOW_QA_DELAY_S) -> FakeQA:
     """Return a FakeQA that sleeps per call and cites the first sentence on law."""
-    clause_types = load_clause_types(load_settings().clause_types_path)
+    clause_types = app_clause_types(load_settings())
     law = next(c for c in clause_types if c.name == "Governing Law")
     return _SlowQA(delay_s, law.cuad_question)

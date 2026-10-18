@@ -147,6 +147,18 @@ def test_every_type_has_two_or_three_paraphrases():
     assert all(2 <= len(texts) <= 3 for texts in paraphrases.values())
 
 
+def test_every_extra_description_name_is_an_extra_clause_type():
+    settings = Settings()
+    if not settings.extra_clause_types_path.exists():
+        pytest.skip("data/extra_clause_types.json does not exist yet")
+    from contract_assistant.clause_types import load_extra_clause_types
+
+    extra = {t.name for t in load_extra_clause_types(settings.extra_clause_types_path)}
+    paraphrases = json.loads(settings.extra_router_descriptions_path.read_text())
+    assert set(paraphrases) == extra
+    assert all(2 <= len(texts) <= 3 for texts in paraphrases.values())
+
+
 def test_load_descriptions_puts_the_cuad_description_first(types):
     descriptions = load_descriptions(types, Settings().router_descriptions_path)
     assert descriptions[types[0].name][0] == types[0].description

@@ -7,6 +7,7 @@ import json
 import logging
 import re
 import sys
+import time
 from dataclasses import replace
 from pathlib import Path
 from typing import get_args
@@ -14,8 +15,20 @@ from typing import get_args
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
-from contract_assistant.answer import answer, render_markdown
-from contract_assistant.clause_types import load_clause_types
+from contract_assistant.answer import (
+    Answer,
+    Passage,
+    answer,
+    blockquote,
+    render_markdown,
+    restrict_to_cache,
+)
+from contract_assistant.clause_types import (
+    ClauseType,
+    app_clause_types,
+    load_clause_types,
+    load_extra_clause_types,
+)
 from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.evaluation.e2e import (
     ORACLE,
@@ -46,7 +59,9 @@ from contract_assistant.router.factory import (
     build_embedding_router,
     build_llm_client,
     build_router,
+    load_encoder,
 )
+from contract_assistant.search import PassageSearch
 from contract_assistant.store import (
     DOC_ID_PREFIX,
     CacheIntegrityError,
@@ -81,6 +96,7 @@ ROUTER_TABLE = "router.md"
 E2E_RESULTS = "e2e_*.json"
 E2E_TABLE = "e2e.md"
 ORACLE_RESULT = f"e2e_{ORACLE}.json"
+PASSAGES_MESSAGE = "Passages of the contract closest to the question:"
 WARM_UP_QUESTION = "Is there an arbitration clause?"
 CLEAR_LINE = "\r\033[K"
 CACHE_ERRORS = (CacheMismatchError, CacheIntegrityError)
@@ -120,15 +136,30 @@ def _progress(done: int, total: int, name: str) -> None:
     print(f"{CLEAR_LINE}  {done}/{total} {name}", end="", file=sys.stderr, flush=True)
 
 
-def _valid_cache_path(store: Store, doc_id: str, settings: Settings) -> Path | None:
-    found = store.find(doc_id)
-    if found is None:
+def _existing_cache(
+    path: Path, doc_id: str, args: argparse.Namespace, settings: Settings, store: Store
+) -> tuple[DocumentCache, Path] | None:
+    found = settings.demo_cache_dir / f"{path.stem}.json" if args.demo else store.find(doc_id)
+    if found is None or not found.is_file():
         return None
     try:
-        store.load_path(found, settings)
+        cache = store.load_path(found, settings)
     except CacheMismatchError:
         return None
-    return found
+    return (cache, found) if cache.doc_id == doc_id else None
+
+
+def _missing_types(cache: DocumentCache, settings: Settings) -> list[str]:
+    return [c.name for c in app_clause_types(settings) if c.name not in cache.clauses]
+
+
+def _save(
+    cache: DocumentCache, demo_target: Path, args: argparse.Namespace, store: Store
+) -> Path:
+    if not args.demo:
+        return store.save(cache)
+    write_cache(cache, demo_target)
+    return demo_target
 
 
 def _extract_file(
@@ -140,22 +171,37 @@ def _extract_file(
 ) -> tuple[str, Extractor | None]:
     doc = load_document(path)
     doc_id = doc_id_of(doc.text)
-    found = None if args.demo else _valid_cache_path(store, doc_id, settings)
-    if found:
-        return f"{path.name}: cache hit -> {_relative(found)}", extractor
+    existing = _existing_cache(path, doc_id, args, settings, store)
+    if existing and not _missing_types(existing[0], settings):
+        return f"{path.name}: cache hit -> {_relative(existing[1])}", extractor
     extractor = extractor or Extractor.from_settings(settings)
+    if existing:
+        return _extend_file(path, existing, args, extractor, store), extractor
     cache = extractor.extract(doc, _progress)
     print(CLEAR_LINE, end="", file=sys.stderr)
-    if args.demo:
-        target = settings.demo_cache_dir / f"{path.stem}.json"
-        write_cache(cache, target)
-    else:
-        target = store.save(cache)
+    target = _save(cache, settings.demo_cache_dir / f"{path.stem}.json", args, store)
     seconds = cache.timing["extract_s"]
     return (
         f"{path.name}: {cache.source.n_chars} chars, {seconds} s -> {_relative(target)}",
         extractor,
     )
+
+
+def _extend_file(
+    path: Path,
+    existing: tuple[DocumentCache, Path],
+    args: argparse.Namespace,
+    extractor: Extractor,
+    store: Store,
+) -> str:
+    cache, found = existing
+    started = time.perf_counter()
+    extended = extractor.extend(cache, _progress)
+    seconds = time.perf_counter() - started
+    print(CLEAR_LINE, end="", file=sys.stderr)
+    added = len(extended.clauses) - len(cache.clauses)
+    target = _save(extended, found, args, store)
+    return f"{path.name}: extended with {added} clause types, {seconds:.1f} s -> {_relative(target)}"
 
 
 def _cmd_extract(args: argparse.Namespace) -> int:
@@ -203,7 +249,9 @@ def _quote(text: str) -> str:
 
 
 def _row(name: str, width: int, cache: DocumentCache) -> str:
-    candidates = cache.clauses.get(name, [])
+    if name not in cache.clauses:
+        return f"{name:<{width}}  missing"
+    candidates = cache.clauses[name]
     if not candidates:
         return f"{name:<{width}}  {'-':>5}  {'-':>4}  "
     best = candidates[0]
@@ -220,11 +268,19 @@ def _cmd_show(args: argparse.Namespace) -> int:
         f"{cache.source.filename}  {cache.source.n_chars} chars  "
         f"model {cache.model.name}  origin {cache.model.origin}"
     )
-    names = [clause_type.name for clause_type in load_clause_types(settings.clause_types_path)]
+    names = _names(app_clause_types(settings))
     width = max(len(name) for name in names)
     for name in names:
         print(_row(name, width, cache))
     return 0
+
+
+def _names(clause_types: list[ClauseType]) -> list[str]:
+    return [clause_type.name for clause_type in clause_types]
+
+
+def _extra_names(settings: Settings) -> frozenset[str]:
+    return frozenset(_names(load_extra_clause_types(settings.extra_clause_types_path)))
 
 
 def _split_names(raw: str) -> list[str]:
@@ -249,10 +305,12 @@ def _llm_settings(settings: Settings) -> str:
     return f"LLM_BACKEND={settings.llm_backend}, LLM_MODEL={settings.llm_model}"
 
 
-def _asked_router(choice: str | None, settings: Settings) -> Router | None:
+def _asked_router(
+    choice: str | None, settings: Settings, clause_types: list[ClauseType]
+) -> Router | None:
     if choice == "embedding":
         settings = replace(settings, llm_backend=BACKEND_NONE)
-    router = build_router(settings)
+    router = build_router(settings, clause_types)
     if choice is not None and router.kind != choice:
         print(
             f"error: the {choice} router is not available ({_llm_settings(settings)})",
@@ -262,30 +320,61 @@ def _asked_router(choice: str | None, settings: Settings) -> Router | None:
     return router
 
 
-def _route(args: argparse.Namespace, settings: Settings) -> RouteResult | None:
+def _route(
+    args: argparse.Namespace, settings: Settings, clause_types: list[ClauseType]
+) -> RouteResult | None:
     if args.types is not None:
         types = _split_names(args.types)
         return RouteResult(clause_types=types, kind="explicit", latency_ms=0.0)
-    router = _asked_router(args.router, settings)
+    router = _asked_router(args.router, settings, clause_types)
     return None if router is None else router.route(args.question)
+
+
+def _render(result: Answer, names: list[str]) -> str:
+    text = render_markdown(result, names)
+    if not result.passages:
+        return text
+    passages = [_render_passage(passage) for passage in result.passages]
+    return "\n\n".join([text, PASSAGES_MESSAGE, *passages])
+
+
+def _render_passage(passage: Passage) -> str:
+    quote = blockquote(passage.quote)
+    return quote if passage.page is None else f"p. {passage.page}\n{quote}"
+
+
+def _with_passages(result: Answer, cache: DocumentCache, settings: Settings) -> Answer:
+    search = PassageSearch(load_encoder(settings.embedding_model_id))
+    return result.model_copy(update={"passages": search.search(cache, result.question)})
 
 
 def _cmd_ask(args: argparse.Namespace) -> int:
     settings = load_settings()
-    names = [clause_type.name for clause_type in load_clause_types(settings.clause_types_path)]
+    clause_types = app_clause_types(settings)
+    names = _names(clause_types)
     if not _valid_ask_arguments(args, names):
         return EXIT_USAGE
     cache = _load_cache(args.target, settings)
     if cache is None:
         return EXIT_ERROR
-    route = _route(args, settings)
+    route = _route(args, settings, clause_types)
     if route is None:
         return EXIT_ERROR
-    result = answer(args.question, route, cache, settings.tau_low, settings.tau_high)
+    route = restrict_to_cache(route, cache)
+    result = answer(
+        args.question,
+        route,
+        cache,
+        settings.tau_low,
+        settings.tau_high,
+        unvalidated=_extra_names(settings),
+    )
+    if args.types is None and not route.clause_types:
+        result = _with_passages(result, cache, settings)
     if args.json:
         print(result.model_dump_json(indent=JSON_INDENT))
         return 0
-    print(render_markdown(result, names))
+    print(_render(result, names))
     if args.types is None:
         print(f"\nrouter: {route.kind} · {route.latency_ms:.0f} ms")
     return 0
@@ -328,7 +417,7 @@ def _publish(name: str, table: str) -> None:
 
 
 def _warmed_router(choice: str, settings: Settings) -> Router | None:
-    router = _asked_router(choice, settings)
+    router = _asked_router(choice, settings, load_clause_types(settings.clause_types_path))
     if router is None:
         return None
     # The first call loads the model, so its latency says nothing about a question.
@@ -339,7 +428,7 @@ def _warmed_router(choice: str, settings: Settings) -> Router | None:
 def _cmd_router_tune(args: argparse.Namespace) -> int:
     settings = load_settings()
     dev = load_questions(settings.router_eval_path, TUNING_SPLIT)
-    router = build_embedding_router(settings)
+    router = build_embedding_router(settings, load_clause_types(settings.clause_types_path))
     sweep = threshold_sweep(router, dev, THRESHOLD_GRID)
     threshold = tune_threshold(router, dev, THRESHOLD_GRID)
     tuning = {
@@ -482,7 +571,8 @@ def _cmd_serve(args: argparse.Namespace) -> int:
 
     logging.basicConfig(level=logging.INFO)
     settings = load_settings()
-    router = build_router(settings)
+    app_types = app_clause_types(settings)
+    router = build_router(settings, app_types)
     store = Store(settings.cache_dir, settings.demo_cache_dir)
     try:
         extractor = Extractor.from_settings(settings)
@@ -492,8 +582,15 @@ def _cmd_serve(args: argparse.Namespace) -> int:
             f"uploads need the extractor model in {settings.extractor_path}",
             file=sys.stderr,
         )
-    clause_types = load_clause_types(settings.clause_types_path)
-    services = Services(store, router, extractor, clause_types, settings)
+    services = Services(
+        store,
+        router,
+        extractor,
+        app_types,
+        settings,
+        PassageSearch(load_encoder(settings.embedding_model_id)),
+        _extra_names(settings),
+    )
     launch_app(build_app(services), services, share=args.share, port=args.port)
     return 0
 

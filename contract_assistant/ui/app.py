@@ -9,12 +9,13 @@ from pathlib import Path
 
 import gradio as gr
 
-from contract_assistant.answer import Answer, Status, answer
+from contract_assistant.answer import Answer, Status, answer, restrict_to_cache
 from contract_assistant.clause_types import ClauseType
 from contract_assistant.config import Settings
 from contract_assistant.extract.extractor import Extractor
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
 from contract_assistant.router.base import Router
+from contract_assistant.search import PassageSearch
 from contract_assistant.store import (
     CacheIntegrityError,
     CacheMismatchError,
@@ -24,14 +25,19 @@ from contract_assistant.store import (
 )
 from contract_assistant.ui.views import (
     CLAUSE_HEADERS,
+    PASSAGE_PREFIX,
+    RELATED_LABEL,
     STATUS_LABELS,
     SUGGESTED_QUESTIONS,
     chat_reply,
+    checklist_intro,
     clause_rows,
     display_name,
     document_name,
     document_title,
     document_view,
+    passage_choices,
+    passage_citation,
     sources_json,
     technical_markdown,
     top_citation,
@@ -81,9 +87,7 @@ CHAT_PLACEHOLDER = (
     "Each answer is marked Found, Verify (read the passage before relying on it) "
     "or Not found (the contract does not appear to contain the clause)."
 )
-CHECKLIST_INTRO = (
-    "All {count} clauses the assistant checks, by topic. Select a row to see its passage."
-)
+ANALYSIS_UPDATED = "Analysis updated"
 THRESHOLD_HELP = (
     "A passage at or above the first value is marked Found. Between the two values it is "
     "marked Verify. Below the second value the clause is reported as not found. "
@@ -112,9 +116,11 @@ CSS = """
 .tier-found { background: #1f7a4d; color: #ffffff; }
 .tier-check { background: transparent; border-color: #b45309; color: #92400e; }
 .tier-not_found { background: transparent; border-color: #9ca3af; color: #6b7280; }
+.tier-related { background: #e5e7eb; color: #374151; }
 .dark .tier-found { background: #34a56f; color: #06210f; }
 .dark .tier-check { border-color: #fbbf24; color: #fbbf24; }
 .dark .tier-not_found { border-color: #6b7280; color: #9ca3af; }
+.dark .tier-related { background: #374151; color: #e5e7eb; }
 #chat .message, #clause-table td, #clause-table td * {
   overflow-wrap: anywhere;
   white-space: normal;
@@ -159,6 +165,8 @@ class Services:
     extractor: Extractor | None
     clause_types: list[ClauseType]
     settings: Settings
+    search: PassageSearch
+    unvalidated: frozenset[str]
 
 
 def guarded(handler: Callable) -> Callable:
@@ -230,13 +238,16 @@ class Handlers:
             return gr.skip()
         label, segments = document_view(cache, None, None)
         path = services.store.find(doc_id)
-        rows = clause_rows(cache, tau_low, tau_high, status_of_filter(status_filter))
+        rows = clause_rows(
+            cache, tau_low, tau_high, status_of_filter(status_filter), services.unvalidated
+        )
         return (
             cache,
             None,
             [],
             document_title(cache),
             rows,
+            checklist_intro(cache, services.unvalidated),
             label,
             segments,
             gr.Radio(choices=[], value=None, visible=False),
@@ -260,16 +271,20 @@ class Handlers:
         if cache is None:
             gr.Warning("Select a contract first.")
             return gr.skip()
-        route = self.services.router.route(question)
+        services = self.services
+        route = restrict_to_cache(services.router.route(question), cache)
         try:
-            result = answer(question, route, cache, tau_low, tau_high)
+            result = answer(question, route, cache, tau_low, tau_high, services.unvalidated)
         except ValueError as error:
             gr.Warning(str(error))
             return gr.skip()
+        if not route.clause_types:
+            passages = services.search.search(cache, question)
+            result = result.model_copy(update={"passages": passages})
         history = [
             *(history or []),
             {"role": "user", "content": question},
-            {"role": "assistant", "content": chat_reply(result)},
+            {"role": "assistant", "content": chat_reply(result, services.unvalidated)},
         ]
         picker, label, segments = _citation_updates(result, cache)
         return (
@@ -293,6 +308,9 @@ class Handlers:
         for item in last.items:
             if item.clause_type == clause_type and item.citation:
                 return document_view(cache, clause_type, item.citation)
+        for index, passage in enumerate(last.passages):
+            if clause_type == f"{PASSAGE_PREFIX}{index}":
+                return document_view(cache, RELATED_LABEL, passage_citation(passage))
         return gr.skip()
 
     @guarded
@@ -300,7 +318,7 @@ class Handlers:
         self, status_filter: str, tau_low: float, tau_high: float, cache: DocumentCache | None
     ):
         """Show only the checklist rows with the chosen status."""
-        return _table(cache, tau_low, tau_high, status_filter)
+        return _table(cache, tau_low, tau_high, status_filter, self.services.unvalidated)
 
     @guarded
     def release_low(
@@ -308,7 +326,9 @@ class Handlers:
     ):
         """Keep the Verify threshold at or below the Found threshold and re-tier the checklist."""
         tau_low = min(tau_low, tau_high)
-        return tau_low, _table(cache, tau_low, tau_high, status_filter)
+        return tau_low, _table(
+            cache, tau_low, tau_high, status_filter, self.services.unvalidated
+        )
 
     @guarded
     def release_high(
@@ -316,13 +336,20 @@ class Handlers:
     ):
         """Keep the Found threshold at or above the Verify threshold and re-tier the checklist."""
         tau_high = max(tau_high, tau_low)
-        return tau_high, _table(cache, tau_low, tau_high, status_filter)
+        return tau_high, _table(
+            cache, tau_low, tau_high, status_filter, self.services.unvalidated
+        )
 
     @guarded
     def reset_thresholds(self, cache: DocumentCache | None, status_filter: str):
         """Restore the default thresholds and re-tier the checklist."""
-        tau_low, tau_high = self.services.settings.tau_low, self.services.settings.tau_high
-        return tau_low, tau_high, _table(cache, tau_low, tau_high, status_filter)
+        services = self.services
+        tau_low, tau_high = services.settings.tau_low, services.settings.tau_high
+        return (
+            tau_low,
+            tau_high,
+            _table(cache, tau_low, tau_high, status_filter, services.unvalidated),
+        )
 
     @guarded
     def show_row(self, cache: DocumentCache | None, evt: gr.SelectData):
@@ -347,43 +374,78 @@ class Handlers:
         try:
             doc = load_document(Path(path))
             doc_id = doc_id_of(doc.text)
-            known = self._has_analysis(doc_id)
+            cached = self._cached(doc_id)
         except UPLOAD_ERRORS as error:
             gr.Warning(str(error))
             return gr.skip()
-        if known:
-            gr.Info(f"{document_name(doc.filename)}: already analysed")
-            return self._selected(doc_id), "Already analysed"
         extractor = services.extractor
+        report = _reporter(progress)
+        if cached is not None and extractor is not None:
+            extended = extractor.extend(cached, report)
+            if extended is not cached:
+                services.store.save(extended)
+                return self._selected(doc_id), ANALYSIS_UPDATED, doc_id
+        if cached is not None:
+            gr.Info(f"{document_name(doc.filename)}: already analysed")
+            return self._selected(doc_id), "Already analysed", None
         if extractor is None:
             gr.Warning(NO_MODEL)
             return gr.skip()
-        started = time.perf_counter()
-
-        def report(done: int, total: int, name: str) -> None:
-            elapsed = time.perf_counter() - started
-            progress((done, total), desc=f"Checking {display_name(name)} · {elapsed:.0f} s")
-
         services.store.save(extractor.extract(doc, report))
-        return self._selected(doc_id), "Analysis complete"
+        return self._selected(doc_id), "Analysis complete", None
 
-    def _has_analysis(self, doc_id: str) -> bool:
+    @guarded
+    def reload_extended(
+        self, doc_id: str | None, tau_low: float, tau_high: float, status_filter: str
+    ):
+        """Reopen a contract whose analysis was just extended; do nothing otherwise."""
+        if not doc_id:
+            return gr.skip()
+        result = self.open_document(doc_id, tau_low, tau_high, status_filter)
+        return (*result, None) if isinstance(result, tuple) else result
+
+    def _cached(self, doc_id: str) -> DocumentCache | None:
         try:
-            return self.services.store.load(doc_id, self.services.settings) is not None
+            return self.services.store.load(doc_id, self.services.settings)
         except CacheMismatchError:
-            return False
+            return None
 
     def _selected(self, doc_id: str) -> gr.Dropdown:
         return gr.Dropdown(choices=document_choices(self.services.store), value=doc_id)
 
 
-def _table(cache: DocumentCache | None, tau_low: float, tau_high: float, status_filter: str):
+def _reporter(progress: gr.Progress) -> Callable[[int, int, str], None]:
+    started = time.perf_counter()
+
+    def report(done: int, total: int, name: str) -> None:
+        elapsed = time.perf_counter() - started
+        progress((done, total), desc=f"Checking {display_name(name)} · {elapsed:.0f} s")
+
+    return report
+
+
+def _table(
+    cache: DocumentCache | None,
+    tau_low: float,
+    tau_high: float,
+    status_filter: str,
+    unvalidated: frozenset[str],
+):
     if cache is None:
         return gr.skip()
-    return clause_rows(cache, tau_low, tau_high, status_of_filter(status_filter))
+    return clause_rows(cache, tau_low, tau_high, status_of_filter(status_filter), unvalidated)
 
 
 def _citation_updates(result: Answer, cache: DocumentCache):
+    if result.passages:
+        first = passage_citation(result.passages[0])
+        label, segments = document_view(cache, RELATED_LABEL, first)
+        picker = gr.Radio(
+            choices=passage_choices(result.passages),
+            value=f"{PASSAGE_PREFIX}0",
+            visible=True,
+        )
+        return picker, label, segments
     cited = [item for item in result.items if item.citation]
     picker = gr.Radio(
         choices=[(display_name(item.clause_type), item.clause_type) for item in cited],
@@ -402,10 +464,12 @@ def build_app(services: Services) -> gr.Blocks:
     settings = services.settings
     choices = document_choices(services.store)
     color_map = {display_name(c.name): HIGHLIGHT_COLOR for c in services.clause_types}
+    color_map[RELATED_LABEL] = HIGHLIGHT_COLOR
 
     with gr.Blocks(title="Contract Assistant", fill_width=True) as demo:
         cache_state = gr.State(None)
         answer_state = gr.State(None)
+        refresh_state = gr.State(None)
         with gr.Column(elem_id="top"):
             gr.Markdown(f"# Contract Assistant\n\n{INTRO}", elem_id="header")
             gr.Markdown(DISCLAIMER, elem_id="disclaimer")
@@ -464,7 +528,7 @@ def build_app(services: Services) -> gr.Blocks:
                         elem_id="view",
                     )
                 with gr.Tab("Clause checklist", id=CHECKLIST_TAB):
-                    gr.Markdown(CHECKLIST_INTRO.format(count=len(services.clause_types)))
+                    checklist_text = gr.Markdown(elem_id="checklist-intro")
                     status_filter = gr.Radio(
                         choices=STATUS_FILTER_CHOICES,
                         value=ALL_CLAUSES,
@@ -500,28 +564,33 @@ def build_app(services: Services) -> gr.Blocks:
                     )
                     reset = gr.Button("Restore defaults", elem_id="reset")
                 with gr.Tab("Technical details", id=TECHNICAL_TAB):
-                    gr.Markdown(technical_markdown(settings, services.router.kind))
+                    gr.Markdown(
+                        technical_markdown(settings, services.router.kind, services.unvalidated)
+                    )
                     sources = gr.JSON(label="Last answer", elem_id="sources")
                     download = gr.DownloadButton(
                         "Download the analysis (JSON)", elem_id="download"
                     )
 
+        open_inputs = [document, tau_low, tau_high, status_filter]
+        open_outputs = [
+            cache_state,
+            answer_state,
+            chat,
+            title,
+            table,
+            checklist_text,
+            view_label,
+            view,
+            picker,
+            sources,
+            download,
+        ]
         gr.on(
             triggers=[demo.load, document.change],
             fn=handlers.open_document,
-            inputs=[document, tau_low, tau_high, status_filter],
-            outputs=[
-                cache_state,
-                answer_state,
-                chat,
-                title,
-                table,
-                view_label,
-                view,
-                picker,
-                sources,
-                download,
-            ],
+            inputs=open_inputs,
+            outputs=open_outputs,
             api_name="load_document",
         )
         ask_outputs = [question, chat, answer_state, picker, view_label, view, sources, tabs]
@@ -576,8 +645,13 @@ def build_app(services: Services) -> gr.Blocks:
         extract.click(
             handlers.extract_upload,
             [upload],
-            [document, extract_status],
+            [document, extract_status, refresh_state],
             api_name="extract",
+        ).then(
+            handlers.reload_extended,
+            [refresh_state, tau_low, tau_high, status_filter],
+            [*open_outputs, refresh_state],
+            api_visibility="private",
         )
     return demo
 

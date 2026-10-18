@@ -9,15 +9,18 @@ import pytest
 from gradio_client import Client
 
 from contract_assistant import cli
-from contract_assistant.clause_types import load_clause_types
+from contract_assistant.answer import Passage
+from contract_assistant.clause_types import app_clause_types, load_extra_clause_types
 from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.extract.extractor import Extractor
+from contract_assistant.router.base import RouteResult
+from contract_assistant.search import PassageSearch
 from contract_assistant.store import Store
 from contract_assistant.ui import app
 from contract_assistant.ui.app import ALL_CLAUSES, DOCUMENT_TAB, Handlers, Services, build_app
 from contract_assistant.ui.views import SUGGESTED_QUESTIONS, display_name
 from tests.support.caches import make_cache
-from tests.support.fakes import FakeQA, FakeRouter, slow_fake_qa
+from tests.support.fakes import FakeEncoder, FakeQA, FakeRouter, FixedRouter, slow_fake_qa
 
 DEMO_TEXT = ROOT / "demo" / "short_supply_agreement.txt"
 SHORT_DOC_ID = "sha256:6d43065ff242642866da6be6b83f9849ad898e6eea9c1e71b0c2853dd3822c5a"
@@ -33,14 +36,29 @@ def settings(tmp_path) -> Settings:
 
 @pytest.fixture
 def clause_types(settings):
-    return load_clause_types(settings.clause_types_path)
+    return app_clause_types(settings)
 
 
 @pytest.fixture
-def make_services(settings, clause_types):
+def unvalidated(settings) -> frozenset[str]:
+    extra = load_extra_clause_types(settings.extra_clause_types_path)
+    return frozenset(clause_type.name for clause_type in extra)
+
+
+@pytest.fixture
+def make_services(settings, clause_types, unvalidated):
     def make(extractor: Extractor | None = None, router=None) -> Services:
         store = Store(settings.cache_dir, settings.demo_cache_dir)
-        return Services(store, router or FakeRouter(), extractor, clause_types, settings)
+        search = PassageSearch(FakeEncoder())
+        return Services(
+            store,
+            router or FakeRouter(),
+            extractor,
+            clause_types,
+            settings,
+            search,
+            unvalidated,
+        )
 
     return make
 
@@ -119,7 +137,7 @@ def test_document_choices_list_each_document_once(make_services):
 
 def test_open_document_resets_the_page(handlers, demo_cache):
     result = handlers.open_document(SHORT_DOC_ID, TAU_LOW, TAU_HIGH, ALL_CLAUSES)
-    cache, last, chat, title, rows, _, _, picker, sources, _ = result
+    cache, last, chat, title, rows, _, _, _, picker, sources, _ = result
     assert (cache.doc_id, last, chat, sources) == (SHORT_DOC_ID, None, [], {})
     assert "Short supply agreement" in title
     assert len(rows) == len(demo_cache.clauses)
@@ -269,7 +287,7 @@ def test_upload_with_an_existing_cache_is_a_hit_and_skips_the_model(make_service
     qa = FakeQA()
     extractor = Extractor(qa, [], load_settings(), "fake")
     handlers = Handlers(make_services(extractor))
-    dropdown, status = handlers.extract_upload(str(DEMO_TEXT), progress=lambda *a, **k: None)
+    dropdown, status, _ = handlers.extract_upload(str(DEMO_TEXT), progress=lambda *a, **k: None)
     assert (dropdown.value, status) == (SHORT_DOC_ID, "Already analysed")
     assert qa.calls == []
 
@@ -288,7 +306,7 @@ def test_upload_of_a_new_text_writes_a_cache_and_selects_it(
     path = tmp_path / "new.txt"
     path.write_text(TEXT, encoding="utf-8")
     calls = []
-    dropdown, status = Handlers(make_services(extractor)).extract_upload(
+    dropdown, status, _ = Handlers(make_services(extractor)).extract_upload(
         str(path), progress=lambda *args, **kwargs: calls.append(args)
     )
     assert len(list(settings.cache_dir.glob("*.json"))) == 1
@@ -307,6 +325,24 @@ def test_upload_of_an_unsupported_file_warns(handlers, tmp_path, warnings):
 def test_upload_with_no_file_warns(handlers, warnings):
     assert is_skip(handlers.extract_upload(None, progress=lambda *a, **k: None))
     assert len(warnings) == 1
+
+
+def test_upload_of_a_cache_missing_clause_types_extends_and_saves_it(
+    make_services, settings, clause_types, tmp_path
+):
+    path = tmp_path / "older.txt"
+    path.write_text(TEXT, encoding="utf-8")
+    older = Extractor(slow_fake_qa(0), clause_types[:41], settings, "fake")
+    full = Extractor(slow_fake_qa(0), clause_types, settings, "fake")
+    Handlers(make_services(older)).extract_upload(str(path), progress=lambda *a, **k: None)
+    calls = []
+    dropdown, status, refresh = Handlers(make_services(full)).extract_upload(
+        str(path), progress=lambda *args, **kwargs: calls.append(args)
+    )
+    saved = Store(settings.cache_dir, settings.demo_cache_dir).load(dropdown.value, settings)
+    assert (status, refresh) == ("Analysis updated", dropdown.value)
+    assert "Payment Terms" in saved.clauses
+    assert calls[-1][0] == (8, 8)
 
 
 def test_unexpected_exception_becomes_a_warning(make_services, demo_cache, warnings):
@@ -336,7 +372,7 @@ def test_serve_builds_the_services_without_a_model(monkeypatch, tmp_path, capsys
     monkeypatch.setenv("CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.setenv("EXTRACTOR_MODEL_ID", "models/does-not-exist")
     monkeypatch.setattr(cli, "load_dotenv", lambda: None)
-    monkeypatch.setattr(cli, "build_router", lambda settings: FakeRouter())
+    monkeypatch.setattr(cli, "build_router", lambda *args: FakeRouter())
     monkeypatch.setattr(
         app,
         "launch_app",
@@ -370,3 +406,117 @@ def test_ask_over_the_client_uses_the_document_loaded_in_the_same_session(make_s
         demo.close()
     assert [choice[0] for choice in picker["choices"]] == ["Parties", "Governing Law"]
     assert len(chat) == 2
+
+
+def payment_cache(settings, conf=0.97):
+    return make_cache(TEXT, settings, {"Payment Terms": [(LAW_SENTENCE, conf)]})
+
+
+def route_to(*names: str) -> FixedRouter:
+    return FixedRouter(
+        {"q": RouteResult(clause_types=list(names), kind="explicit", latency_ms=0)}
+    )
+
+
+def test_ask_fills_passages_for_an_empty_route(make_services, settings):
+    cache = make_cache(TEXT, settings)
+    handlers = Handlers(make_services(router=route_to()))
+    handlers.services.search.search = lambda cache, question: [passage()]
+    result = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)
+    assert len(result[2].passages) == 1
+    assert "tier-related" in result[1][-1]["content"]
+
+
+def passage(start: int = 10) -> Passage:
+    return Passage(quote=LAW_SENTENCE, page=None, score=0.7, start=start, end=start + 49)
+
+
+def test_ask_leaves_passages_empty_when_the_route_has_clause_types(make_services, settings):
+    cache = make_cache(TEXT, settings, {"Governing Law": [(LAW_SENTENCE, 0.95)]})
+    handlers = Handlers(make_services(router=route_to("Governing Law")))
+    handlers.services.search.search = lambda cache, question: [passage()]
+    assert handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)[2].passages == []
+
+
+def test_ask_about_a_type_missing_from_an_older_cache_does_not_raise(make_services):
+    cache = make_cache(TEXT, load_settings(), {"Governing Law": []})
+    handlers = Handlers(make_services(router=route_to("Payment Terms")))
+    result = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)
+    assert result[2].items == []
+
+
+def test_ask_caps_an_unvalidated_type_at_verify(make_services, settings):
+    cache = payment_cache(settings)
+    handlers = Handlers(make_services(router=route_to("Payment Terms")))
+    reply = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)[1][-1]["content"]
+    assert "tier-check" in reply and "tier-found" not in reply
+    assert "Not validated on test data" in reply
+
+
+def test_ask_with_passages_lists_them_in_the_picker_and_shows_the_first(
+    make_services, settings
+):
+    cache = make_cache(TEXT, settings)
+    handlers = Handlers(make_services(router=route_to()))
+    handlers.services.search.search = lambda cache, question: [passage(10), passage(20)]
+    result = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)
+    picker, segments = result[3], result[5]
+    assert [label for label, _ in picker.choices] == ["Related passage 1", "Related passage 2"]
+    assert highlighted(segments)[0][1] == "Related passage"
+    assert picker.value == picker.choices[0][1]
+
+
+def test_pick_citation_shows_the_chosen_related_passage(make_services, settings):
+    cache = make_cache(TEXT, settings)
+    handlers = Handlers(make_services(router=route_to()))
+    handlers.services.search.search = lambda cache, question: [passage(0), passage(10)]
+    result = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)
+    value = result[3].choices[1][1]
+    _, segments = handlers.pick_citation(value, result[2], cache)
+    assert highlighted(segments)[0][0] == TEXT[10:59]
+
+
+def test_checklist_lists_extra_types_as_verify_at_most(make_services, settings):
+    cache = payment_cache(settings)
+    handlers = Handlers(make_services())
+    rows = handlers.filter_clauses(ALL_CLAUSES, TAU_LOW, TAU_HIGH, cache)
+    assert "tier-check" in status_of(rows, "Payment Terms")
+    assert next(row[0] for row in rows if row[1] == "Payment Terms") == "Other common clauses"
+
+
+def test_technical_tab_names_the_unvalidated_types(make_services):
+    demo = build_app(make_services())
+    texts = [b.value for b in demo.blocks.values() if isinstance(b, gr.Markdown) and b.value]
+    assert any(
+        "Not validated on test data:** " in text and "Payment Terms" in text for text in texts
+    )
+
+
+def test_dev_app_builds():
+    from tests.support import dev_app
+
+    assert isinstance(dev_app.demo, gr.Blocks)
+
+
+def test_reload_after_an_extension_reopens_the_contract_and_clears_the_flag(handlers):
+    result = handlers.reload_extended(SHORT_DOC_ID, TAU_LOW, TAU_HIGH, ALL_CLAUSES)
+    assert result[0].doc_id == SHORT_DOC_ID
+    assert result[-1] is None
+
+
+def test_reload_without_an_extension_leaves_the_page_as_it_is(handlers):
+    assert is_skip(handlers.reload_extended(None, TAU_LOW, TAU_HIGH, ALL_CLAUSES))
+
+
+def test_skipped_upload_does_not_flag_a_reload(handlers, warnings):
+    assert is_skip(handlers.extract_upload(None, progress=lambda *a, **k: None))
+
+
+def test_new_upload_does_not_flag_a_reload(make_services, settings, clause_types, tmp_path):
+    extractor = Extractor(slow_fake_qa(0), clause_types, settings, "fake")
+    path = tmp_path / "new.txt"
+    path.write_text(TEXT, encoding="utf-8")
+    result = Handlers(make_services(extractor)).extract_upload(
+        str(path), progress=lambda *a, **k: None
+    )
+    assert result[2] is None
