@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from contract_assistant.answer import answer, compose, tier, verify_quotes
+from contract_assistant.answer import answer, compose, restrict_to_cache, tier, verify_quotes
 from contract_assistant.config import Settings
 from contract_assistant.router.base import RouteResult
 from contract_assistant.store import read_cache
@@ -122,7 +122,7 @@ def test_untampered_demo_cache_drops_no_quotes(settings):
     cache = read_cache(DEMO_CACHE, settings)
     route = route_of(*cache.clauses)
     result = answer("q", route, cache, settings.tau_low, settings.tau_high)
-    assert (len(result.items), result.dropped_quotes) == (41, 0)
+    assert (len(result.items), result.dropped_quotes) == (len(cache.clauses), 0)
 
 
 def test_unvalidated_type_above_tau_high_is_check(settings):
@@ -154,3 +154,22 @@ def test_answer_without_unvalidated_is_unchanged(settings):
     cache = make_cache(TEXT, settings, {"Term": [(TERM, 0.95)]})
     result = answer("q", route_of("Term"), cache, TAU_LOW, TAU_HIGH)
     assert result.items[0].status == "found"
+
+
+def test_restrict_to_cache_drops_the_types_the_cache_lacks(settings):
+    cache = make_cache(TEXT, settings, {"Term": [(TERM, 0.9)]})
+    restricted = restrict_to_cache(route_of("Term", "Payment Terms"), cache)
+    assert restricted.clause_types == ["Term"]
+
+
+def test_restrict_to_cache_keeps_the_order_and_the_route_details(settings):
+    cache = make_cache(TEXT, settings, {"A": [], "B": []})
+    route = RouteResult(clause_types=["B", "A"], kind="llm", latency_ms=3.0, raw="x")
+    assert restrict_to_cache(route, cache) == route
+
+
+def test_restrict_to_cache_leaves_the_given_route_unchanged(settings):
+    cache = make_cache(TEXT, settings, {})
+    route = route_of("Term")
+    restrict_to_cache(route, cache)
+    assert route.clause_types == ["Term"]

@@ -92,6 +92,12 @@ def compose(
     return [_item(name, cache, tau_low, tau_high, name in unvalidated) for name in clause_types]
 
 
+def restrict_to_cache(route: RouteResult, cache: DocumentCache) -> RouteResult:
+    """Drop the clause types the cache has no entry for."""
+    kept = [name for name in route.clause_types if name in cache.clauses]
+    return route.model_copy(update={"clause_types": kept})
+
+
 def _item(
     name: str, cache: DocumentCache, tau_low: float, tau_high: float, capped: bool
 ) -> AnswerItem:
