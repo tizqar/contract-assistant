@@ -20,6 +20,9 @@ TEMPERATURE = 0
 MAX_RETRIES = 0
 SCHEMA_NAME = "response"
 DEFAULT_TAG = "latest"
+KEEP_ALIVE = "30m"
+# A cold load takes longer than the per-question timeout.
+LOAD_TIMEOUT_S = 120
 # ollama raises the builtin ConnectionError when the server cannot be reached.
 OLLAMA_ERRORS = (ollama.ResponseError, httpx.HTTPError, ConnectionError)
 
@@ -43,14 +46,28 @@ def _messages(system: str, user: str) -> list[dict[str, str]]:
 class OllamaClient:
     """A model served by an Ollama server."""
 
-    def __init__(self, client: ollama.Client, model: str):
+    def __init__(
+        self, client: ollama.Client, model: str, load_client: ollama.Client | None = None
+    ):
         self.client = client
         self.model = model
+        self.load_client = load_client or client
 
     @classmethod
     def from_settings(cls, settings: Settings) -> OllamaClient:
         """Build the client from the settings; OLLAMA_HOST selects the server."""
-        return cls(ollama.Client(timeout=settings.llm_timeout_s), settings.llm_model)
+        return cls(
+            ollama.Client(timeout=settings.llm_timeout_s),
+            settings.llm_model,
+            ollama.Client(timeout=LOAD_TIMEOUT_S),
+        )
+
+    def load(self) -> None:
+        """Load the model into memory and keep it there."""
+        try:
+            self.load_client.generate(model=self.model, prompt="", keep_alive=KEEP_ALIVE)
+        except OLLAMA_ERRORS as error:
+            raise LLMError(f"ollama load of {self.model} failed: {error!r}") from error
 
     def complete_json(self, system: str, user: str, schema: dict) -> str:
         """Return the model's reply as JSON text that follows the schema."""
@@ -61,6 +78,7 @@ class OllamaClient:
                 format=schema,
                 think=False,
                 options={"temperature": TEMPERATURE},
+                keep_alive=KEEP_ALIVE,
             )
         except OLLAMA_ERRORS as error:
             raise LLMError(f"ollama request to {self.model} failed: {error!r}") from error

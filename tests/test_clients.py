@@ -5,7 +5,13 @@ import ollama
 import pytest
 
 from contract_assistant.config import Settings
-from contract_assistant.router.clients import LLMError, OllamaClient, OpenAICompatClient
+from contract_assistant.router.clients import (
+    KEEP_ALIVE,
+    LOAD_TIMEOUT_S,
+    LLMError,
+    OllamaClient,
+    OpenAICompatClient,
+)
 
 MODEL = "test-model"
 SYSTEM = "Map the question to clause types."
@@ -84,6 +90,39 @@ def test_ollama_request_uses_temperature_zero():
     assert ollama_request_body()["options"]["temperature"] == 0
 
 
+def test_ollama_request_keeps_the_model_loaded():
+    assert ollama_request_body()["keep_alive"] == KEEP_ALIVE
+
+
+def generate_request_body() -> dict:
+    bodies = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append((request.url.path, json.loads(request.content)))
+        return httpx.Response(200, json={"model": MODEL, "response": "", "done": True})
+
+    ollama_client(handler).load()
+    [(path, body)] = bodies
+    assert path == "/api/generate"
+    return body
+
+
+def test_ollama_load_posts_the_model_with_an_empty_prompt():
+    body = generate_request_body()
+    assert body["model"] == MODEL
+    assert body["prompt"] == ""
+
+
+def test_ollama_load_sets_keep_alive():
+    assert generate_request_body()["keep_alive"] == KEEP_ALIVE
+
+
+@pytest.mark.parametrize("handler", FAILURES)
+def test_ollama_load_failure_becomes_llm_error_naming_the_model(handler):
+    with pytest.raises(LLMError, match=MODEL):
+        ollama_client(handler).load()
+
+
 def test_ollama_request_sends_system_then_user_message():
     assert ollama_request_body()["messages"] == [
         {"role": "system", "content": SYSTEM},
@@ -138,7 +177,7 @@ def test_ollama_from_settings_uses_the_configured_model_and_timeout(monkeypatch)
     monkeypatch.setattr(ollama, "Client", fake_client)
     client = OllamaClient.from_settings(Settings(llm_model="other", llm_timeout_s=3.0))
     assert client.model == "other"
-    assert created == [{"timeout": 3.0}]
+    assert created == [{"timeout": 3.0}, {"timeout": LOAD_TIMEOUT_S}]
 
 
 def completion(content: str | None) -> httpx.Response:
