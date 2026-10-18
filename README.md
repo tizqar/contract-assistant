@@ -5,7 +5,7 @@ plain language, get **verbatim quotes with a page number and a confidence** — 
 explicit *"not found"*.
 
 The expensive model (a fine-tuned 150M-parameter encoder, trained in the companion
-`diplomski` repo) runs **once at upload** and extracts all 41 CUAD clause types with
+`cuad-encoder` repo) runs **once at upload** and extracts all 41 CUAD clause types with
 character offsets. Every later question is a cache lookup: a router only maps the question
 to clause types and never writes legal content. The router is Qwen3-1.7B served by Ollama,
 constrained to the clause type names; without Ollama an embedding router
@@ -18,13 +18,6 @@ Resolution, Data Protection). They are asked with CUAD's question template and t
 extractor, without retraining, and are never marked Found because no gold data exists to
 validate their thresholds. A question that matches no clause type gets up to three related
 passages of the contract, shown verbatim and labelled as not a clause match.
-
-**Status:** built are the inference core, the extractor and cache, three-tier answers with
-the verbatim guard, the embedding and LLM routers, the Gradio app, and the router,
-end-to-end and phrasing evaluations, with the oracle end-to-end results. Still to do: the
-author's review of the 60 evaluation questions, then the run phase (threshold tuning, the
-router table, the embedding and LLM end-to-end rows, the phrasing rate). Build order:
-[IMPLEMENTATION.md](IMPLEMENTATION.md).
 
 ## Install
 
@@ -54,8 +47,8 @@ question.
 ## Model weights
 
 The fine-tuned 150M extractor is the one manual step: download it from the Kaggle run
-output and unzip it to `models/ettin-150m-cuad-seed3407/` (gitignored). Step A in
-[IMPLEMENTATION.md](IMPLEMENTATION.md) has the details.
+output and unzip it to `models/ettin-150m-cuad-seed3407/` (gitignored). The folder must
+contain `config.json`, `model.safetensors`, `tokenizer.json` and `tokenizer_config.json`.
 
 Without the model the app still opens the three demo documents from their caches. Uploading
 a new contract needs the model, and the app says so.
@@ -89,8 +82,7 @@ router and fails if it is not available. `--types` names the clause types and lo
 model. `--json` prints the answer as JSON. A question that matches no clause type prints
 related passages instead.
 
-The evaluations are described in PLAN.md, sections 4 to 6. They use the 41 CUAD clause
-types only:
+The evaluations use the 41 CUAD clause types only:
 
 ```bash
 contract-assistant router-tune                                 # embedding threshold, on dev
@@ -106,7 +98,7 @@ The other commands are `contract-assistant import-demo | extract | show | check 
 ## How answers read
 
 Each requested clause type gets one of three tiers, from the extractor's confidence
-(thresholds chosen on validation in `diplomski`: τ_high = 0.91, τ_low = 0.06):
+(thresholds chosen on validation in `cuad-encoder`: τ_high = 0.91, τ_low = 0.06):
 
 | tier | meaning |
 |---|---|
@@ -159,25 +151,22 @@ The thresholds and the model details are in their own tabs.
 Three CUAD contracts with pre-extracted caches: see [demo/README.md](demo/README.md).
 
 The end-to-end table is `eval/results/e2e.md`. It has the oracle-router rows, which route by
-the gold clause types and so show the extractor and the tiers without routing errors. The
-router table (`eval/results/router.md`) and the embedding and LLM rows follow the review of
-the evaluation questions.
+the gold clause types and so show the extractor and the tiers without routing errors.
 
 ## Repository layout
 
 This is its **own repository**, a sibling of the thesis repo — not a subfolder of it:
 
 ```
-~/Desktop/diplomski/            training, evaluation, thesis figures   (produces the model)
+~/Desktop/cuad-encoder/         training, evaluation, thesis figures   (produces the model)
 ~/Desktop/contract-assistant/   this application                       (consumes it)
 ```
 
-Separate git history, separate virtualenv. See [IMPLEMENTATION.md](IMPLEMENTATION.md),
-"Where this code lives", for the rules and the setup from scratch.
+Separate git history, separate virtualenv.
 
-## Relationship to `diplomski`
+## Relationship to `cuad-encoder`
 
-| from `diplomski` | into here |
+| from `cuad-encoder` | into here |
 |---|---|
 | fine-tuned extractor (local folder) and its run tag | `EXTRACTOR_MODEL_ID`, `EXTRACTOR_NAME` |
 | operating thresholds (val-selected) | `TAU_LOW`, `TAU_HIGH` |
@@ -187,4 +176,4 @@ Separate git history, separate virtualenv. See [IMPLEMENTATION.md](IMPLEMENTATIO
 | test predictions of the chosen run | demo caches, via `contract-assistant import-demo` |
 
 Training, evaluation against published CUAD numbers, and the thesis figures stay in
-`diplomski`.
+`cuad-encoder`.
