@@ -53,6 +53,17 @@ class Passage(BaseModel):
     end: int
 
 
+class GeneratedAnswer(BaseModel):
+    """An answer the language model wrote from the related passages, or why it is withheld."""
+
+    model: str
+    text: str | None
+    reason: str | None = None
+    unfaithful_spans: list[str] = []
+    attempts: int = 1
+    latency_ms: float
+
+
 class Answer(BaseModel):
     """The items for one question over one document."""
 
@@ -63,6 +74,7 @@ class Answer(BaseModel):
     items: list[AnswerItem]
     dropped_quotes: int
     passages: list[Passage] = []
+    generated: GeneratedAnswer | None = None
 
 
 def _check_thresholds(tau_low: float, tau_high: float) -> None:

@@ -32,6 +32,7 @@ from contract_assistant.summary import (
     request_summary,
     summary_items,
 )
+from contract_assistant.term_sheet import TermSheetStore
 from contract_assistant.ui.views import (
     CLAUSE_HEADERS,
     PASSAGE_PREFIX,
@@ -198,6 +199,7 @@ class Services:
     unvalidated: frozenset[str]
     gen: LLMClient | None = None
     summaries: SummaryStore | None = None
+    term_sheets: TermSheetStore | None = None
 
 
 def guarded(handler: Callable) -> Callable:

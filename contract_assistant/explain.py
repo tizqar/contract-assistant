@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import logging
-import time
 
 from pydantic import BaseModel
 
-from contract_assistant.phrase import unfaithful_spans
+from contract_assistant import generation
+from contract_assistant.generation import faithfulness_reason, generate
 from contract_assistant.phrase import unsupported_numbers as _unsupported_numbers
 from contract_assistant.router.clients import LLMClient
 
@@ -17,10 +17,10 @@ LANGUAGES = {"en": "English", "sr": "Serbian, in Latin script"}
 DEFAULT_LANGUAGE = "en"
 MAX_TOKENS = 160
 MAX_SENTENCES = 2
-MS_PER_S = 1000
-MISQUOTE_REASON = "it quotes text that is not in the clause"
-NUMBERS_REASON = "it names numbers the clause does not: {numbers}"
-EMPTY_REASON = "the model gave an empty reply"
+SOURCE = "clause"
+MISQUOTE_REASON = generation.MISQUOTE_REASON.format(source=SOURCE)
+NUMBERS_REASON = generation.NUMBERS_REASON.format(source=SOURCE, numbers="{numbers}")
+EMPTY_REASON = generation.EMPTY_REASON
 SYSTEM_PROMPT = (
     "Restate the contract clause given by the user in plain {language}, in at most "
     f"{MAX_SENTENCES} sentences, for a reader who is not a lawyer. "
@@ -61,29 +61,21 @@ def request_explanation(
         )
     system = SYSTEM_PROMPT.format(language=LANGUAGES[language])
     user = f'Clause type: {clause_type}\nClause: "{" ".join(quote.split())}"'
-    start = time.perf_counter()
-    text = client.complete_text(system, user, MAX_TOKENS).strip()
-    latency_ms = (time.perf_counter() - start) * MS_PER_S
-    reason = _reason(text, quote)
-    if reason:
-        logger.warning("explanation of %s by %s withheld: %s", clause_type, client.model, reason)
+    result = generate(
+        client,
+        system,
+        user,
+        MAX_TOKENS,
+        lambda text: faithfulness_reason(text, [quote], SOURCE),
+        source=SOURCE,
+        label=f"explanation of {clause_type}",
+    )
     return Explanation(
         clause_type=clause_type,
         quote=quote,
         language=language,
         model=client.model,
-        text=None if reason else text,
-        reason=reason,
-        latency_ms=latency_ms,
+        text=result.text,
+        reason=result.reason,
+        latency_ms=result.latency_ms,
     )
-
-
-def _reason(text: str, quote: str) -> str | None:
-    if not text:
-        return EMPTY_REASON
-    if unfaithful_spans(text, [quote]):
-        return MISQUOTE_REASON
-    numbers = unsupported_numbers(text, quote)
-    if numbers:
-        return NUMBERS_REASON.format(numbers=", ".join(numbers))
-    return None

@@ -1,3 +1,4 @@
+import json
 import re
 import time
 import zlib
@@ -143,7 +144,16 @@ class FakeLLMClient:
 
 
 QUOTED = re.compile(r'"([^"]+)"')
+ITEM = re.compile(r'^- (.+?)(?: \(.*?\))?: "(.+?)"', re.MULTILINE)
 ECHO_QUOTES = 3
+ECHO_WORDS = 4
+# A request whose system prompt asks for a JSON object gets the term sheet fields it can fill.
+ECHO_TERMS = {
+    "parties": "Parties",
+    "agreement_date": "Agreement Date",
+    "expiration_date": "Expiration Date",
+    "governing_law": "Governing Law",
+}
 
 
 class EchoTextClient:
@@ -159,10 +169,23 @@ class EchoTextClient:
 
     def complete_text(self, system: str, user: str, max_tokens: int) -> str:
         self.text_calls.append((system, user, max_tokens))
+        if "JSON" in system:
+            return self._json_reply(user)
         quotes = QUOTED.findall(user)[:ECHO_QUOTES]
         if not quotes:
             return "The request names no clause."
         return " ".join(f'The contract states "{quote}".' for quote in quotes)
+
+    @staticmethod
+    def _json_reply(user: str) -> str:
+        quotes = {name: quote for name, quote in ITEM.findall(user)}
+        reply: dict[str, object] = {}
+        for field, name in ECHO_TERMS.items():
+            if name not in quotes:
+                continue
+            fragment = " ".join(quotes[name].split()[:ECHO_WORDS])
+            reply[field] = [fragment] if field == "parties" else fragment
+        return json.dumps(reply)
 
 
 class _SlowQA(FakeQA):
