@@ -1,0 +1,311 @@
+{
+  "model": "qwen3.5:4b",
+  "calls": 25,
+  "answered": 25,
+  "withheld": 0,
+  "no_passages": 5,
+  "llm_failures": 0,
+  "mean_latency_ms": 2446.0521183232777,
+  "records": [
+    {
+      "question_id": "q12",
+      "document": "long_outsourcing_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 4,
+      "attempts": 1,
+      "latency_ms": 5359.217917008209
+    },
+    {
+      "question_id": "q12",
+      "document": "medium_sponsorship_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 1,
+      "attempts": 1,
+      "latency_ms": 2575.866708008107
+    },
+    {
+      "question_id": "q12",
+      "document": "short_supply_agreement",
+      "passages": 0,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 0,
+      "latency_ms": 0.0
+    },
+    {
+      "question_id": "q14",
+      "document": "long_outsourcing_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 1,
+      "attempts": 1,
+      "latency_ms": 2393.73904200329
+    },
+    {
+      "question_id": "q14",
+      "document": "medium_sponsorship_agreement",
+      "passages": 0,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 0,
+      "latency_ms": 0.0
+    },
+    {
+      "question_id": "q14",
+      "document": "short_supply_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 1,
+      "attempts": 1,
+      "latency_ms": 1125.3393750084797
+    },
+    {
+      "question_id": "q15",
+      "document": "long_outsourcing_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 1,
+      "attempts": 1,
+      "latency_ms": 2110.7812090049265
+    },
+    {
+      "question_id": "q15",
+      "document": "medium_sponsorship_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 1,
+      "latency_ms": 2532.562667009188
+    },
+    {
+      "question_id": "q15",
+      "document": "short_supply_agreement",
+      "passages": 1,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 1,
+      "latency_ms": 565.6140409992076
+    },
+    {
+      "question_id": "q17",
+      "document": "long_outsourcing_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 1,
+      "attempts": 1,
+      "latency_ms": 2820.4994999978226
+    },
+    {
+      "question_id": "q17",
+      "document": "medium_sponsorship_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 1,
+      "latency_ms": 2578.5760409926297
+    },
+    {
+      "question_id": "q17",
+      "document": "short_supply_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 1,
+      "latency_ms": 3575.539833007497
+    },
+    {
+      "question_id": "q18",
+      "document": "long_outsourcing_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 1,
+      "attempts": 1,
+      "latency_ms": 2351.3390840089414
+    },
+    {
+      "question_id": "q18",
+      "document": "medium_sponsorship_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 1,
+      "attempts": 1,
+      "latency_ms": 2153.428791993065
+    },
+    {
+      "question_id": "q18",
+      "document": "short_supply_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 1,
+      "latency_ms": 1816.5085410000756
+    },
+    {
+      "question_id": "q35",
+      "document": "long_outsourcing_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 1,
+      "attempts": 1,
+      "latency_ms": 2697.9849580093287
+    },
+    {
+      "question_id": "q35",
+      "document": "medium_sponsorship_agreement",
+      "passages": 1,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 1,
+      "latency_ms": 2583.650208005565
+    },
+    {
+      "question_id": "q35",
+      "document": "short_supply_agreement",
+      "passages": 0,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 0,
+      "latency_ms": 0.0
+    },
+    {
+      "question_id": "q36",
+      "document": "long_outsourcing_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 2,
+      "attempts": 1,
+      "latency_ms": 3395.206750006764
+    },
+    {
+      "question_id": "q36",
+      "document": "medium_sponsorship_agreement",
+      "passages": 2,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 1,
+      "latency_ms": 2609.6973749954486
+    },
+    {
+      "question_id": "q36",
+      "document": "short_supply_agreement",
+      "passages": 1,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 1,
+      "latency_ms": 2482.9692500061356
+    },
+    {
+      "question_id": "q54",
+      "document": "long_outsourcing_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 1,
+      "attempts": 1,
+      "latency_ms": 4261.980417009909
+    },
+    {
+      "question_id": "q54",
+      "document": "medium_sponsorship_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 1,
+      "latency_ms": 4050.217625001096
+    },
+    {
+      "question_id": "q54",
+      "document": "short_supply_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 1,
+      "latency_ms": 1136.128665995784
+    },
+    {
+      "question_id": "q56",
+      "document": "long_outsourcing_agreement",
+      "passages": 1,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 1,
+      "attempts": 1,
+      "latency_ms": 1547.0734999980778
+    },
+    {
+      "question_id": "q56",
+      "document": "medium_sponsorship_agreement",
+      "passages": 0,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 0,
+      "latency_ms": 0.0
+    },
+    {
+      "question_id": "q56",
+      "document": "short_supply_agreement",
+      "passages": 0,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 0,
+      "latency_ms": 0.0
+    },
+    {
+      "question_id": "q59",
+      "document": "long_outsourcing_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 1,
+      "latency_ms": 510.20729199808557
+    },
+    {
+      "question_id": "q59",
+      "document": "medium_sponsorship_agreement",
+      "passages": 3,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 0,
+      "attempts": 1,
+      "latency_ms": 1368.4036250051577
+    },
+    {
+      "question_id": "q59",
+      "document": "short_supply_agreement",
+      "passages": 1,
+      "withheld": false,
+      "reason": null,
+      "quoted_spans": 2,
+      "attempts": 1,
+      "latency_ms": 2548.7705420091515
+    }
+  ]
+}

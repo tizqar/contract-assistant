@@ -9,16 +9,18 @@ from contract_assistant.clause_types import load_clause_types
 from contract_assistant.cli import main
 from contract_assistant.config import ROOT, Settings
 from contract_assistant.evaluation.e2e import E2EReport, OracleRouter
+from contract_assistant.evaluation.passage_eval import PassageAnswerReport
 from contract_assistant.evaluation.phrase_eval import PhrasingReport
 from contract_assistant.evaluation.questions import EvalQuestion, load_questions
 from contract_assistant.evaluation.router_eval import THRESHOLD_GRID, RouterRun
 from contract_assistant.evaluation.summary_eval import SummaryReport
+from contract_assistant.evaluation.term_sheet_eval import TermSheetReport
 from contract_assistant.router.base import RouteResult
 from contract_assistant.router.clients import LLMError
 from contract_assistant.router.factory import UnknownBackendError
 from contract_assistant.store import DocumentCache, HarnessImportError, write_cache
 from tests.support.caches import make_cache
-from tests.support.fakes import EchoTextClient, FakeLLMClient, FixedRouter
+from tests.support.fakes import EchoTextClient, FakeEncoder, FakeLLMClient, FixedRouter
 
 LAW = "Governing Law"
 INSURANCE = "Insurance"
@@ -847,4 +849,107 @@ def test_summary_eval_without_a_generation_client_exits_one_and_writes_nothing(
     error = capsys.readouterr().err
     assert error.startswith("error: summary-eval needs a generation model (")
     assert "LLM_BACKEND=ollama" in error and "GEN_MODEL=" in error
+    assert not results.exists()
+
+
+def test_term_sheet_eval_writes_the_report_named_after_the_model(
+    settings, monkeypatch, results
+):
+    use_real_demo_caches(monkeypatch, settings)
+    install_gen_client(monkeypatch, EchoTextClient())
+    assert main(["term-sheet-eval"]) == 0
+    assert file_names(results) == ["term_sheet_fake-gen.json"]
+    text = (results / "term_sheet_fake-gen.json").read_text(encoding="utf-8")
+    report = TermSheetReport.model_validate_json(text)
+    assert (report.model, report.documents, report.fields) == ("fake-gen", 3, 24)
+
+
+def test_term_sheet_eval_prints_one_line_with_the_counts_and_the_path(
+    settings, monkeypatch, results, capsys
+):
+    use_real_demo_caches(monkeypatch, settings)
+    install_gen_client(monkeypatch, EchoTextClient())
+    main(["term-sheet-eval"])
+    [line] = capsys.readouterr().out.splitlines()
+    assert line.startswith("term-sheet-eval: fake-gen · 3 documents · ")
+    assert " agree with gold · " in line and " rejected · " in line
+    assert line.endswith(f" s → {results / 'term_sheet_fake-gen.json'}")
+
+
+def test_term_sheet_eval_model_option_changes_the_file_name_and_the_settings(
+    settings, monkeypatch, results
+):
+    use_real_demo_caches(monkeypatch, settings)
+    client = EchoTextClient()
+    client.model = "other-gen"
+    received = install_gen_client(monkeypatch, client)
+    assert main(["term-sheet-eval", "--model", "qwen3.5:9b"]) == 0
+    assert file_names(results) == ["term_sheet_other-gen.json"]
+    assert [s.gen_model for s in received] == ["qwen3.5:9b"]
+
+
+def test_term_sheet_eval_without_a_generation_client_exits_one_and_writes_nothing(
+    monkeypatch, results, capsys
+):
+    install_gen_client(monkeypatch, None)
+    assert main(["term-sheet-eval"]) == 1
+    assert capsys.readouterr().err.startswith("error: term-sheet-eval needs a generation model (")
+    assert not results.exists()
+
+
+def use_real_questions(monkeypatch, settings: Settings) -> None:
+    real = dataclasses.replace(
+        settings,
+        demo_cache_dir=ROOT / "demo" / "cache",
+        router_eval_path=ROOT / "data" / "router_eval.jsonl",
+    )
+    use_settings(monkeypatch, real)
+
+
+def test_passage_eval_writes_the_report_named_after_the_model(
+    settings, monkeypatch, results
+):
+    use_real_questions(monkeypatch, settings)
+    install_gen_client(monkeypatch, EchoTextClient())
+    monkeypatch.setattr(cli, "load_encoder", lambda model_id: FakeEncoder())
+    assert main(["passage-eval"]) == 0
+    assert file_names(results) == ["passages_fake-gen.json"]
+    text = (results / "passages_fake-gen.json").read_text(encoding="utf-8")
+    report = PassageAnswerReport.model_validate_json(text)
+    assert (report.no_passages, report.calls) == (30, 0)
+
+
+def test_passage_eval_prints_one_line_with_the_counts_and_the_path(
+    settings, monkeypatch, results, capsys
+):
+    use_real_questions(monkeypatch, settings)
+    install_gen_client(monkeypatch, EchoTextClient())
+    monkeypatch.setattr(cli, "load_encoder", lambda model_id: FakeEncoder())
+    main(["passage-eval"])
+    [line] = capsys.readouterr().out.splitlines()
+    assert line == (
+        "passage-eval: fake-gen · 0 calls · 0 answered · 0 withheld · 30 without passages · "
+        f"0 failures · mean n/a → {results / 'passages_fake-gen.json'}"
+    )
+
+
+def test_passage_eval_model_option_changes_the_file_name_and_the_settings(
+    settings, monkeypatch, results
+):
+    use_real_questions(monkeypatch, settings)
+    client = EchoTextClient()
+    client.model = "other-gen"
+    received = install_gen_client(monkeypatch, client)
+    monkeypatch.setattr(cli, "load_encoder", lambda model_id: FakeEncoder())
+    assert main(["passage-eval", "--model", "qwen3.5:9b"]) == 0
+    assert file_names(results) == ["passages_other-gen.json"]
+    assert [s.gen_model for s in received] == ["qwen3.5:9b"]
+
+
+def test_passage_eval_without_a_generation_client_exits_one_and_writes_nothing(
+    monkeypatch, results, capsys
+):
+    install_gen_client(monkeypatch, None)
+    assert main(["passage-eval"]) == 1
+    assert capsys.readouterr().err.startswith("error: passage-eval needs a generation model (")
     assert not results.exists()

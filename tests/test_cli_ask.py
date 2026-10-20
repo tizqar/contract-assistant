@@ -8,10 +8,11 @@ from contract_assistant.clause_types import app_clause_types
 from contract_assistant.cli import main
 from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.router.base import RouteResult
+from contract_assistant.router.clients import LLMError
 from contract_assistant.router.factory import UnknownBackendError
 from contract_assistant.store import Store
 from tests.support.caches import make_cache
-from tests.support.fakes import FakeEncoder, FixedRouter
+from tests.support.fakes import EchoTextClient, FakeEncoder, FakeLLMClient, FixedRouter
 
 DEMO_TEXT = ROOT / "demo" / "short_supply_agreement.txt"
 DEMO_CACHE = ROOT / "demo" / "cache" / "short_supply_agreement.json"
@@ -29,6 +30,7 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setenv("CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.setattr(cli, "load_dotenv", lambda: None)
     monkeypatch.setattr(cli, "build_router", refuse_router)
+    monkeypatch.setattr(cli, "build_gen_client", lambda settings: None)
 
 
 @pytest.fixture
@@ -336,3 +338,71 @@ def test_routed_question_searches_no_passages(monkeypatch, capsys):
     monkeypatch.setattr(cli, "load_encoder", refuse_router)
     assert main(["ask", str(DEMO_TEXT), QUESTION, "--json"]) == 0
     assert Answer.model_validate_json(capsys.readouterr().out).passages == []
+
+
+def install_gen_client(monkeypatch, client) -> None:
+    monkeypatch.setattr(cli, "build_gen_client", lambda settings: client)
+
+
+def test_empty_route_prints_the_generated_answer_between_the_message_and_the_passages(
+    tmp_path, monkeypatch, capsys
+):
+    doc_id = save_cache(tmp_path, PAYMENT_TEXT, {"Parties": []})
+    install_empty_router(monkeypatch, PAYMENT_QUESTION)
+    install_gen_client(monkeypatch, EchoTextClient())
+    assert main(["ask", doc_id, PAYMENT_QUESTION]) == 0
+    output = capsys.readouterr().out
+    generated = output.index(cli.GENERATED_MESSAGE)
+    assert output.index(EMPTY_ROUTE_MESSAGE) < generated < output.index(cli.PASSAGES_MESSAGE)
+    assert f"{cli.GENERATED_MESSAGE}\n\nThe contract states" in output
+
+
+def test_empty_route_json_carries_the_generated_answer(tmp_path, monkeypatch, capsys):
+    doc_id = save_cache(tmp_path, PAYMENT_TEXT, {"Parties": []})
+    install_empty_router(monkeypatch, PAYMENT_QUESTION)
+    install_gen_client(monkeypatch, EchoTextClient())
+    assert main(["ask", doc_id, PAYMENT_QUESTION, "--json"]) == 0
+    result = Answer.model_validate_json(capsys.readouterr().out)
+    assert result.generated is not None
+    assert result.generated.text.startswith("The contract states")
+
+
+def test_a_withheld_generated_answer_prints_the_reason(tmp_path, monkeypatch, capsys):
+    doc_id = save_cache(tmp_path, PAYMENT_TEXT, {"Parties": []})
+    install_empty_router(monkeypatch, PAYMENT_QUESTION)
+    misquote = 'It says "this text is not in the contract at all".'
+    install_gen_client(monkeypatch, FakeLLMClient([misquote, misquote]))
+    assert main(["ask", doc_id, PAYMENT_QUESTION]) == 0
+    output = capsys.readouterr().out
+    assert "The language model's answer was withheld: " in output
+    assert cli.GENERATED_MESSAGE not in output
+
+
+def test_without_a_generation_client_the_output_has_no_generated_answer(
+    tmp_path, monkeypatch, capsys
+):
+    doc_id = save_cache(tmp_path, PAYMENT_TEXT, {"Parties": []})
+    install_empty_router(monkeypatch, PAYMENT_QUESTION)
+    install_gen_client(monkeypatch, None)
+    assert main(["ask", doc_id, PAYMENT_QUESTION, "--json"]) == 0
+    result = Answer.model_validate_json(capsys.readouterr().out)
+    assert result.generated is None
+    assert [passage.quote for passage in result.passages] == [PAYMENT_TEXT]
+
+
+def test_a_failing_model_leaves_the_answer_without_generated_text_and_warns(
+    tmp_path, monkeypatch, capsys
+):
+    doc_id = save_cache(tmp_path, PAYMENT_TEXT, {"Parties": []})
+    install_empty_router(monkeypatch, PAYMENT_QUESTION)
+    install_gen_client(monkeypatch, FakeLLMClient([LLMError("timed out")]))
+    assert main(["ask", doc_id, PAYMENT_QUESTION]) == 0
+    captured = capsys.readouterr()
+    assert cli.PASSAGES_MESSAGE in captured.out
+    assert captured.err == "warning: the language model did not answer: timed out\n"
+
+
+def test_routed_question_builds_no_generation_client(monkeypatch, capsys):
+    install_router(monkeypatch, fixed_router("embedding"))
+    monkeypatch.setattr(cli, "build_gen_client", refuse_router)
+    assert main(["ask", str(DEMO_TEXT), QUESTION]) == 0

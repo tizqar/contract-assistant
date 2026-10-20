@@ -42,6 +42,10 @@ from contract_assistant.evaluation.e2e import (
     load_cuad_gold,
 )
 from contract_assistant.evaluation.e2e import markdown_table as e2e_table
+from contract_assistant.evaluation.passage_eval import (
+    PassageAnswerReport,
+    evaluate_passage_answers,
+)
 from contract_assistant.evaluation.phrase_eval import PhrasingReport, evaluate_phrasing
 from contract_assistant.evaluation.questions import EvalQuestion, Split, load_questions
 from contract_assistant.evaluation.router_eval import (
@@ -53,6 +57,11 @@ from contract_assistant.evaluation.router_eval import (
 )
 from contract_assistant.evaluation.router_eval import markdown_table as router_table
 from contract_assistant.evaluation.summary_eval import SummaryReport, evaluate_summaries
+from contract_assistant.evaluation.term_sheet_eval import (
+    TermSheetReport,
+    evaluate_term_sheets,
+    load_demo_gold,
+)
 from contract_assistant.explain import (
     DEFAULT_LANGUAGE,
     LANGUAGES,
@@ -61,6 +70,8 @@ from contract_assistant.explain import (
 )
 from contract_assistant.extract.extractor import Extractor, ModelNotFoundError
 from contract_assistant.extract.windowing import assert_sliding_windows
+from contract_assistant.passage_answer import APP_ATTEMPTS as PASSAGE_ATTEMPTS
+from contract_assistant.passage_answer import request_passage_answer
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
 from contract_assistant.router.base import Router, RouteResult
 from contract_assistant.router.clients import LLMClient, LLMError
@@ -87,7 +98,9 @@ from contract_assistant.store import (
     write_cache,
 )
 from contract_assistant.summary import (
-    APP_ATTEMPTS,
+    APP_ATTEMPTS as SUMMARY_ATTEMPTS,
+)
+from contract_assistant.summary import (
     SUMMARY_DIR,
     Summary,
     SummaryStore,
@@ -96,6 +109,19 @@ from contract_assistant.summary import (
 )
 from contract_assistant.summary import (
     render_markdown as render_summary,
+)
+from contract_assistant.term_sheet import (
+    APP_ATTEMPTS as TERM_SHEET_ATTEMPTS,
+)
+from contract_assistant.term_sheet import (
+    TERM_SHEET_DIR,
+    TermSheet,
+    TermSheetStore,
+    request_term_sheet,
+    term_sheet_items,
+)
+from contract_assistant.term_sheet import (
+    render_markdown as render_term_sheet,
 )
 
 DEMO_DOCUMENTS = ROOT / "demo" / "demo_documents.json"
@@ -125,7 +151,14 @@ LLM_FAILED = "error: the language model did not answer: {error}"
 NOT_FOUND = "error: {name} was not found in this contract"
 NOT_IN_CACHE = "error: {name} is not in the analysis of this contract"
 EXPLANATION_WITHHELD = "Explanation withheld: {reason}."
+NO_KEY_TERMS = "error: no key-term clause was found in {name}"
 PASSAGES_MESSAGE = "Passages of the contract closest to the question:"
+GENERATED_MESSAGE = (
+    "Answer written by the language model from the passages below "
+    "(quoted text verified, not a clause match):"
+)
+GENERATED_WITHHELD = "The language model's answer was withheld: {reason}."
+GENERATED_FAILED = "warning: the language model did not answer: {error}"
 WARM_UP_QUESTION = "Is there an arbitration clause?"
 CLEAR_LINE = "\r\033[K"
 CACHE_ERRORS = (CacheMismatchError, CacheIntegrityError)
@@ -378,7 +411,16 @@ def _render(result: Answer, names: list[str]) -> str:
     if not result.passages:
         return text
     passages = [_render_passage(passage) for passage in result.passages]
-    return "\n\n".join([text, PASSAGES_MESSAGE, *passages])
+    return "\n\n".join([text, *_render_generated(result), PASSAGES_MESSAGE, *passages])
+
+
+def _render_generated(result: Answer) -> list[str]:
+    generated = result.generated
+    if generated is None:
+        return []
+    if generated.text is None:
+        return [GENERATED_WITHHELD.format(reason=generated.reason)]
+    return [f"{GENERATED_MESSAGE}\n\n{generated.text}"]
 
 
 def _render_passage(passage: Passage) -> str:
@@ -389,6 +431,20 @@ def _render_passage(passage: Passage) -> str:
 def _with_passages(result: Answer, cache: DocumentCache, settings: Settings) -> Answer:
     search = PassageSearch(load_encoder(settings.embedding_model_id))
     return result.model_copy(update={"passages": search.search(cache, result.question)})
+
+
+def _with_generated(result: Answer, settings: Settings) -> Answer:
+    client = build_gen_client(settings)
+    if client is None or not result.passages:
+        return result
+    try:
+        generated = request_passage_answer(
+            result.question, result.passages, client, attempts=PASSAGE_ATTEMPTS
+        )
+    except LLMError as error:
+        print(GENERATED_FAILED.format(error=error), file=sys.stderr)
+        return result
+    return result.model_copy(update={"generated": generated})
 
 
 def _cmd_ask(args: argparse.Namespace) -> int:
@@ -413,7 +469,7 @@ def _cmd_ask(args: argparse.Namespace) -> int:
         unvalidated=_extra_names(settings),
     )
     if args.types is None and not route.clause_types:
-        result = _with_passages(result, cache, settings)
+        result = _with_generated(_with_passages(result, cache, settings), settings)
     if args.json:
         print(result.model_dump_json(indent=JSON_INDENT))
         return 0
@@ -436,7 +492,7 @@ def _summary(
     if saved is not None:
         return saved
     summary = request_summary(
-        cache.doc_id, items, client, settings.tau_low, settings.tau_high, attempts=APP_ATTEMPTS
+        cache.doc_id, items, client, settings.tau_low, settings.tau_high, attempts=SUMMARY_ATTEMPTS
     )
     # A withheld summary is not saved, so the next run asks the model again.
     if summary.text is not None:
@@ -465,6 +521,69 @@ def _cmd_summarize(args: argparse.Namespace) -> int:
         print(LLM_FAILED.format(error=error), file=sys.stderr)
         return EXIT_ERROR
     print(summary.model_dump_json(indent=JSON_INDENT) if args.json else render_summary(summary))
+    return 0
+
+
+def _term_sheet(
+    cache: DocumentCache,
+    items: list[AnswerItem],
+    client: LLMClient,
+    fresh: bool,
+    settings: Settings,
+) -> TermSheet:
+    store = TermSheetStore(settings.cache_dir / TERM_SHEET_DIR)
+    key = (cache.doc_id, client.model, settings.tau_low, settings.tau_high)
+    saved = None if fresh else store.load(*key)
+    if saved is not None:
+        return saved
+    sheet = request_term_sheet(
+        cache.doc_id,
+        items,
+        client,
+        settings.tau_low,
+        settings.tau_high,
+        attempts=TERM_SHEET_ATTEMPTS,
+    )
+    # A withheld term sheet is not saved, so the next run asks the model again.
+    if sheet.reason is None:
+        store.save(sheet)
+    return sheet
+
+
+def _sheets(
+    args: argparse.Namespace, client: LLMClient, settings: Settings
+) -> list[tuple[str, TermSheet]] | None:
+    sheets = []
+    for target in args.targets:
+        cache = _load_cache(target, settings)
+        if cache is None:
+            return None
+        name = Path(cache.source.filename).stem
+        items = term_sheet_items(cache, settings.tau_low, settings.tau_high, _extra_names(settings))
+        if not items:
+            print(NO_KEY_TERMS.format(name=name), file=sys.stderr)
+            return None
+        sheets.append((name, _term_sheet(cache, items, client, args.fresh, settings)))
+    return sheets
+
+
+def _cmd_term_sheet(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    client = _gen_client("term-sheet", settings)
+    if client is None:
+        return EXIT_ERROR
+    try:
+        sheets = _sheets(args, client, settings)
+    except LLMError as error:
+        print(LLM_FAILED.format(error=error), file=sys.stderr)
+        return EXIT_ERROR
+    if sheets is None:
+        return EXIT_ERROR
+    if args.json:
+        data = {name: sheet.model_dump(mode="json") for name, sheet in sheets}
+        print(json.dumps(data, indent=JSON_INDENT))
+    else:
+        print(render_term_sheet(sheets))
     return 0
 
 
@@ -706,6 +825,65 @@ def _cmd_summary_eval(args: argparse.Namespace) -> int:
     return 0
 
 
+def _mean_seconds(latency_ms: float | None) -> str:
+    return "n/a" if latency_ms is None else f"{latency_ms / MS_PER_S:.1f} s"
+
+
+def _term_sheet_line(report: TermSheetReport, path: Path) -> str:
+    return (
+        f"term-sheet-eval: {report.model} · {report.documents} documents · "
+        f"{report.values} values · {report.agreeing} agree with gold · "
+        f"{report.rejected} rejected · {report.missing} missing · "
+        f"{report.withheld} withheld · {report.llm_failures} failures · "
+        f"mean {_mean_seconds(report.mean_latency_ms)} → {_relative(path)}"
+    )
+
+
+def _cmd_term_sheet_eval(args: argparse.Namespace) -> int:
+    settings = _with_model(load_settings(), "gen", args.model)
+    client = _gen_client("term-sheet-eval", settings)
+    if client is None:
+        return EXIT_ERROR
+    report = evaluate_term_sheets(
+        client,
+        _demo_caches(settings),
+        load_demo_gold(DEMO_DOCUMENTS),
+        settings.tau_low,
+        settings.tau_high,
+        _extra_names(settings),
+    )
+    path = _write_result(
+        f"term_sheet_{_slug(report.model)}.json", report.model_dump_json(indent=JSON_INDENT)
+    )
+    print(_term_sheet_line(report, path))
+    return 0
+
+
+def _passage_line(report: PassageAnswerReport, path: Path) -> str:
+    return (
+        f"passage-eval: {report.model} · {report.calls} calls · {report.answered} answered · "
+        f"{report.withheld} withheld · {report.no_passages} without passages · "
+        f"{report.llm_failures} failures · "
+        f"mean {_mean_seconds(report.mean_latency_ms)} → {_relative(path)}"
+    )
+
+
+def _cmd_passage_eval(args: argparse.Namespace) -> int:
+    settings = _with_model(load_settings(), "gen", args.model)
+    client = _gen_client("passage-eval", settings)
+    if client is None:
+        return EXIT_ERROR
+    search = PassageSearch(load_encoder(settings.embedding_model_id))
+    report = evaluate_passage_answers(
+        client, load_questions(settings.router_eval_path), _demo_caches(settings), search
+    )
+    path = _write_result(
+        f"passages_{_slug(report.model)}.json", report.model_dump_json(indent=JSON_INDENT)
+    )
+    print(_passage_line(report, path))
+    return 0
+
+
 def _cmd_check(args: argparse.Namespace) -> int:
     settings = load_settings()
     try:
@@ -807,6 +985,18 @@ def _add_evaluation_commands(commands: argparse._SubParsersAction) -> None:
     )
     summary_eval.add_argument("--model", help="generation model instead of the configured one")
     summary_eval.set_defaults(func=_cmd_summary_eval)
+    term_sheet_eval = commands.add_parser(
+        "term-sheet-eval", help="check generated term sheets against CUAD's gold spans"
+    )
+    term_sheet_eval.add_argument(
+        "--model", help="generation model instead of the configured one"
+    )
+    term_sheet_eval.set_defaults(func=_cmd_term_sheet_eval)
+    passage_eval = commands.add_parser(
+        "passage-eval", help="check answers written from passages for out-of-scope questions"
+    )
+    passage_eval.add_argument("--model", help="generation model instead of the configured one")
+    passage_eval.set_defaults(func=_cmd_passage_eval)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -842,6 +1032,17 @@ def _parser() -> argparse.ArgumentParser:
         "--fresh", action="store_true", help="ask the model again instead of using the saved summary"
     )
     summarize.set_defaults(func=_cmd_summarize)
+    term_sheet = commands.add_parser(
+        "term-sheet", help="fill in the key terms of one or more documents, side by side"
+    )
+    term_sheet.add_argument(
+        "targets", nargs="+", metavar="target", help="document, cache file or sha256: id"
+    )
+    term_sheet.add_argument("--json", action="store_true", help="print the term sheets as JSON")
+    term_sheet.add_argument(
+        "--fresh", action="store_true", help="ask the model again instead of using saved sheets"
+    )
+    term_sheet.set_defaults(func=_cmd_term_sheet)
     explain = commands.add_parser("explain", help="restate one clause in plain language")
     explain.add_argument("target", help="document, cache file or sha256: document id")
     explain.add_argument("--type", required=True, help="clause type to restate")

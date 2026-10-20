@@ -1,0 +1,241 @@
+{
+  "model": "qwen3.5:4b",
+  "documents": 3,
+  "fields": 24,
+  "values": 18,
+  "agreeing": 16,
+  "rejected": 0,
+  "missing": 5,
+  "withheld": 0,
+  "llm_failures": 0,
+  "mean_latency_ms": 4180.977930668935,
+  "records": [
+    {
+      "document": "long_outsourcing_agreement",
+      "field": "parties",
+      "values": [
+        "Tri City National Bank, a Wisconsin corporation (including its Affiliates, \"Customer\")",
+        "Marshall & Ilsley Corporation"
+      ],
+      "agreeing": 2,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "long_outsourcing_agreement",
+      "field": "agreement_date",
+      "values": [
+        "16th day of February, 1998"
+      ],
+      "agreeing": 1,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "long_outsourcing_agreement",
+      "field": "effective_date",
+      "values": [
+        "February 16, 1998"
+      ],
+      "agreeing": 1,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "long_outsourcing_agreement",
+      "field": "expiration_date",
+      "values": [],
+      "agreeing": 0,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "long_outsourcing_agreement",
+      "field": "term",
+      "values": [],
+      "agreeing": 0,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "long_outsourcing_agreement",
+      "field": "renewal_term",
+      "values": [
+        "one (1) twelve month period"
+      ],
+      "agreeing": 1,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "long_outsourcing_agreement",
+      "field": "notice_period",
+      "values": [
+        "five (5) months"
+      ],
+      "agreeing": 0,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "long_outsourcing_agreement",
+      "field": "governing_law",
+      "values": [
+        "the internal laws of the State of Wisconsin, excluding its principles of conflict of laws."
+      ],
+      "agreeing": 1,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "medium_sponsorship_agreement",
+      "field": "parties",
+      "values": [
+        "Excite"
+      ],
+      "agreeing": 1,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "medium_sponsorship_agreement",
+      "field": "agreement_date",
+      "values": [
+        "23rd day of September, 1997"
+      ],
+      "agreeing": 1,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "medium_sponsorship_agreement",
+      "field": "effective_date",
+      "values": [
+        "23rd day of September, 1997"
+      ],
+      "agreeing": 1,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "medium_sponsorship_agreement",
+      "field": "expiration_date",
+      "values": [],
+      "agreeing": 0,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "medium_sponsorship_agreement",
+      "field": "term",
+      "values": [],
+      "agreeing": 0,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "medium_sponsorship_agreement",
+      "field": "renewal_term",
+      "values": [],
+      "agreeing": 0,
+      "rejected": [],
+      "gold_present": false
+    },
+    {
+      "document": "medium_sponsorship_agreement",
+      "field": "notice_period",
+      "values": [],
+      "agreeing": 0,
+      "rejected": [],
+      "gold_present": false
+    },
+    {
+      "document": "medium_sponsorship_agreement",
+      "field": "governing_law",
+      "values": [
+        "This Agreement will be governed by and                   construed in accordance with the laws of the State of New York"
+      ],
+      "agreeing": 1,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "short_supply_agreement",
+      "field": "parties",
+      "values": [
+        "the Customer"
+      ],
+      "agreeing": 1,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "short_supply_agreement",
+      "field": "agreement_date",
+      "values": [
+        "15t h day of January 2018"
+      ],
+      "agreeing": 1,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "short_supply_agreement",
+      "field": "effective_date",
+      "values": [
+        "15t h day of January 2018"
+      ],
+      "agreeing": 0,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "short_supply_agreement",
+      "field": "expiration_date",
+      "values": [],
+      "agreeing": 0,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "short_supply_agreement",
+      "field": "term",
+      "values": [
+        "ten (10) years"
+      ],
+      "agreeing": 1,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "short_supply_agreement",
+      "field": "renewal_term",
+      "values": [
+        "ten (10) year term"
+      ],
+      "agreeing": 1,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "short_supply_agreement",
+      "field": "notice_period",
+      "values": [
+        "six (6) months"
+      ],
+      "agreeing": 1,
+      "rejected": [],
+      "gold_present": true
+    },
+    {
+      "document": "short_supply_agreement",
+      "field": "governing_law",
+      "values": [
+        "Laws of England (English common and statutory Law)"
+      ],
+      "agreeing": 1,
+      "rejected": [],
+      "gold_present": true
+    }
+  ]
+}
