@@ -67,6 +67,8 @@ def model_ids(monkeypatch):
 def no_clients(monkeypatch):
     monkeypatch.setattr(factory.OllamaClient, "from_settings", refuse_client)
     monkeypatch.setattr(factory.OpenAICompatClient, "from_settings", refuse_client)
+    monkeypatch.setattr(factory.OllamaClient, "for_generation", refuse_client)
+    monkeypatch.setattr(factory.OpenAICompatClient, "for_generation", refuse_client)
 
 
 @pytest.fixture
@@ -75,6 +77,15 @@ def clients(monkeypatch):
     openai = FakeLLMClient([], model="openai-test")
     monkeypatch.setattr(factory.OllamaClient, "from_settings", lambda settings: ollama)
     monkeypatch.setattr(factory.OpenAICompatClient, "from_settings", lambda settings: openai)
+    return SimpleNamespace(ollama=ollama, openai=openai)
+
+
+@pytest.fixture
+def gen_clients(monkeypatch):
+    ollama = FakeOllama(available=True)
+    openai = FakeLLMClient([], model="openai-gen")
+    monkeypatch.setattr(factory.OllamaClient, "for_generation", lambda settings: ollama)
+    monkeypatch.setattr(factory.OpenAICompatClient, "for_generation", lambda settings: openai)
     return SimpleNamespace(ollama=ollama, openai=openai)
 
 
@@ -228,3 +239,68 @@ def test_encoder_is_loaded_again_for_another_model_id(model_ids):
     factory.load_encoder("model-a")
     factory.load_encoder("model-b")
     assert model_ids == ["model-a", "model-b"]
+
+
+def test_router_unavailable_warning_still_says_embedding_router(clients, caplog):
+    clients.ollama.is_available = False
+    with caplog.at_level(logging.WARNING):
+        factory.build_llm_client(Settings(llm_backend="ollama"))
+    assert "using the embedding router" in caplog.text
+
+
+def test_none_backend_has_no_gen_client():
+    assert factory.build_gen_client(Settings(llm_backend="none")) is None
+
+
+def test_ollama_backend_returns_the_ollama_gen_client(gen_clients):
+    assert factory.build_gen_client(Settings(llm_backend="ollama")) is gen_clients.ollama
+
+
+def test_ollama_gen_model_is_loaded_once(gen_clients):
+    factory.build_gen_client(Settings(llm_backend="ollama"))
+    assert gen_clients.ollama.loads == 1
+
+
+def test_ollama_backend_without_the_gen_model_has_no_gen_client(gen_clients):
+    gen_clients.ollama.is_available = False
+    assert factory.build_gen_client(Settings(llm_backend="ollama")) is None
+    assert gen_clients.ollama.loads == 0
+
+
+def test_unavailable_gen_model_warns_naming_the_model_and_the_fallback(gen_clients, caplog):
+    gen_clients.ollama.is_available = False
+    with caplog.at_level(logging.WARNING):
+        factory.build_gen_client(Settings(llm_backend="ollama"))
+    [record] = caplog.records
+    assert OLLAMA_MODEL in record.getMessage()
+    assert factory.GENERATION_FALLBACK in record.getMessage()
+    assert "summaries and explanations are off" in record.getMessage()
+
+
+def test_gen_load_failure_gives_no_client_and_warns_with_the_error(gen_clients, caplog):
+    gen_clients.ollama.load_error = LLMError("load failed")
+    with caplog.at_level(logging.WARNING):
+        assert factory.build_gen_client(Settings(llm_backend="ollama")) is None
+    [record] = caplog.records
+    assert "load failed" in record.getMessage()
+    assert "summaries and explanations are off" in record.getMessage()
+
+
+def test_openai_backend_returns_the_openai_gen_client(gen_clients):
+    assert factory.build_gen_client(Settings(llm_backend="openai")) is gen_clients.openai
+
+
+def test_unknown_backend_for_the_gen_client_raises_listing_the_backends():
+    with pytest.raises(factory.UnknownBackendError) as raised:
+        factory.build_gen_client(Settings(llm_backend="olama"))
+    assert str(raised.value).endswith("use one of ollama, openai, none")
+
+
+@pytest.mark.parametrize("backend", ["ollama", "openai"])
+def test_building_the_gen_client_never_builds_the_router_client(backend, gen_clients):
+    assert factory.build_gen_client(Settings(llm_backend=backend)) is not None
+
+
+@pytest.mark.parametrize("backend", ["ollama", "openai"])
+def test_building_the_router_client_never_builds_the_gen_client(backend, clients):
+    assert factory.build_llm_client(Settings(llm_backend=backend)) is not None

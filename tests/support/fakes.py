@@ -125,13 +125,44 @@ class FakeLLMClient:
         self.model = model
         self.replies = list(replies)
         self.calls: list[tuple[str, str, dict]] = []
+        self.text_calls: list[tuple[str, str, int]] = []
 
     def complete_json(self, system: str, user: str, schema: dict) -> str:
         self.calls.append((system, user, schema))
+        return self._reply()
+
+    def complete_text(self, system: str, user: str, max_tokens: int) -> str:
+        self.text_calls.append((system, user, max_tokens))
+        return self._reply()
+
+    def _reply(self) -> str:
         reply = self.replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
         return reply
+
+
+QUOTED = re.compile(r'"([^"]+)"')
+ECHO_QUOTES = 3
+
+
+class EchoTextClient:
+    """Text client that quotes the first quotes of the request back; faithful by construction."""
+
+    model = "fake-gen"
+
+    def __init__(self):
+        self.text_calls: list[tuple[str, str, int]] = []
+
+    def complete_json(self, system: str, user: str, schema: dict) -> str:
+        return "{}"
+
+    def complete_text(self, system: str, user: str, max_tokens: int) -> str:
+        self.text_calls.append((system, user, max_tokens))
+        quotes = QUOTED.findall(user)[:ECHO_QUOTES]
+        if not quotes:
+            return "The request names no clause."
+        return " ".join(f'The contract states "{quote}".' for quote in quotes)
 
 
 class _SlowQA(FakeQA):

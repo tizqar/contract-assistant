@@ -51,6 +51,11 @@ class Settings:
     openai_api_key: str | None = field(default_factory=lambda: _env("OPENAI_API_KEY"))
     llm_timeout_s: float = 10.0
 
+    # Summaries and explanations: the same backend, a model of its own, a longer timeout.
+    gen_model: str = field(default_factory=lambda: _env("GEN_MODEL", "qwen3.5:4b"))
+    gen_timeout_s: float = field(default_factory=lambda: float(_env("GEN_TIMEOUT_S", "120")))
+    gen_num_ctx: int = field(default_factory=lambda: int(_env("GEN_NUM_CTX", "8192")))
+
     embedding_model_id: str = field(
         default_factory=lambda: _env("EMBEDDING_MODEL_ID", "BAAI/bge-base-en-v1.5")
     )

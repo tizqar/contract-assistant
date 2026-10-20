@@ -40,3 +40,22 @@ def test_embedding_threshold_from_env(monkeypatch):
 def test_embedding_model_defaults_to_bge_base(monkeypatch):
     monkeypatch.delenv("EMBEDDING_MODEL_ID", raising=False)
     assert Settings().embedding_model_id == "BAAI/bge-base-en-v1.5"
+
+
+def test_generation_settings_from_env(monkeypatch):
+    monkeypatch.setenv("GEN_MODEL", "other:7b")
+    monkeypatch.setenv("GEN_TIMEOUT_S", "45.5")
+    monkeypatch.setenv("GEN_NUM_CTX", "2048")
+    settings = Settings()
+    assert settings.gen_model == "other:7b"
+    assert settings.gen_timeout_s == 45.5
+    assert settings.gen_num_ctx == 2048
+
+
+def test_generation_settings_default_when_unset(monkeypatch):
+    for name in ("GEN_MODEL", "GEN_TIMEOUT_S", "GEN_NUM_CTX"):
+        monkeypatch.delenv(name, raising=False)
+    settings = Settings()
+    assert settings.gen_model == "qwen3.5:4b"
+    assert settings.gen_timeout_s == 120.0
+    assert settings.gen_num_ctx == 8192

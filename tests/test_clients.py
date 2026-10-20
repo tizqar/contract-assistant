@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import httpx
 import ollama
@@ -23,6 +24,9 @@ SCHEMA = {
     "additionalProperties": False,
 }
 REPLY = json.dumps({"clause_types": ["Governing Law"]})
+TEXT_REPLY = "The agreement is governed by Delaware law."
+MAX_TOKENS = 123
+NUM_CTX = 4096
 
 
 def raise_timeout(request: httpx.Request) -> httpx.Response:
@@ -115,6 +119,22 @@ def test_ollama_load_posts_the_model_with_an_empty_prompt():
 
 def test_ollama_load_sets_keep_alive():
     assert generate_request_body()["keep_alive"] == KEEP_ALIVE
+
+
+def test_ollama_load_without_a_context_size_sends_no_options():
+    assert "options" not in generate_request_body()
+
+
+def test_ollama_load_of_a_generation_client_sets_its_context_size():
+    bodies = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        return httpx.Response(200, json={"model": MODEL, "response": "", "done": True})
+
+    client = ollama.Client(host="http://test", transport=httpx.MockTransport(handler))
+    OllamaClient(client, MODEL, num_ctx=8192).load()
+    assert bodies[0]["options"] == {"num_ctx": 8192}
 
 
 @pytest.mark.parametrize("handler", FAILURES)
@@ -257,6 +277,144 @@ def test_openai_reply_without_content_becomes_llm_error(content):
     client = openai_client(lambda request: completion(content))
     with pytest.raises(LLMError, match=MODEL):
         client.complete_json(SYSTEM, USER, SCHEMA)
+
+
+def ollama_text_request_body(num_ctx: int | None = None) -> dict:
+    bodies = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        return chat_reply(TEXT_REPLY)
+
+    client = ollama_client(handler)
+    client.num_ctx = num_ctx
+    client.complete_text(SYSTEM, USER, MAX_TOKENS)
+    return bodies[0]
+
+
+def test_ollama_text_returns_the_message_content():
+    client = ollama_client(lambda request: chat_reply(TEXT_REPLY))
+    assert client.complete_text(SYSTEM, USER, MAX_TOKENS) == TEXT_REPLY
+
+
+def test_ollama_text_request_has_no_format():
+    assert "format" not in ollama_text_request_body()
+
+
+def test_ollama_text_request_turns_thinking_off():
+    assert ollama_text_request_body()["think"] is False
+
+
+def test_ollama_text_request_uses_temperature_zero_and_the_token_limit():
+    options = ollama_text_request_body()["options"]
+    assert options["temperature"] == 0
+    assert options["num_predict"] == MAX_TOKENS
+
+
+def test_ollama_text_request_has_no_context_size_unless_the_client_has_one():
+    assert "num_ctx" not in ollama_text_request_body()["options"]
+
+
+def test_ollama_text_request_sets_the_context_size_of_the_client():
+    assert ollama_text_request_body(num_ctx=NUM_CTX)["options"]["num_ctx"] == NUM_CTX
+
+
+def test_ollama_text_request_keeps_the_model_loaded():
+    assert ollama_text_request_body()["keep_alive"] == KEEP_ALIVE
+
+
+@pytest.mark.parametrize("handler", FAILURES)
+def test_ollama_text_failure_becomes_llm_error_naming_the_model(handler):
+    with pytest.raises(LLMError, match=MODEL):
+        ollama_client(handler).complete_text(SYSTEM, USER, MAX_TOKENS)
+
+
+def test_ollama_text_reply_without_content_becomes_llm_error():
+    client = ollama_client(lambda request: chat_reply(""))
+    with pytest.raises(LLMError, match=MODEL):
+        client.complete_text(SYSTEM, USER, MAX_TOKENS)
+
+
+def test_ollama_from_settings_has_no_context_size(monkeypatch):
+    monkeypatch.setattr(ollama, "Client", lambda **kwargs: object())
+    assert OllamaClient.from_settings(Settings()).num_ctx is None
+
+
+def test_ollama_for_generation_uses_the_generation_settings(monkeypatch):
+    created = []
+
+    def fake_client(**kwargs):
+        created.append(kwargs)
+        return object()
+
+    monkeypatch.setattr(ollama, "Client", fake_client)
+    settings = Settings(gen_model="gen", gen_timeout_s=90.0, gen_num_ctx=NUM_CTX)
+    client = OllamaClient.for_generation(settings)
+    assert client.model == "gen"
+    assert client.num_ctx == NUM_CTX
+    assert created == [{"timeout": 90.0}, {"timeout": LOAD_TIMEOUT_S}]
+
+
+class FakeCompletions:
+    def __init__(self, content: str | None = TEXT_REPLY):
+        self.content = content
+        self.calls: list[dict] = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        message = SimpleNamespace(content=self.content)
+        return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+
+def fake_openai(completions: FakeCompletions) -> OpenAICompatClient:
+    chat = SimpleNamespace(completions=completions)
+    return OpenAICompatClient(SimpleNamespace(chat=chat), MODEL)
+
+
+def test_openai_text_returns_the_content_with_the_token_limit_and_no_response_format():
+    completions = FakeCompletions()
+    reply = fake_openai(completions).complete_text(SYSTEM, USER, MAX_TOKENS)
+    [call] = completions.calls
+    assert reply == TEXT_REPLY
+    assert call["max_tokens"] == MAX_TOKENS
+    assert "response_format" not in call
+    assert call["temperature"] == 0
+
+
+def test_openai_text_request_sends_system_then_user_message():
+    completions = FakeCompletions()
+    fake_openai(completions).complete_text(SYSTEM, USER, MAX_TOKENS)
+    assert completions.calls[0]["messages"] == [
+        {"role": "system", "content": SYSTEM},
+        {"role": "user", "content": USER},
+    ]
+
+
+@pytest.mark.parametrize("handler", FAILURES)
+def test_openai_text_failure_becomes_llm_error_naming_the_model(handler):
+    with pytest.raises(LLMError, match=MODEL):
+        openai_client(handler).complete_text(SYSTEM, USER, MAX_TOKENS)
+
+
+def test_openai_text_reply_without_content_becomes_llm_error():
+    with pytest.raises(LLMError, match=MODEL):
+        fake_openai(FakeCompletions(content="")).complete_text(SYSTEM, USER, MAX_TOKENS)
+
+
+def test_openai_for_generation_uses_the_generation_settings():
+    pytest.importorskip("openai")
+    settings = Settings(
+        llm_model="router",
+        llm_timeout_s=3.0,
+        gen_model="gen",
+        gen_timeout_s=90.0,
+        openai_base_url="http://test/v1",
+        openai_api_key="test",
+    )
+    client = OpenAICompatClient.for_generation(settings)
+    assert client.model == "gen"
+    assert client.client.timeout == 90.0
+    assert client.client.max_retries == 0
 
 
 @pytest.fixture

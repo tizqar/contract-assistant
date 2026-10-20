@@ -26,6 +26,9 @@ PHRASE_SCHEMA = {
     "properties": {"paragraph": {"type": "string"}},
 }
 QUOTED_SPAN = re.compile(r'"([^"]*)"|“([^”]*)”')
+# A number written in words with its digits, "six (6)", counts as one number: contracts write
+# numbers that way and a model mixes the pairs up ("six (10)") more often than it invents digits.
+NUMBER = re.compile(r"[A-Za-z-]+ \(\d+(?:[.,]\d+)*\)|\d+(?:[.,]\d+)*")
 
 
 class PhraseReply(BaseModel):
@@ -51,6 +54,16 @@ def unfaithful_spans(paragraph: str, quotes: Sequence[str]) -> list[str]:
     """Return the quoted spans that are not word for word part of one of the quotes."""
     collapsed = [_collapse(quote) for quote in quotes]
     return [span for span in quoted_spans(paragraph) if not _is_part_of(span, collapsed)]
+
+
+def unsupported_numbers(text: str, quotes: Sequence[str]) -> list[str]:
+    """Return the numbers written in text that none of the quotes contains, in order."""
+    lowered = [_collapse(quote).lower() for quote in quotes]
+    return [
+        number
+        for number in NUMBER.findall(text)
+        if not any(number.lower() in quote for quote in lowered)
+    ]
 
 
 def _is_part_of(span: str, collapsed_quotes: Sequence[str]) -> bool:

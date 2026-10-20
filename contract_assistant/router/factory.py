@@ -28,6 +28,8 @@ BACKEND_OLLAMA = "ollama"
 BACKEND_OPENAI = "openai"
 BACKEND_NONE = "none"
 BACKENDS = (BACKEND_OLLAMA, BACKEND_OPENAI, BACKEND_NONE)
+ROUTER_FALLBACK = "using the embedding router"
+GENERATION_FALLBACK = "summaries and explanations are off"
 
 
 class UnknownBackendError(ValueError):
@@ -65,17 +67,32 @@ def _descriptions(settings: Settings, clause_types: list[ClauseType]) -> dict[st
 
 
 def build_llm_client(settings: Settings) -> LLMClient | None:
-    """Build the client of LLM_BACKEND; None without a backend or when Ollama lacks the model."""
-    backend = settings.llm_backend
+    """Build the router's client of LLM_BACKEND; None without a backend or Ollama's model."""
+    backend = _checked_backend(settings)
     if backend == BACKEND_OPENAI:
         return OpenAICompatClient.from_settings(settings)
     if backend == BACKEND_OLLAMA:
-        return _ollama_client(settings)
-    if backend == BACKEND_NONE:
-        return None
-    raise UnknownBackendError(
-        f"unknown LLM_BACKEND {backend!r}; use one of {', '.join(BACKENDS)}"
-    )
+        return _ready(OllamaClient.from_settings(settings), ROUTER_FALLBACK)
+    return None
+
+
+def build_gen_client(settings: Settings) -> LLMClient | None:
+    """Build the generation client of LLM_BACKEND; None without a backend or Ollama's model."""
+    backend = _checked_backend(settings)
+    if backend == BACKEND_OPENAI:
+        return OpenAICompatClient.for_generation(settings)
+    if backend == BACKEND_OLLAMA:
+        return _ready(OllamaClient.for_generation(settings), GENERATION_FALLBACK)
+    return None
+
+
+def _checked_backend(settings: Settings) -> str:
+    backend = settings.llm_backend
+    if backend not in BACKENDS:
+        raise UnknownBackendError(
+            f"unknown LLM_BACKEND {backend!r}; use one of {', '.join(BACKENDS)}"
+        )
+    return backend
 
 
 def build_router(settings: Settings, clause_types: list[ClauseType]) -> Router:
@@ -87,16 +104,13 @@ def build_router(settings: Settings, clause_types: list[ClauseType]) -> Router:
     return LLMRouter(client, embedding, clause_types)
 
 
-def _ollama_client(settings: Settings) -> OllamaClient | None:
-    client = OllamaClient.from_settings(settings)
+def _ready(client: OllamaClient, fallback: str) -> OllamaClient | None:
     if not client.available():
-        logger.warning(
-            "ollama model %s is not available; using the embedding router", client.model
-        )
+        logger.warning("ollama model %s is not available; %s", client.model, fallback)
         return None
     try:
         client.load()
     except LLMError as error:
-        logger.warning("%s; using the embedding router", error)
+        logger.warning("%s; %s", error, fallback)
         return None
     return client

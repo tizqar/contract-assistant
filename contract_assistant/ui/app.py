@@ -15,6 +15,7 @@ from contract_assistant.config import Settings
 from contract_assistant.extract.extractor import Extractor
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
 from contract_assistant.router.base import Router
+from contract_assistant.router.clients import LLMClient
 from contract_assistant.search import PassageSearch
 from contract_assistant.store import (
     CacheIntegrityError,
@@ -23,6 +24,7 @@ from contract_assistant.store import (
     Store,
     doc_id_of,
 )
+from contract_assistant.summary import SummaryStore
 from contract_assistant.ui.views import (
     CLAUSE_HEADERS,
     PASSAGE_PREFIX,
@@ -167,6 +169,8 @@ class Services:
     settings: Settings
     search: PassageSearch
     unvalidated: frozenset[str]
+    gen: LLMClient | None = None
+    summaries: SummaryStore | None = None
 
 
 def guarded(handler: Callable) -> Callable:
