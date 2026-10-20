@@ -19,9 +19,10 @@ extractor, without retraining, and are never marked Found because no gold data e
 validate their thresholds. A question that matches no clause type gets up to three related
 passages of the contract, shown verbatim and labelled as not a clause match.
 
-The app can also write a short summary from the clauses it found and restate one clause in
-plain English or Serbian. This text is generated and labelled as such. Quotes inside it are
-verified against the contract.
+The app can also write a short summary from the clauses it found, fill in a term sheet of
+key terms, restate one clause in plain English or Serbian, and answer a question that
+matches no clause from the passages closest to it. This text is generated and labelled as
+such. Quotes inside it are verified against the contract.
 
 ## Install
 
@@ -76,6 +77,8 @@ make lint         # ruff
 make router-eval  # router-eval --router llm --split test
 make e2e          # e2e-eval --router llm
 make summary-eval # summary-eval
+make term-sheet-eval # term-sheet-eval
+make passage-eval # passage-eval
 ```
 
 The first `make demo` loads the embedding model and downloads it if it is not cached. With
@@ -105,10 +108,12 @@ contract-assistant router-eval --router llm --split test       # make router-eva
 contract-assistant e2e-eval --router oracle                    # also embedding and llm
 contract-assistant phrase-eval                                 # LLM paragraphs vs. the quotes
 contract-assistant summary-eval                                # summaries vs. the quotes
+contract-assistant term-sheet-eval                             # term sheets vs. CUAD's gold
+contract-assistant passage-eval                                # answers vs. the passages
 ```
 
-The other commands are `contract-assistant import-demo | extract | show | summarize | explain |
-check | serve`.
+The other commands are `contract-assistant import-demo | extract | show | summarize | term-sheet |
+explain | check | serve`.
 `extract` adds the extra clause types to an existing cache without re-extracting the 41.
 
 ## How answers read
@@ -163,8 +168,10 @@ The thresholds and the model details are in their own tabs.
 | An explicit not found: the clause was checked. | One question answered for two clause types. |
 | ![The summary of a contract](docs/screenshots/summary.png) | ![A clause restated in Serbian](docs/screenshots/explain.png) |
 | The Summary tab, written from the clauses found. | The highlighted passage restated in plain Serbian. |
+| ![The key terms of a contract](docs/screenshots/terms.png) | ![An answer written from the passages](docs/screenshots/generated.png) |
+| The key terms, each a verbatim value from a clause found. | A question outside the clause types, answered from the related passages. |
 
-## Summary and explanations
+## Summary, key terms and explanations
 
 The summary is written by the generation model only from the Found and Verify quotes of the
 contract, never from the full text. Every passage in double quotes must match a verified
@@ -177,6 +184,23 @@ the sliders writes a new one; a withheld one is not saved, so the next request a
 model again. On an Apple M4 with 16 GB, qwen3.5:4b takes about 15 to 25 s for a demo
 contract, at about 27 tokens per second.
 
+The term sheet fills in eight key terms: parties, agreement date, effective date,
+expiration date, initial term, renewal, notice period and governing law. The generation
+model picks each value from the quotes of the clauses found, and each value is copied word
+for word from the quote of one clause and located in the contract with its offsets. A value
+the model gave that is not in a clause is shown as "not verified" with what the model
+wrote. A term the clauses do not state is "not stated". A value taken from the clause of
+another field names that clause. A term sheet is saved under `cache/term_sheets/`. The web
+app shows it as a table and offers the JSON. On the command line, `term-sheet a.txt b.txt`
+prints one column per document, which is the comparison.
+
+When a question matches no clause type, the language model writes up to three sentences
+from the related passages. The same checks as for the summary apply: quoted text is
+verified and numbers are checked, with one corrected retry, or the answer is withheld with
+the reason. The chat labels it Generated and says it is not a clause match. This is the
+free-answer option that was left out on 18 October 2026 for breaking the verbatim
+guarantee. It is now added behind the checks and the label.
+
 The explanation restates one highlighted passage in at most two sentences, in English or
 Serbian. It is withheld when it quotes text that is not in the clause or names a number the
 clause does not. The web app labels it as a restatement, not a quote. The model can still
@@ -185,6 +209,8 @@ misstate what the clause means, so the reader checks it against the highlighted 
 ```bash
 contract-assistant summarize demo/short_supply_agreement.txt
 contract-assistant explain demo/short_supply_agreement.txt --type "Governing Law" --language sr
+contract-assistant term-sheet demo/short_supply_agreement.txt demo/long_outsourcing_agreement.txt
+contract-assistant term-sheet demo/short_supply_agreement.txt --json
 ```
 
 `summarize` reads the saved summary when there is one; `--fresh` asks the model again.
@@ -194,6 +220,13 @@ contract-assistant explain demo/short_supply_agreement.txt --type "Governing Law
 retry, and writes `eval/results/summary_<model>.json`. It records per document the number of
 items, characters, sentences, quoted spans, unfaithful spans, whether the summary was
 withheld, the attempts it took, and the latency.
+
+`term-sheet-eval` compares each value with CUAD's gold spans of the demo contracts in
+`demo/demo_documents.json` and counts the values that agree, the rejected values and the
+missing ones. It writes `eval/results/term_sheet_<model>.json`. `passage-eval` asks the ten
+out-of-scope evaluation questions on the three demo contracts and counts the answers
+shown, the withheld ones and the questions without passages. It writes
+`eval/results/passages_<model>.json`.
 
 ## Demo documents
 

@@ -4,12 +4,26 @@ import re
 
 import pytest
 
-from contract_assistant.answer import Answer, AnswerItem, Citation, Passage, answer
+from contract_assistant.answer import (
+    Answer,
+    AnswerItem,
+    Citation,
+    GeneratedAnswer,
+    Passage,
+    answer,
+)
 from contract_assistant.config import ROOT, Settings
 from contract_assistant.explain import Explanation
 from contract_assistant.router.base import RouteResult
 from contract_assistant.store import read_cache
 from contract_assistant.summary import Summary
+from contract_assistant.term_sheet import (
+    FIELDS,
+    LABELS,
+    NOT_STATED,
+    TermSheet,
+    TermValue,
+)
 from contract_assistant.ui.views import (
     CLAUSE_GROUPS,
     CLAUSE_HEADERS,
@@ -37,6 +51,7 @@ from contract_assistant.ui.views import (
     sources_json,
     summary_markdown,
     technical_markdown,
+    term_rows,
     top_citation,
 )
 from tests.support.caches import make_cache
@@ -660,3 +675,81 @@ def test_technical_details_name_the_generation_model(settings):
 
 def test_technical_details_say_generation_is_off(settings):
     assert "**Summaries and explanations:** off" in technical_markdown(settings, "embedding")
+
+
+def generated_of(text: str | None = "Payable in sixty days.", reason=None) -> GeneratedAnswer:
+    return GeneratedAnswer(model="gen-1", text=text, reason=reason, latency_ms=5.0)
+
+
+def with_generated(generated: GeneratedAnswer | None) -> Answer:
+    answer_ = passages_answer([a_passage()])
+    return answer_.model_copy(update={"generated": generated})
+
+
+def test_reply_shows_the_generated_answer_before_the_passages():
+    reply = chat_reply(with_generated(generated_of()))
+    assert '<span class="tier tier-generated">Generated</span> **Answer from the passages**' in reply
+    assert reply.index("Payable in sixty days.") < reply.index("does not match a clause")
+    assert "Written by the language model gen-1 from the passages below." in reply
+    assert "This is not a clause match." in reply
+    assert "tier-related" in reply and "The passage is highlighted" in reply
+
+
+def test_reply_with_a_withheld_generated_answer_gives_only_the_reason():
+    reply = chat_reply(with_generated(generated_of(None, "it adds numbers: 9")))
+    assert reply.startswith(
+        "<small>The language model's answer is not shown because it adds numbers: 9.</small>"
+    )
+    assert "tier-generated" not in reply and "tier-related" in reply
+
+
+def test_reply_without_a_generated_answer_has_no_generated_block():
+    assert "tier-generated" not in chat_reply(with_generated(None))
+
+
+def sheet_of(terms=None, rejected=None) -> TermSheet:
+    return TermSheet(
+        doc_id="d",
+        model="gen-1",
+        tau_low=0.2,
+        tau_high=0.8,
+        latency_ms=1.0,
+        items=[],
+        terms={field: [] for field in FIELDS} | (terms or {}),
+        rejected=rejected or {},
+    )
+
+
+def term_value(value="Vanuatu", clause_type="Governing Law", page=3) -> TermValue:
+    return TermValue(value=value, clause_type=clause_type, page=page, start=0, end=len(value))
+
+
+def test_term_rows_have_one_labelled_row_per_field_in_order():
+    rows = term_rows(sheet_of())
+    assert [row[0] for row in rows] == [LABELS[field] for field in FIELDS]
+    assert all(len(row) == 4 for row in rows)
+
+
+def test_term_row_shows_value_clause_name_and_page():
+    rows = term_rows(sheet_of({"governing_law": [term_value()]}))
+    assert rows[-1] == ["Governing law", "Vanuatu", "Governing Law", "3"]
+
+
+def test_term_row_joins_clause_names_and_takes_the_first_page():
+    values = [term_value("A", "Parties", 2), term_value("B", "Agreement Date", None)]
+    row = term_rows(sheet_of({"parties": values}))[0]
+    assert row[2] == "Parties, Agreement Date" and row[3] == "2"
+
+
+def test_term_row_without_a_page_shows_the_dash():
+    row = term_rows(sheet_of({"governing_law": [term_value(page=None)]}))[-1]
+    assert row[3] == NO_PAGE
+
+
+def test_term_row_not_stated_has_no_clause_and_no_page():
+    assert term_rows(sheet_of())[0] == ["Parties", NOT_STATED, "", NO_PAGE]
+
+
+def test_term_row_not_verified_names_the_rejected_value():
+    row = term_rows(sheet_of(rejected={"governing_law": ["Mars"]}))[-1]
+    assert row[1].startswith("not verified") and "Mars" in row[1]

@@ -11,6 +11,7 @@ from contract_assistant.answer import (
     Answer,
     AnswerItem,
     Citation,
+    GeneratedAnswer,
     Passage,
     Status,
     blockquote,
@@ -20,6 +21,7 @@ from contract_assistant.config import Settings
 from contract_assistant.explain import LANGUAGES, Explanation
 from contract_assistant.store import DocumentCache
 from contract_assistant.summary import MS_PER_S, Summary
+from contract_assistant.term_sheet import FIELDS, LABELS, TermSheet, cell
 
 CLAUSE_GROUPS: dict[str, tuple[str, ...]] = {
     "General terms": (
@@ -148,6 +150,15 @@ EXPLANATION_META_TEXT = (
     "Written by the language model {model}. This is a restatement, not a quote; "
     "check it against the highlighted passage."
 )
+GENERATED_ANSWER_HEADING = (
+    '<span class="tier tier-generated">Generated</span> **Answer from the passages**'
+)
+GENERATED_ANSWER_META = (
+    "Written by the language model {model} from the passages below. "
+    "Text in double quotes is verified against them; the rest is the model's wording. "
+    "This is not a clause match."
+)
+GENERATED_ANSWER_WITHHELD = "The language model's answer is not shown because {reason}."
 MATCHING_BACKENDS = {"ollama": "Ollama"}
 OPENAI_BACKEND = "an OpenAI-compatible API"
 GENERATION_OFF = "off"
@@ -195,7 +206,7 @@ def chat_reply(answer: Answer, unvalidated: Collection[str] = ()) -> str:
     """Return the Markdown shown in the chat for an answer."""
     if not answer.items:
         return (
-            _passages_reply(answer.passages)
+            _passages_reply(answer.passages, answer.generated)
             if answer.passages
             else _empty_route_reply(unvalidated)
         )
@@ -206,10 +217,23 @@ def chat_reply(answer: Answer, unvalidated: Collection[str] = ()) -> str:
     return "\n\n".join(blocks)
 
 
-def _passages_reply(passages: list[Passage]) -> str:
-    blocks = [PASSAGES_TEXT, *(_passage_block(i, p) for i, p in enumerate(passages, start=1))]
+def _passages_reply(passages: list[Passage], generated: GeneratedAnswer | None = None) -> str:
+    blocks = [
+        *_generated_blocks(generated),
+        PASSAGES_TEXT,
+        *(_passage_block(i, p) for i, p in enumerate(passages, start=1)),
+    ]
     blocks.append(f"<small>{HIGHLIGHT_TEXT[min(len(passages), 2)]}</small>")
     return "\n\n".join(blocks)
+
+
+def _generated_blocks(generated: GeneratedAnswer | None) -> list[str]:
+    if generated is None:
+        return []
+    if generated.text is None:
+        return [f"<small>{GENERATED_ANSWER_WITHHELD.format(reason=generated.reason)}</small>"]
+    meta = GENERATED_ANSWER_META.format(model=generated.model)
+    return [GENERATED_ANSWER_HEADING, generated.text, f"<small>{meta}</small>"]
 
 
 def _passage_block(number: int, passage: Passage) -> str:
@@ -499,3 +523,21 @@ def explanation_markdown(explanation: Explanation) -> str:
     heading = EXPLANATION_HEADING.format(name=name, language=language)
     meta = EXPLANATION_META_TEXT.format(model=explanation.model)
     return f"{heading}\n\n{explanation.text}\n\n<small>{meta}</small>"
+
+
+def term_rows(sheet: TermSheet) -> list[list[str]]:
+    """Return one row per key term: label, value, clause types it comes from and page."""
+    rows = []
+    for field in FIELDS:
+        values = sheet.terms.get(field, [])
+        names = dict.fromkeys(display_name(value.clause_type) for value in values)
+        page = values[0].page if values else None
+        rows.append(
+            [
+                LABELS[field],
+                cell(sheet, field),
+                ", ".join(names),
+                NO_PAGE if page is None else str(page),
+            ]
+        )
+    return rows

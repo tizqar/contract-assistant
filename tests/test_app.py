@@ -9,7 +9,7 @@ import pytest
 from gradio_client import Client
 
 from contract_assistant import cli
-from contract_assistant.answer import Passage
+from contract_assistant.answer import GeneratedAnswer, Passage
 from contract_assistant.clause_types import app_clause_types, load_extra_clause_types
 from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.extract.extractor import Extractor
@@ -17,6 +17,7 @@ from contract_assistant.router.base import RouteResult
 from contract_assistant.router.clients import LLMError
 from contract_assistant.search import PassageSearch
 from contract_assistant.store import Store
+from contract_assistant.term_sheet import FIELDS, INVALID_REASON, LABELS, TermSheet
 from contract_assistant.ui import app
 from contract_assistant.ui.app import ALL_CLAUSES, DOCUMENT_TAB, Handlers, Services, build_app
 from contract_assistant.ui.views import SUGGESTED_QUESTIONS, display_name
@@ -722,3 +723,108 @@ def test_summarize_does_not_save_a_withheld_summary_and_asks_again(
     second = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
     assert FAITHFUL_REPLY in second
     assert len(client.text_calls) == 3
+
+
+def test_term_sheet_returns_rows_in_field_order_and_a_download(
+    make_services, demo_cache, settings
+):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    rows, button = handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH)
+    assert [row[0] for row in rows] == [LABELS[field] for field in FIELDS]
+    assert len(rows) == 8
+    assert button.visible is True
+    [path] = (settings.cache_dir / "term_sheets").glob("*.json")
+    assert button.value["orig_name"] == path.name
+    assert TermSheet.model_validate_json(path.read_text()).doc_id == demo_cache.doc_id
+
+
+def test_term_sheet_again_makes_no_model_call(make_services, demo_cache):
+    client = EchoTextClient()
+    handlers = Handlers(make_services(gen=client))
+    handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH)
+    calls = len(client.text_calls)
+    handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH)
+    assert calls > 0 and len(client.text_calls) == calls
+
+
+def test_term_sheet_without_a_model_warns(make_services, demo_cache, warnings):
+    assert is_skip(Handlers(make_services()).term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
+    assert warnings == [app.SUMMARIES_OFF]
+
+
+def test_term_sheet_without_a_document_warns(make_services, warnings):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    assert is_skip(handlers.term_sheet(None, TAU_LOW, TAU_HIGH))
+    assert warnings == [app.SELECT_CONTRACT]
+
+
+def test_term_sheet_without_key_term_clauses_says_so(make_services, settings, infos):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    cache = make_cache(TEXT, settings)
+    assert is_skip(handlers.term_sheet(cache, TAU_LOW, TAU_HIGH))
+    assert infos == [app.NO_TERM_CLAUSES]
+
+
+def test_term_sheet_with_inverted_thresholds_warns(make_services, demo_cache, warnings):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    assert is_skip(handlers.term_sheet(demo_cache, 0.9, 0.1))
+    assert len(warnings) == 1
+
+
+def test_term_sheet_warns_when_the_model_does_not_answer(make_services, demo_cache, warnings):
+    handlers, _ = generating(make_services, [LLMError("down")])
+    assert is_skip(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
+    assert warnings == [app.GENERATION_FAILED]
+
+
+def test_term_sheet_withheld_shows_not_stated_hides_the_download_and_is_not_saved(
+    make_services, demo_cache, warnings, settings
+):
+    handlers, _ = generating(make_services, ["no json", "still no json"])
+    rows, button = handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH)
+    assert {row[1] for row in rows} == {"not stated"}
+    assert button.visible is False
+    assert warnings == [app.TERM_SHEET_WITHHELD.format(reason=INVALID_REASON)]
+    assert not (settings.cache_dir / "term_sheets").exists()
+
+
+def test_term_sheet_button_follows_the_model(make_services):
+    assert find_component(build_app(make_services()), "term-sheet").interactive is False
+    demo = build_app(make_services(gen=FakeLLMClient([])))
+    assert find_component(demo, "term-sheet").interactive is True
+    assert find_component(demo, "term-download").visible is False
+
+
+def test_ask_writes_an_answer_from_the_passages(make_services, settings):
+    cache = make_cache(TEXT, settings)
+    handlers = Handlers(make_services(router=route_to(), gen=EchoTextClient()))
+    handlers.services.search.search = lambda cache, question: [passage()]
+    result = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)
+    assert isinstance(result[2].generated, GeneratedAnswer)
+    assert "tier-generated" in result[1][-1]["content"]
+
+
+def test_ask_keeps_the_passages_when_the_model_does_not_answer(make_services, settings):
+    cache = make_cache(TEXT, settings)
+    client = FakeLLMClient([LLMError("down"), LLMError("down")])
+    handlers = Handlers(make_services(router=route_to(), gen=client))
+    handlers.services.search.search = lambda cache, question: [passage()]
+    result = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)
+    assert len(result[2].passages) == 1 and result[2].generated is None
+    assert "tier-generated" not in result[1][-1]["content"]
+
+
+def test_ask_without_a_model_has_no_generated_answer(make_services, settings):
+    cache = make_cache(TEXT, settings)
+    handlers = Handlers(make_services(router=route_to()))
+    handlers.services.search.search = lambda cache, question: [passage()]
+    assert handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)[2].generated is None
+
+
+def test_ask_with_clause_types_requests_no_generated_answer(make_services, settings):
+    cache = make_cache(TEXT, settings, {"Governing Law": [(LAW_SENTENCE, 0.95)]})
+    client = EchoTextClient()
+    handlers = Handlers(make_services(router=route_to("Governing Law"), gen=client))
+    result = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)
+    assert result[2].generated is None and client.text_calls == []
+

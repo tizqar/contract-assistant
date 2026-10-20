@@ -9,11 +9,13 @@ from pathlib import Path
 
 import gradio as gr
 
-from contract_assistant.answer import Answer, Status, answer, restrict_to_cache
+from contract_assistant.answer import Answer, GeneratedAnswer, Status, answer, restrict_to_cache
 from contract_assistant.clause_types import ClauseType
 from contract_assistant.config import Settings
 from contract_assistant.explain import DEFAULT_LANGUAGE, LANGUAGES, request_explanation
 from contract_assistant.extract.extractor import Extractor
+from contract_assistant.passage_answer import APP_ATTEMPTS as PASSAGE_ATTEMPTS
+from contract_assistant.passage_answer import request_passage_answer
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
 from contract_assistant.router.base import Router
 from contract_assistant.router.clients import LLMClient, LLMError
@@ -32,7 +34,13 @@ from contract_assistant.summary import (
     request_summary,
     summary_items,
 )
-from contract_assistant.term_sheet import TermSheetStore
+from contract_assistant.term_sheet import APP_ATTEMPTS as TERM_SHEET_ATTEMPTS
+from contract_assistant.term_sheet import (
+    TERM_SHEET_DIR,
+    TermSheetStore,
+    request_term_sheet,
+    term_sheet_items,
+)
 from contract_assistant.ui.views import (
     CLAUSE_HEADERS,
     PASSAGE_PREFIX,
@@ -53,6 +61,7 @@ from contract_assistant.ui.views import (
     sources_json,
     summary_markdown,
     technical_markdown,
+    term_rows,
     top_citation,
 )
 
@@ -105,6 +114,16 @@ SELECT_CONTRACT = "Select a contract first."
 SUMMARIES_OFF = (
     "Summaries and explanations are off: they need a local language model. See the README."
 )
+TERMS_INTRO = (
+    "### Key terms\n\n"
+    "The values are copied word for word from the clauses found in this contract. "
+    "A value the language model gave that is not in a clause is shown as not verified. "
+    "A term the clauses do not state is shown as not stated."
+)
+NO_TERM_CLAUSES = "None of the clauses the key terms are read from was found in this contract."
+TERM_SHEET_WITHHELD = "The term sheet is not shown because {reason}."
+TERM_HEADERS = ["Term", "Value", "From clause", "Page"]
+TERM_DOWNLOAD_LABEL = "Download the term sheet (JSON)"
 GENERATION_FAILED = "The language model did not answer; see the server log."
 NOTHING_TO_SUMMARIZE = "No clause was found in this contract, so there is nothing to summarize."
 NOTHING_HIGHLIGHTED = (
@@ -147,10 +166,12 @@ CSS = """
 .tier-check { background: transparent; border-color: #b45309; color: #92400e; }
 .tier-not_found { background: transparent; border-color: #9ca3af; color: #6b7280; }
 .tier-related { background: #e5e7eb; color: #374151; }
+.tier-generated { background: #dbeafe; color: #1e3a8a; }
 .dark .tier-found { background: #34a56f; color: #06210f; }
 .dark .tier-check { border-color: #fbbf24; color: #fbbf24; }
 .dark .tier-not_found { border-color: #6b7280; color: #9ca3af; }
 .dark .tier-related { background: #374151; color: #e5e7eb; }
+.dark .tier-generated { background: #1e3a8a; color: #dbeafe; }
 #chat .message, #clause-table td, #clause-table td * {
   overflow-wrap: anywhere;
   white-space: normal;
@@ -254,6 +275,9 @@ class Handlers:
         self.summaries = services.summaries or SummaryStore(
             services.settings.cache_dir / SUMMARY_DIR
         )
+        self.term_sheets = services.term_sheets or TermSheetStore(
+            services.settings.cache_dir / TERM_SHEET_DIR
+        )
 
     @guarded
     def open_document(
@@ -316,7 +340,8 @@ class Handlers:
             return gr.skip()
         if not route.clause_types:
             passages = services.search.search(cache, question)
-            result = result.model_copy(update={"passages": passages})
+            generated = self._generated_answer(question, passages)
+            result = result.model_copy(update={"passages": passages, "generated": generated})
         history = [
             *(history or []),
             {"role": "user", "content": question},
@@ -435,6 +460,44 @@ class Handlers:
         return summary_markdown(summary, services.unvalidated)
 
     @guarded
+    def term_sheet(self, cache: DocumentCache | None, tau_low: float, tau_high: float):
+        """Extract the key terms of the open contract, reusing a saved term sheet."""
+        services = self.services
+        gen = services.gen
+        if cache is None:
+            gr.Warning(SELECT_CONTRACT)
+            return gr.skip()
+        if gen is None:
+            gr.Warning(SUMMARIES_OFF)
+            return gr.skip()
+        try:
+            items = term_sheet_items(cache, tau_low, tau_high, services.unvalidated)
+        except ValueError as error:
+            gr.Warning(str(error))
+            return gr.skip()
+        if not items:
+            gr.Info(NO_TERM_CLAUSES)
+            return gr.skip()
+        sheet = self.term_sheets.load(cache.doc_id, gen.model, tau_low, tau_high)
+        if sheet is None:
+            try:
+                sheet = request_term_sheet(
+                    cache.doc_id, items, gen, tau_low, tau_high, attempts=TERM_SHEET_ATTEMPTS
+                )
+            except LLMError:
+                logger.exception("term sheet of %s failed", cache.doc_id)
+                gr.Warning(GENERATION_FAILED)
+                return gr.skip()
+            # A withheld term sheet is not saved, so the next click asks the model again.
+            if sheet.reason is None:
+                self.term_sheets.save(sheet)
+        if sheet.reason is not None:
+            gr.Warning(TERM_SHEET_WITHHELD.format(reason=sheet.reason))
+            return term_rows(sheet), gr.DownloadButton(visible=False)
+        path = self.term_sheets.path_of(sheet)
+        return term_rows(sheet), gr.DownloadButton(value=str(path), visible=True)
+
+    @guarded
     def explain(self, segments: list | None, language: str, cache: DocumentCache | None):
         """Restate the highlighted passage in plain language."""
         gen = self.services.gen
@@ -497,6 +560,16 @@ class Handlers:
             return gr.skip()
         result = self.open_document(doc_id, tau_low, tau_high, status_filter)
         return (*result, None) if isinstance(result, tuple) else result
+
+    def _generated_answer(self, question: str, passages: list) -> GeneratedAnswer | None:
+        gen = self.services.gen
+        if gen is None or not passages:
+            return None
+        try:
+            return request_passage_answer(question, passages, gen, attempts=PASSAGE_ATTEMPTS)
+        except LLMError:
+            logger.warning("answer from the passages failed", exc_info=True)
+            return None
 
     def _cached(self, doc_id: str) -> DocumentCache | None:
         try:
@@ -648,6 +721,22 @@ def build_app(services: Services) -> gr.Blocks:
                         interactive=services.gen is not None,
                     )
                     summary_output = gr.Markdown(elem_id="summary")
+                    gr.Markdown(TERMS_INTRO, elem_id="terms-intro")
+                    term_sheet_button = gr.Button(
+                        "Extract key terms",
+                        elem_id="term-sheet",
+                        interactive=services.gen is not None,
+                    )
+                    term_table = gr.Dataframe(
+                        headers=TERM_HEADERS,
+                        datatype=["str", "str", "str", "str"],
+                        interactive=False,
+                        wrap=True,
+                        elem_id="term-table",
+                    )
+                    term_download = gr.DownloadButton(
+                        TERM_DOWNLOAD_LABEL, elem_id="term-download", visible=False
+                    )
                 with gr.Tab("Clause checklist", id=CHECKLIST_TAB):
                     checklist_text = gr.Markdown(elem_id="checklist-intro")
                     status_filter = gr.Radio(
@@ -773,6 +862,12 @@ def build_app(services: Services) -> gr.Blocks:
             [cache_state, tau_low, tau_high],
             [summary_output],
             api_name="summarize",
+        )
+        term_sheet_button.click(
+            handlers.term_sheet,
+            [cache_state, tau_low, tau_high],
+            [term_table, term_download],
+            api_name="term_sheet",
         )
         explain.click(
             handlers.explain,
