@@ -10,7 +10,7 @@ from contract_assistant.extract.extractor import Extractor
 from contract_assistant.search import PassageSearch
 from contract_assistant.store import Store
 from contract_assistant.ui.app import Services, build_app, launch_app
-from tests.support.fakes import FakeEncoder, FakeRouter, slow_fake_qa
+from tests.support.fakes import EchoTextClient, FakeEncoder, FakeRouter, slow_fake_qa
 
 DEV_CACHE_DIR = Path(tempfile.gettempdir()) / "contract-assistant-dev"
 
@@ -24,7 +24,10 @@ def dev_services() -> Services:
     store = Store(settings.cache_dir, settings.demo_cache_dir)
     unvalidated = frozenset(clause_type.name for clause_type in extra)
     search = PassageSearch(FakeEncoder())
-    return Services(store, FakeRouter(), extractor, clause_types, settings, search, unvalidated)
+    gen = EchoTextClient()
+    return Services(
+        store, FakeRouter(), extractor, clause_types, settings, search, unvalidated, gen=gen
+    )
 
 
 services = dev_services()

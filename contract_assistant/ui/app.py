@@ -12,10 +12,11 @@ import gradio as gr
 from contract_assistant.answer import Answer, Status, answer, restrict_to_cache
 from contract_assistant.clause_types import ClauseType
 from contract_assistant.config import Settings
+from contract_assistant.explain import DEFAULT_LANGUAGE, LANGUAGES, request_explanation
 from contract_assistant.extract.extractor import Extractor
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
 from contract_assistant.router.base import Router
-from contract_assistant.router.clients import LLMClient
+from contract_assistant.router.clients import LLMClient, LLMError
 from contract_assistant.search import PassageSearch
 from contract_assistant.store import (
     CacheIntegrityError,
@@ -24,7 +25,13 @@ from contract_assistant.store import (
     Store,
     doc_id_of,
 )
-from contract_assistant.summary import SummaryStore
+from contract_assistant.summary import (
+    APP_ATTEMPTS,
+    SUMMARY_DIR,
+    SummaryStore,
+    request_summary,
+    summary_items,
+)
 from contract_assistant.ui.views import (
     CLAUSE_HEADERS,
     PASSAGE_PREFIX,
@@ -38,9 +45,12 @@ from contract_assistant.ui.views import (
     document_name,
     document_title,
     document_view,
+    explanation_markdown,
+    highlighted_quote,
     passage_choices,
     passage_citation,
     sources_json,
+    summary_markdown,
     technical_markdown,
     top_citation,
 )
@@ -62,6 +72,7 @@ NO_MODEL = (
 UPLOAD_ERRORS = (UnsupportedFileError, EmptyDocumentError, CacheIntegrityError)
 
 DOCUMENT_TAB = "tab-document"
+SUMMARY_TAB = "tab-summary"
 CHECKLIST_TAB = "tab-checklist"
 SETTINGS_TAB = "tab-settings"
 TECHNICAL_TAB = "tab-technical"
@@ -89,6 +100,22 @@ CHAT_PLACEHOLDER = (
     "Each answer is marked Found, Verify (read the passage before relying on it) "
     "or Not found (the contract does not appear to contain the clause)."
 )
+SELECT_CONTRACT = "Select a contract first."
+SUMMARIES_OFF = (
+    "Summaries and explanations are off: they need a local language model. See the README."
+)
+GENERATION_FAILED = "The language model did not answer; see the server log."
+NOTHING_TO_SUMMARIZE = "No clause was found in this contract, so there is nothing to summarize."
+NOTHING_HIGHLIGHTED = (
+    "Nothing is highlighted. Ask a question or select a clause in the checklist first."
+)
+SUMMARY_INTRO_ON = (
+    "A short overview written by a local language model from the clauses found in this "
+    "contract. Text in double quotes is checked word for word against the contract; "
+    "the rest is the model's own wording. Read the passages before relying on it."
+)
+SUMMARY_INTRO_OFF = "Summaries need a local language model. See the README."
+LANGUAGE_CHOICES = [(name.split(",")[0], code) for code, name in LANGUAGES.items()]
 ANALYSIS_UPDATED = "Analysis updated"
 THRESHOLD_HELP = (
     "A passage at or above the first value is marked Found. Between the two values it is "
@@ -222,6 +249,9 @@ class Handlers:
             display_name(clause_type.name): clause_type.name
             for clause_type in services.clause_types
         }
+        self.summaries = services.summaries or SummaryStore(
+            services.settings.cache_dir / SUMMARY_DIR
+        )
 
     @guarded
     def open_document(
@@ -273,7 +303,7 @@ class Handlers:
             gr.Warning("Type a question first.")
             return gr.skip()
         if cache is None:
-            gr.Warning("Select a contract first.")
+            gr.Warning(SELECT_CONTRACT)
             return gr.skip()
         services = self.services
         route = restrict_to_cache(services.router.route(question), cache)
@@ -367,6 +397,64 @@ class Handlers:
             gr.Info(f"No passage found for {name}.")
             return gr.skip()
         return *document_view(cache, clause_type, citation), show_tab(DOCUMENT_TAB)
+
+    @guarded
+    def summarize(self, cache: DocumentCache | None, tau_low: float, tau_high: float):
+        """Summarize the clauses found in the open contract, reusing a saved summary."""
+        services = self.services
+        gen = services.gen
+        if cache is None:
+            gr.Warning(SELECT_CONTRACT)
+            return gr.skip()
+        if gen is None:
+            gr.Warning(SUMMARIES_OFF)
+            return gr.skip()
+        names = [clause_type.name for clause_type in services.clause_types]
+        try:
+            items = summary_items(cache, names, tau_low, tau_high, services.unvalidated)
+        except ValueError as error:
+            gr.Warning(str(error))
+            return gr.skip()
+        if not items:
+            return NOTHING_TO_SUMMARIZE
+        summary = self.summaries.load(cache.doc_id, gen.model, tau_low, tau_high)
+        if summary is None:
+            try:
+                summary = request_summary(
+                    cache.doc_id, items, gen, tau_low, tau_high, attempts=APP_ATTEMPTS
+                )
+            except LLMError:
+                logger.exception("summary of %s failed", cache.doc_id)
+                gr.Warning(GENERATION_FAILED)
+                return gr.skip()
+            # A withheld summary is not saved, so the next click asks the model again.
+            if summary.text is not None:
+                self.summaries.save(summary)
+        return summary_markdown(summary, services.unvalidated)
+
+    @guarded
+    def explain(self, segments: list | None, language: str, cache: DocumentCache | None):
+        """Restate the highlighted passage in plain language."""
+        gen = self.services.gen
+        if cache is None:
+            gr.Warning(SELECT_CONTRACT)
+            return gr.skip()
+        if gen is None:
+            gr.Warning(SUMMARIES_OFF)
+            return gr.skip()
+        highlight = highlighted_quote(segments)
+        if highlight is None:
+            gr.Info(NOTHING_HIGHLIGHTED)
+            return gr.skip()
+        quote, label = highlight
+        clause_type = self.clause_by_name.get(label, label)
+        try:
+            explanation = request_explanation(clause_type, quote, language, gen)
+        except LLMError:
+            logger.exception("explanation of %s failed", clause_type)
+            gr.Warning(GENERATION_FAILED)
+            return gr.skip()
+        return explanation_markdown(explanation)
 
     @guarded
     def extract_upload(self, path: str | None, progress: gr.Progress = gr.Progress()):  # noqa: B008
@@ -531,6 +619,33 @@ def build_app(services: Services) -> gr.Blocks:
                         show_label=False,
                         elem_id="view",
                     )
+                    with gr.Row():
+                        language = gr.Dropdown(
+                            choices=LANGUAGE_CHOICES,
+                            value=DEFAULT_LANGUAGE,
+                            label="Explain in",
+                            elem_id="explain-language",
+                            scale=1,
+                        )
+                        explain = gr.Button(
+                            "Explain the highlighted passage",
+                            elem_id="explain",
+                            scale=2,
+                            interactive=services.gen is not None,
+                        )
+                    explanation = gr.Markdown(elem_id="explanation")
+                with gr.Tab("Summary", id=SUMMARY_TAB):
+                    gr.Markdown(
+                        SUMMARY_INTRO_ON if services.gen else SUMMARY_INTRO_OFF,
+                        elem_id="summary-intro",
+                    )
+                    summarize = gr.Button(
+                        "Summarize contract",
+                        variant="primary",
+                        elem_id="summarize",
+                        interactive=services.gen is not None,
+                    )
+                    summary_output = gr.Markdown(elem_id="summary")
                 with gr.Tab("Clause checklist", id=CHECKLIST_TAB):
                     checklist_text = gr.Markdown(elem_id="checklist-intro")
                     status_filter = gr.Radio(
@@ -569,7 +684,12 @@ def build_app(services: Services) -> gr.Blocks:
                     reset = gr.Button("Restore defaults", elem_id="reset")
                 with gr.Tab("Technical details", id=TECHNICAL_TAB):
                     gr.Markdown(
-                        technical_markdown(settings, services.router.kind, services.unvalidated)
+                        technical_markdown(
+                            settings,
+                            services.router.kind,
+                            services.unvalidated,
+                            services.gen.model if services.gen else None,
+                        )
                     )
                     sources = gr.JSON(label="Last answer", elem_id="sources")
                     download = gr.DownloadButton(
@@ -646,6 +766,18 @@ def build_app(services: Services) -> gr.Blocks:
         table.select(
             handlers.show_row, [cache_state], [view_label, view, tabs], api_name="show_row"
         ).then(None, None, None, js=SCROLL_TO_HIGHLIGHT)
+        summarize.click(
+            handlers.summarize,
+            [cache_state, tau_low, tau_high],
+            [summary_output],
+            api_name="summarize",
+        )
+        explain.click(
+            handlers.explain,
+            [view, language, cache_state],
+            [explanation],
+            api_name="explain",
+        )
         extract.click(
             handlers.extract_upload,
             [upload],

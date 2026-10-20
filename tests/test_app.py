@@ -14,6 +14,7 @@ from contract_assistant.clause_types import app_clause_types, load_extra_clause_
 from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.extract.extractor import Extractor
 from contract_assistant.router.base import RouteResult
+from contract_assistant.router.clients import LLMError
 from contract_assistant.search import PassageSearch
 from contract_assistant.store import Store
 from contract_assistant.ui import app
@@ -23,6 +24,7 @@ from tests.support.caches import make_cache
 from tests.support.fakes import (
     EchoTextClient,
     FakeEncoder,
+    FakeLLMClient,
     FakeQA,
     FakeRouter,
     FixedRouter,
@@ -54,7 +56,7 @@ def unvalidated(settings) -> frozenset[str]:
 
 @pytest.fixture
 def make_services(settings, clause_types, unvalidated):
-    def make(extractor: Extractor | None = None, router=None) -> Services:
+    def make(extractor: Extractor | None = None, router=None, gen=None) -> Services:
         store = Store(settings.cache_dir, settings.demo_cache_dir)
         search = PassageSearch(FakeEncoder())
         return Services(
@@ -65,6 +67,7 @@ def make_services(settings, clause_types, unvalidated):
             settings,
             search,
             unvalidated,
+            gen=gen,
         )
 
     return make
@@ -530,3 +533,192 @@ def test_new_upload_does_not_flag_a_reload(make_services, settings, clause_types
         str(path), progress=lambda *a, **k: None
     )
     assert result[2] is None
+
+
+FAITHFUL_REPLY = f'The law is set by "{LAW_SENTENCE}" (Governing Law).'
+MISQUOTING_REPLY = 'The contract says "This agreement ends on Friday." (Governing Law).'
+ALTERNATIVE_TAU_HIGH = 0.9
+
+
+@pytest.fixture
+def infos(monkeypatch) -> list[str]:
+    messages: list[str] = []
+    monkeypatch.setattr(app.gr, "Info", messages.append)
+    return messages
+
+
+@pytest.fixture
+def law_cache(settings):
+    return make_cache(TEXT, settings, {"Governing Law": [(LAW_SENTENCE, 0.95)]})
+
+
+def generating(make_services, replies: list[str | Exception]):
+    client = FakeLLMClient(replies)
+    return Handlers(make_services(gen=client)), client
+
+
+def view_segments(label: str | None, text: str = LAW_SENTENCE) -> list[dict]:
+    return [
+        {"token": "Preamble. ", "class_or_confidence": None},
+        {"token": text, "class_or_confidence": label},
+    ]
+
+
+def component_values(demo: gr.Blocks) -> list[str]:
+    return [b.value for b in demo.blocks.values() if isinstance(b, gr.Markdown) and b.value]
+
+
+def test_summarize_returns_the_reply_and_saves_it(make_services, law_cache, settings):
+    handlers, client = generating(make_services, [FAITHFUL_REPLY])
+    result = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
+    assert FAITHFUL_REPLY in result
+    assert len(client.text_calls) == 1
+    assert len(list((settings.cache_dir / "summaries").glob("*.json"))) == 1
+
+
+def test_summarize_again_with_the_same_thresholds_makes_no_model_call(make_services, law_cache):
+    handlers, client = generating(make_services, [FAITHFUL_REPLY])
+    first = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
+    second = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
+    assert len(client.text_calls) == 1
+    assert second == first
+
+
+def test_summarize_with_other_thresholds_asks_the_model_again(make_services, law_cache):
+    handlers, client = generating(make_services, [FAITHFUL_REPLY, FAITHFUL_REPLY])
+    handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
+    handlers.summarize(law_cache, TAU_LOW, ALTERNATIVE_TAU_HIGH)
+    assert len(client.text_calls) == 2
+
+
+def test_summarize_withholds_a_reply_that_misquotes_twice(make_services, law_cache):
+    handlers, client = generating(make_services, [MISQUOTING_REPLY, MISQUOTING_REPLY])
+    result = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
+    assert "not shown" in result
+    assert "ends on Friday" not in result
+    assert len(client.text_calls) == 2
+
+
+def test_summarize_shows_the_second_reply_when_the_first_misquotes(make_services, law_cache):
+    handlers, client = generating(make_services, [MISQUOTING_REPLY, FAITHFUL_REPLY])
+    result = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
+    assert FAITHFUL_REPLY in result
+    assert len(client.text_calls) == 2
+
+
+def test_summarize_without_a_model_warns(make_services, law_cache, warnings):
+    result = Handlers(make_services()).summarize(law_cache, TAU_LOW, TAU_HIGH)
+    assert is_skip(result)
+    assert warnings == [app.SUMMARIES_OFF]
+
+
+def test_summarize_without_a_document_warns(make_services, warnings):
+    handlers, client = generating(make_services, [])
+    assert is_skip(handlers.summarize(None, TAU_LOW, TAU_HIGH))
+    assert warnings == [app.SELECT_CONTRACT]
+    assert client.text_calls == []
+
+
+def test_summarize_with_inverted_thresholds_warns(make_services, law_cache, warnings):
+    handlers, client = generating(make_services, [])
+    assert is_skip(handlers.summarize(law_cache, 0.9, 0.1))
+    assert len(warnings) == 1
+    assert client.text_calls == []
+
+
+def test_summarize_without_found_clauses_says_there_is_nothing_to_summarize(
+    make_services, settings
+):
+    handlers, client = generating(make_services, [])
+    cache = make_cache(TEXT, settings)
+    assert handlers.summarize(cache, TAU_LOW, TAU_HIGH) == app.NOTHING_TO_SUMMARIZE
+    assert client.text_calls == []
+
+
+def test_summarize_warns_when_the_model_does_not_answer(make_services, law_cache, warnings):
+    handlers, _ = generating(make_services, [LLMError("down")])
+    assert is_skip(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
+    assert warnings == [app.GENERATION_FAILED]
+
+
+def test_explain_restates_the_highlighted_quote(make_services, law_cache):
+    handlers, client = generating(make_services, ["The law of Vanuatu applies."])
+    result = handlers.explain(view_segments("Governing Law"), "en", law_cache)
+    assert LAW_SENTENCE in client.text_calls[0][1]
+    assert "**Governing Law**" in result and "The law of Vanuatu applies." in result
+
+
+def test_explain_keeps_the_related_passage_label(make_services, law_cache):
+    handlers, client = generating(make_services, ["The law of Vanuatu applies."])
+    result = handlers.explain(view_segments(app.RELATED_LABEL), "sr", law_cache)
+    assert f"Clause type: {app.RELATED_LABEL}" in client.text_calls[0][1]
+    assert f"**{app.RELATED_LABEL}** · in plain Serbian" in result
+
+
+def test_explain_without_a_highlight_says_so(make_services, law_cache, infos):
+    handlers, client = generating(make_services, [])
+    assert is_skip(handlers.explain(view_segments(None), "en", law_cache))
+    assert infos == [app.NOTHING_HIGHLIGHTED]
+    assert client.text_calls == []
+
+
+def test_explain_without_a_model_warns(make_services, law_cache, warnings):
+    result = Handlers(make_services()).explain(view_segments("Governing Law"), "en", law_cache)
+    assert is_skip(result)
+    assert warnings == [app.SUMMARIES_OFF]
+
+
+def test_explain_without_a_document_warns(make_services, warnings):
+    handlers, _ = generating(make_services, [])
+    assert is_skip(handlers.explain(view_segments("Governing Law"), "en", None))
+    assert warnings == [app.SELECT_CONTRACT]
+
+
+def test_explain_warns_when_the_model_does_not_answer(make_services, law_cache, warnings):
+    handlers, _ = generating(make_services, [LLMError("down")])
+    assert is_skip(handlers.explain(view_segments("Governing Law"), "en", law_cache))
+    assert warnings == [app.GENERATION_FAILED]
+
+
+def test_buttons_are_off_and_the_intro_says_so_without_a_model(make_services):
+    demo = build_app(make_services())
+    assert find_component(demo, "summarize").interactive is False
+    assert find_component(demo, "explain").interactive is False
+    assert find_component(demo, "summary-intro").value == app.SUMMARY_INTRO_OFF
+
+
+def test_buttons_are_on_with_a_model(make_services):
+    demo = build_app(make_services(gen=FakeLLMClient([])))
+    assert find_component(demo, "summarize").interactive is True
+    assert find_component(demo, "explain").interactive is True
+    assert find_component(demo, "summary-intro").value == app.SUMMARY_INTRO_ON
+
+
+def test_technical_tab_names_the_generation_model(make_services):
+    demo = build_app(make_services(gen=FakeLLMClient([], model="gen-model-x")))
+    assert any("`gen-model-x`" in text for text in component_values(demo))
+
+
+def test_summarize_over_the_client_returns_the_summary(make_services):
+    demo = build_app(make_services(gen=EchoTextClient()))
+    demo.launch(prevent_thread_lock=True, quiet=True, server_port=free_port())
+    try:
+        client = Client(demo.local_url, verbose=False)
+        client.predict(SHORT_DOC_ID, TAU_LOW, TAU_HIGH, api_name="/load_document")
+        reply = client.predict(TAU_LOW, TAU_HIGH, api_name="/summarize")
+    finally:
+        demo.close()
+    assert "Based on" in reply
+
+
+def test_summarize_does_not_save_a_withheld_summary_and_asks_again(
+    make_services, law_cache, settings
+):
+    replies = [MISQUOTING_REPLY, MISQUOTING_REPLY, FAITHFUL_REPLY]
+    handlers, client = generating(make_services, replies)
+    first = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
+    assert "not shown" in first
+    assert not (settings.cache_dir / "summaries").exists()
+    second = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
+    assert FAITHFUL_REPLY in second
+    assert len(client.text_calls) == 3

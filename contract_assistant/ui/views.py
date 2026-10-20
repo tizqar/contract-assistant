@@ -17,7 +17,9 @@ from contract_assistant.answer import (
     tier,
 )
 from contract_assistant.config import Settings
+from contract_assistant.explain import LANGUAGES, Explanation
 from contract_assistant.store import DocumentCache
+from contract_assistant.summary import MS_PER_S, Summary
 
 CLAUSE_GROUPS: dict[str, tuple[str, ...]] = {
     "General terms": (
@@ -130,6 +132,25 @@ CONTEXT_CHARS = 1500
 # Longer than any line of the demo texts; a text without line breaks is cut mid-line.
 MAX_WIDEN_CHARS = 3000
 EXAMPLE_QUESTIONS = 2
+
+SUMMARY_WITHHELD_TEXT = "The summary is not shown because {reason}."
+SUMMARY_MISMATCH_TEXT = "{count} quoted passage(s) did not match the contract."
+SUMMARY_META_TEXT = (
+    "Written by the language model {model} from {count} clause(s) in {seconds} s. "
+    "Text in double quotes is verified word for word against the contract; "
+    "the rest is the model's own wording."
+)
+SUMMARY_BASED_ON = "Based on: "
+UNVALIDATED_MARK = "*"
+EXPLANATION_HEADING = "**{name}** · in plain {language}"
+EXPLANATION_WITHHELD_TEXT = "The explanation is not shown because {reason}."
+EXPLANATION_META_TEXT = (
+    "Written by the language model {model}. This is a restatement, not a quote; "
+    "check it against the highlighted passage."
+)
+MATCHING_BACKENDS = {"ollama": "Ollama"}
+OPENAI_BACKEND = "an OpenAI-compatible API"
+GENERATION_OFF = "off"
 
 Segments = list[tuple[str, str | None]]
 
@@ -376,7 +397,10 @@ def _segments(
 
 
 def technical_markdown(
-    settings: Settings, route_kind: str, unvalidated: Collection[str] = ()
+    settings: Settings,
+    route_kind: str,
+    unvalidated: Collection[str] = (),
+    gen_model: str | None = None,
 ) -> str:
     """Return the technical facts behind the answers as a short Markdown list."""
     lines = [
@@ -384,6 +408,7 @@ def technical_markdown(
         f"- **Question matching:** {_matching(settings, route_kind)}",
         f"- **Found from:** {_percent(settings.tau_high)} confidence ({settings.tau_source})",
         f"- **Verify from:** {_percent(settings.tau_low)} confidence ({settings.tau_source})",
+        f"- **Summaries and explanations:** {_generation(settings, gen_model)}",
     ]
     if unvalidated:
         names = ", ".join(display_name(name) for name in sorted(unvalidated))
@@ -391,10 +416,19 @@ def technical_markdown(
     return "\n".join(lines)
 
 
+def _backend(settings: Settings) -> str:
+    return MATCHING_BACKENDS.get(settings.llm_backend, OPENAI_BACKEND)
+
+
+def _generation(settings: Settings, gen_model: str | None) -> str:
+    if gen_model is None:
+        return GENERATION_OFF
+    return f"`{gen_model}` through {_backend(settings)}"
+
+
 def _matching(settings: Settings, route_kind: str) -> str:
     if route_kind == "llm":
-        backend = "Ollama" if settings.llm_backend == "ollama" else "an OpenAI-compatible API"
-        return f"`{settings.llm_model}` through {backend}"
+        return f"`{settings.llm_model}` through {_backend(settings)}"
     if route_kind == "embedding":
         return f"embedding model `{settings.embedding_model_id}`"
     return route_kind
@@ -410,3 +444,58 @@ def sources_json(answer: Answer, cache: DocumentCache) -> dict:
         for item in answer.items
     }
     return {"answer": answer.model_dump(mode="json"), "other_candidates": others}
+
+
+def highlighted_quote(segments: object) -> tuple[str, str] | None:
+    """Return the text and label of the first labelled segment, or None if there is none."""
+    for segment in segments or []:
+        if isinstance(segment, dict):
+            text, label = segment.get("token"), segment.get("class_or_confidence")
+        else:
+            text, label = segment
+        if label and text:
+            return text, label
+    return None
+
+
+def summary_markdown(summary: Summary, unvalidated: Collection[str] = ()) -> str:
+    """Return the Markdown shown for a summary: its text, or why it is withheld."""
+    if summary.text is None:
+        withheld = SUMMARY_WITHHELD_TEXT.format(reason=summary.reason)
+        if not summary.unfaithful_spans:
+            return withheld
+        count = SUMMARY_MISMATCH_TEXT.format(count=len(summary.unfaithful_spans))
+        return f"{withheld}\n\n<small>{count}</small>"
+    meta = SUMMARY_META_TEXT.format(
+        model=summary.model,
+        count=len(summary.items),
+        seconds=round(summary.latency_ms / MS_PER_S),
+    )
+    names = ", ".join(
+        _based_on(item, item.clause_type in unvalidated) for item in summary.items
+    )
+    if any(item.clause_type in unvalidated for item in summary.items):
+        names = f"{names} · {UNVALIDATED_MARK} {UNVALIDATED_TEXT}"
+    return (
+        f"{summary.text}\n\n<small>{meta}</small>\n\n<small>{SUMMARY_BASED_ON}{names}</small>"
+    )
+
+
+def _based_on(item: AnswerItem, unvalidated: bool) -> str:
+    name = f"{display_name(item.clause_type)} {_badge(item.status)}"
+    return f"{name}{UNVALIDATED_MARK}" if unvalidated else name
+
+
+def explanation_markdown(explanation: Explanation) -> str:
+    """Return the Markdown shown for an explanation: its text, or why it is withheld."""
+    if explanation.text is None:
+        return EXPLANATION_WITHHELD_TEXT.format(reason=explanation.reason)
+    name = (
+        explanation.clause_type
+        if explanation.clause_type == RELATED_LABEL
+        else display_name(explanation.clause_type)
+    )
+    language = LANGUAGES[explanation.language].split(",")[0]
+    heading = EXPLANATION_HEADING.format(name=name, language=language)
+    meta = EXPLANATION_META_TEXT.format(model=explanation.model)
+    return f"{heading}\n\n{explanation.text}\n\n<small>{meta}</small>"

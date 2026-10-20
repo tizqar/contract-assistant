@@ -19,6 +19,10 @@ extractor, without retraining, and are never marked Found because no gold data e
 validate their thresholds. A question that matches no clause type gets up to three related
 passages of the contract, shown verbatim and labelled as not a clause match.
 
+The app can also write a short summary from the clauses it found and restate one clause in
+plain English or Serbian. This text is generated and labelled as such. Quotes inside it are
+verified against the contract.
+
 ## Install
 
 Python 3.12.
@@ -35,6 +39,7 @@ The LLM router needs Ollama and the model. This step is optional:
 ```bash
 brew install ollama && brew services start ollama
 ollama pull qwen3:1.7b      # qwen3:4b for the comparison row
+ollama pull qwen3.5:4b      # summaries and explanations
 ```
 
 `LLM_BACKEND` in `.env` selects the router: `ollama` (default), `openai` (an
@@ -43,6 +48,14 @@ needs the `api` extra) or `none`, which routes with the embedding router only. I
 not running or the model is not pulled, the app logs a warning and uses the embedding
 router alone. When the LLM fails on a single question, the embedding router routes that
 question.
+
+`GEN_MODEL` (default `qwen3.5:4b`), `GEN_TIMEOUT_S` (120) and `GEN_NUM_CTX` (8192) select
+the generation model. It uses `LLM_BACKEND` like the router. It answers in free text, so it
+needs no JSON-schema support. This matters because Ollama's MLX runtime in the Homebrew
+build (Ollama 0.40, the default for gemma4 and qwen3.5 on Apple Silicon) has no structured
+output and returns 501 for the router's schema-constrained calls. The router therefore
+stays on `qwen3:1.7b` (llama.cpp runtime) while generation uses `qwen3.5:4b`. Without the
+generation model the app runs with the Summary and Explain buttons off.
 
 ## Model weights
 
@@ -62,6 +75,7 @@ make test         # fast tests
 make lint         # ruff
 make router-eval  # router-eval --router llm --split test
 make e2e          # e2e-eval --router llm
+make summary-eval # summary-eval
 ```
 
 The first `make demo` loads the embedding model and downloads it if it is not cached. With
@@ -90,9 +104,11 @@ contract-assistant router-eval --router embedding --split test
 contract-assistant router-eval --router llm --split test       # make router-eval
 contract-assistant e2e-eval --router oracle                    # also embedding and llm
 contract-assistant phrase-eval                                 # LLM paragraphs vs. the quotes
+contract-assistant summary-eval                                # summaries vs. the quotes
 ```
 
-The other commands are `contract-assistant import-demo | extract | show | check | serve`.
+The other commands are `contract-assistant import-demo | extract | show | summarize | explain |
+check | serve`.
 `extract` adds the extra clause types to an existing cache without re-extracting the 41.
 
 ## How answers read
@@ -145,6 +161,39 @@ The thresholds and the model details are in their own tabs.
 | A found answer, with the passage highlighted in the contract. | A passage the reader should verify. |
 | ![A not found answer](docs/screenshots/not_found.png) | ![A question about two clause types](docs/screenshots/compound.png) |
 | An explicit not found: the clause was checked. | One question answered for two clause types. |
+| ![The summary of a contract](docs/screenshots/summary.png) | ![A clause restated in Serbian](docs/screenshots/explain.png) |
+| The Summary tab, written from the clauses found. | The highlighted passage restated in plain Serbian. |
+
+## Summary and explanations
+
+The summary is written by the generation model only from the Found and Verify quotes of the
+contract, never from the full text. Every passage in double quotes must match a verified
+quote word for word, and every number in it must appear in one of those quotes (a number
+written in words with its digits, like "six (6)", counts as one number), or the whole summary
+is withheld with the reason. The app and the command line then ask the model once more
+before giving up. The clause types it used are listed under it. A shown
+summary is saved under `cache/summaries/` per contract, model and thresholds, so a change of
+the sliders writes a new one; a withheld one is not saved, so the next request asks the
+model again. On an Apple M4 with 16 GB, qwen3.5:4b takes about 15 to 25 s for a demo
+contract, at about 27 tokens per second.
+
+The explanation restates one highlighted passage in at most two sentences, in English or
+Serbian. It is withheld when it quotes text that is not in the clause or names a number the
+clause does not. The web app labels it as a restatement, not a quote. The model can still
+misstate what the clause means, so the reader checks it against the highlighted passage.
+
+```bash
+contract-assistant summarize demo/short_supply_agreement.txt
+contract-assistant explain demo/short_supply_agreement.txt --type "Governing Law" --language sr
+```
+
+`summarize` reads the saved summary when there is one; `--fresh` asks the model again.
+`--json` prints either result as JSON.
+
+`summary-eval` summarizes the three demo contracts as the app does, with the one corrected
+retry, and writes `eval/results/summary_<model>.json`. It records per document the number of
+items, characters, sentences, quoted spans, unfaithful spans, whether the summary was
+withheld, the attempts it took, and the latency.
 
 ## Demo documents
 

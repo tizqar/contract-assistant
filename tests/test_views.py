@@ -4,10 +4,12 @@ import re
 
 import pytest
 
-from contract_assistant.answer import Answer, Citation, Passage, answer
+from contract_assistant.answer import Answer, AnswerItem, Citation, Passage, answer
 from contract_assistant.config import ROOT, Settings
+from contract_assistant.explain import Explanation
 from contract_assistant.router.base import RouteResult
 from contract_assistant.store import read_cache
+from contract_assistant.summary import Summary
 from contract_assistant.ui.views import (
     CLAUSE_GROUPS,
     CLAUSE_HEADERS,
@@ -16,6 +18,7 @@ from contract_assistant.ui.views import (
     NO_PAGE,
     OTHER_TOPIC,
     PASSAGE_PREFIX,
+    RELATED_LABEL,
     STATUS_LABELS,
     SUGGESTED_QUESTIONS,
     TABLE_PASSAGE_CHARS,
@@ -27,9 +30,12 @@ from contract_assistant.ui.views import (
     document_name,
     document_title,
     document_view,
+    explanation_markdown,
+    highlighted_quote,
     passage_choices,
     passage_citation,
     sources_json,
+    summary_markdown,
     technical_markdown,
     top_citation,
 )
@@ -528,3 +534,129 @@ def test_empty_route_lists_the_extra_types_after_the_other_topics(settings):
     lines = [line for line in reply.splitlines() if line.startswith("- **")]
     assert lines[-1].startswith(f"- **{OTHER_TOPIC}:**")
     assert "Payment Terms" in lines[-1] and "Delivery" in lines[-1]
+
+
+def summary_of(**changes) -> Summary:
+    fields = {
+        "doc_id": "sha256:x",
+        "model": "gen-1",
+        "tau_low": 0.2,
+        "tau_high": 0.8,
+        "items": [
+            AnswerItem(
+                clause_type="Governing Law",
+                status="found",
+                best_conf=0.9,
+                citation=Citation(quote="Vanuatu law.", page=None, conf=0.9, start=0, end=12),
+            ),
+            AnswerItem(
+                clause_type="Payment Terms",
+                status="check",
+                best_conf=0.5,
+                citation=Citation(
+                    quote="Pay in 30 days.", page=None, conf=0.5, start=13, end=28
+                ),
+            ),
+        ],
+        "text": "Vanuatu law governs.",
+        "latency_ms": 4600.0,
+    }
+    return Summary(**{**fields, **changes})
+
+
+def explanation_of(**changes) -> Explanation:
+    fields = {
+        "clause_type": "Governing Law",
+        "quote": "Vanuatu law.",
+        "language": "en",
+        "model": "gen-1",
+        "text": "Vanuatu law applies.",
+        "latency_ms": 100.0,
+    }
+    return Explanation(**{**fields, **changes})
+
+
+def test_highlighted_quote_reads_the_dict_form_gradio_passes():
+    segments = [
+        {"token": "Before ", "class_or_confidence": None},
+        {"token": "Clause.", "class_or_confidence": "Parties"},
+        {"token": "Other.", "class_or_confidence": "Governing Law"},
+    ]
+    assert highlighted_quote(segments) == ("Clause.", "Parties")
+
+
+def test_highlighted_quote_reads_tuples():
+    assert highlighted_quote([("a", None), ("b", "Parties")]) == ("b", "Parties")
+
+
+def test_highlighted_quote_is_none_without_a_label():
+    assert highlighted_quote([("a", None), {"token": "b", "class_or_confidence": None}]) is None
+
+
+def test_highlighted_quote_is_none_for_none_and_empty():
+    assert highlighted_quote(None) is None
+    assert highlighted_quote([]) is None
+
+
+def test_summary_shows_the_text_the_model_and_the_counts():
+    markdown = summary_markdown(summary_of())
+    assert markdown.startswith("Vanuatu law governs.")
+    assert "gen-1" in markdown and "2 clause(s)" in markdown and "5 s" in markdown
+    assert "verified word for word" in markdown
+
+
+def test_summary_lists_the_sources_with_badges_in_order():
+    based_on = summary_markdown(summary_of()).splitlines()[-1]
+    assert based_on.index("Governing Law") < based_on.index("Payment Terms")
+    assert "tier-found" in based_on and "tier-check" in based_on
+
+
+def test_summary_marks_unvalidated_sources():
+    based_on = summary_markdown(summary_of(), {"Payment Terms"}).splitlines()[-1]
+    assert based_on.count("Not validated on test data") == 1
+    assert based_on.index("Not validated") > based_on.index("Payment Terms")
+
+
+def test_withheld_summary_gives_the_reason_and_counts_the_spans_without_printing_them():
+    summary = summary_of(text=None, reason="it quotes text that is not in the contract")
+    summary = summary.model_copy(update={"unfaithful_spans": ["Made up one", "Made up two"]})
+    markdown = summary_markdown(summary)
+    assert "not shown because it quotes text that is not in the contract." in markdown
+    assert "2 quoted passage(s)" in markdown
+    assert "Made up" not in markdown
+
+
+def test_withheld_summary_without_spans_has_no_count_line():
+    markdown = summary_markdown(summary_of(text=None, reason="the model gave an empty reply"))
+    assert "<small>" not in markdown
+
+
+def test_explanation_has_heading_text_and_restatement_note():
+    markdown = explanation_markdown(explanation_of())
+    assert markdown.startswith("**Governing Law** · in plain English")
+    assert "Vanuatu law applies." in markdown
+    assert "gen-1" in markdown and "not a quote" in markdown
+
+
+def test_explanation_names_serbian_without_the_script_note():
+    heading = explanation_markdown(explanation_of(language="sr")).splitlines()[0]
+    assert heading.endswith("in plain Serbian")
+
+
+def test_withheld_explanation_gives_the_reason_only():
+    markdown = explanation_markdown(explanation_of(text=None, reason="it names numbers: 9"))
+    assert markdown == "The explanation is not shown because it names numbers: 9."
+
+
+def test_explanation_of_a_related_passage_keeps_the_label():
+    markdown = explanation_markdown(explanation_of(clause_type=RELATED_LABEL))
+    assert markdown.startswith(f"**{RELATED_LABEL}** · in plain English")
+
+
+def test_technical_details_name_the_generation_model(settings):
+    text = technical_markdown(settings, "embedding", gen_model="gen-1")
+    assert "**Summaries and explanations:** `gen-1` through Ollama" in text
+
+
+def test_technical_details_say_generation_is_off(settings):
+    assert "**Summaries and explanations:** off" in technical_markdown(settings, "embedding")
