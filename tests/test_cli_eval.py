@@ -7,17 +7,18 @@ import pytest
 from contract_assistant import cli
 from contract_assistant.clause_types import load_clause_types
 from contract_assistant.cli import main
-from contract_assistant.config import Settings
+from contract_assistant.config import ROOT, Settings
 from contract_assistant.evaluation.e2e import E2EReport, OracleRouter
 from contract_assistant.evaluation.phrase_eval import PhrasingReport
 from contract_assistant.evaluation.questions import EvalQuestion, load_questions
 from contract_assistant.evaluation.router_eval import THRESHOLD_GRID, RouterRun
+from contract_assistant.evaluation.summary_eval import SummaryReport
 from contract_assistant.router.base import RouteResult
 from contract_assistant.router.clients import LLMError
 from contract_assistant.router.factory import UnknownBackendError
 from contract_assistant.store import DocumentCache, HarnessImportError, write_cache
 from tests.support.caches import make_cache
-from tests.support.fakes import FakeLLMClient, FixedRouter
+from tests.support.fakes import EchoTextClient, FakeLLMClient, FixedRouter
 
 LAW = "Governing Law"
 INSURANCE = "Insurance"
@@ -772,3 +773,78 @@ def test_evaluation_commands_build_the_router_over_the_41_cuad_types(
     expected = [c.name for c in load_clause_types(settings.clause_types_path)]
     assert received == [expected]
     assert len(expected) == 41
+
+
+def use_real_demo_caches(monkeypatch, settings: Settings) -> None:
+    demo = dataclasses.replace(settings, demo_cache_dir=ROOT / "demo" / "cache")
+    use_settings(monkeypatch, demo)
+
+
+def install_gen_client(monkeypatch, client) -> list[Settings]:
+    return install(monkeypatch, "build_gen_client", client)
+
+
+def test_summary_eval_writes_the_report_named_after_the_model(
+    settings, monkeypatch, results
+):
+    use_real_demo_caches(monkeypatch, settings)
+    install_gen_client(monkeypatch, EchoTextClient())
+    assert main(["summary-eval"]) == 0
+    assert file_names(results) == ["summary_fake-gen.json"]
+
+
+def test_summary_eval_report_has_one_record_per_demo_document(
+    settings, monkeypatch, results
+):
+    use_real_demo_caches(monkeypatch, settings)
+    install_gen_client(monkeypatch, EchoTextClient())
+    main(["summary-eval"])
+    text = (results / "summary_fake-gen.json").read_text(encoding="utf-8")
+    report = SummaryReport.model_validate_json(text)
+    assert (report.model, report.documents, len(report.records)) == ("fake-gen", 3, 3)
+    assert (report.withheld, report.llm_failures) == (0, 0)
+
+
+def test_summary_eval_prints_one_line_with_the_counts_and_the_path(
+    settings, monkeypatch, results, capsys
+):
+    use_real_demo_caches(monkeypatch, settings)
+    install_gen_client(monkeypatch, EchoTextClient())
+    main(["summary-eval"])
+    [line] = capsys.readouterr().out.splitlines()
+    assert line.startswith(
+        "summary-eval: fake-gen · 3 documents · 0 withheld · 0 retried · 0 failures · mean "
+    )
+    assert line.endswith(f" s → {results / 'summary_fake-gen.json'}")
+
+
+def test_summary_eval_prints_not_available_when_every_call_failed(
+    settings, monkeypatch, capsys
+):
+    use_real_demo_caches(monkeypatch, settings)
+    install_gen_client(monkeypatch, FakeLLMClient([LLMError("down")] * 3, model="fake-gen"))
+    assert main(["summary-eval"]) == 0
+    assert "3 failures · mean n/a → " in capsys.readouterr().out
+
+
+def test_summary_eval_model_option_changes_the_file_name_and_the_settings(
+    settings, monkeypatch, results
+):
+    use_real_demo_caches(monkeypatch, settings)
+    client = EchoTextClient()
+    client.model = "other-gen"
+    received = install_gen_client(monkeypatch, client)
+    assert main(["summary-eval", "--model", "qwen3.5:9b"]) == 0
+    assert file_names(results) == ["summary_other-gen.json"]
+    assert [s.gen_model for s in received] == ["qwen3.5:9b"]
+
+
+def test_summary_eval_without_a_generation_client_exits_one_and_writes_nothing(
+    monkeypatch, results, capsys
+):
+    install_gen_client(monkeypatch, None)
+    assert main(["summary-eval"]) == 1
+    error = capsys.readouterr().err
+    assert error.startswith("error: summary-eval needs a generation model (")
+    assert "LLM_BACKEND=ollama" in error and "GEN_MODEL=" in error
+    assert not results.exists()

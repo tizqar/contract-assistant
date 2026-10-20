@@ -20,7 +20,14 @@ from contract_assistant.ui import app
 from contract_assistant.ui.app import ALL_CLAUSES, DOCUMENT_TAB, Handlers, Services, build_app
 from contract_assistant.ui.views import SUGGESTED_QUESTIONS, display_name
 from tests.support.caches import make_cache
-from tests.support.fakes import FakeEncoder, FakeQA, FakeRouter, FixedRouter, slow_fake_qa
+from tests.support.fakes import (
+    EchoTextClient,
+    FakeEncoder,
+    FakeQA,
+    FakeRouter,
+    FixedRouter,
+    slow_fake_qa,
+)
 
 DEMO_TEXT = ROOT / "demo" / "short_supply_agreement.txt"
 SHORT_DOC_ID = "sha256:6d43065ff242642866da6be6b83f9849ad898e6eea9c1e71b0c2853dd3822c5a"
@@ -373,6 +380,8 @@ def test_serve_builds_the_services_without_a_model(monkeypatch, tmp_path, capsys
     monkeypatch.setenv("EXTRACTOR_MODEL_ID", "models/does-not-exist")
     monkeypatch.setattr(cli, "load_dotenv", lambda: None)
     monkeypatch.setattr(cli, "build_router", lambda *args: FakeRouter())
+    gen = EchoTextClient()
+    monkeypatch.setattr(cli, "build_gen_client", lambda settings: gen)
     monkeypatch.setattr(
         app,
         "launch_app",
@@ -382,6 +391,7 @@ def test_serve_builds_the_services_without_a_model(monkeypatch, tmp_path, capsys
     )
     assert cli.main(["serve", "--port", "7999", "--share"]) == 0
     assert launched["services"].extractor is None
+    assert launched["services"].gen is gen
     assert (launched["port"], launched["share"]) == (7999, True)
     assert isinstance(launched["demo"], gr.Blocks)
     assert "models/does-not-exist" in capsys.readouterr().err

@@ -17,11 +17,14 @@ from pydantic import BaseModel
 
 from contract_assistant.answer import (
     Answer,
+    AnswerItem,
     Passage,
     answer,
     blockquote,
+    compose,
     render_markdown,
     restrict_to_cache,
+    verify_quotes,
 )
 from contract_assistant.clause_types import (
     ClauseType,
@@ -49,14 +52,23 @@ from contract_assistant.evaluation.router_eval import (
     tune_threshold,
 )
 from contract_assistant.evaluation.router_eval import markdown_table as router_table
+from contract_assistant.evaluation.summary_eval import SummaryReport, evaluate_summaries
+from contract_assistant.explain import (
+    DEFAULT_LANGUAGE,
+    LANGUAGES,
+    Explanation,
+    request_explanation,
+)
 from contract_assistant.extract.extractor import Extractor, ModelNotFoundError
 from contract_assistant.extract.windowing import assert_sliding_windows
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
 from contract_assistant.router.base import Router, RouteResult
+from contract_assistant.router.clients import LLMClient, LLMError
 from contract_assistant.router.factory import (
     BACKEND_NONE,
     UnknownBackendError,
     build_embedding_router,
+    build_gen_client,
     build_llm_client,
     build_router,
     load_encoder,
@@ -74,6 +86,17 @@ from contract_assistant.store import (
     read_cache,
     write_cache,
 )
+from contract_assistant.summary import (
+    APP_ATTEMPTS,
+    SUMMARY_DIR,
+    Summary,
+    SummaryStore,
+    request_summary,
+    summary_items,
+)
+from contract_assistant.summary import (
+    render_markdown as render_summary,
+)
 
 DEMO_DOCUMENTS = ROOT / "demo" / "demo_documents.json"
 CHECK_DOCUMENT = ROOT / "demo" / "short_supply_agreement.txt"
@@ -84,10 +107,11 @@ EXIT_ERROR = 1
 EXIT_NO_MODEL = 2
 EXIT_USAGE = 2
 JSON_INDENT = 2
+MS_PER_S = 1000
 ROUTER_CHOICES = ("embedding", "llm")
 E2E_ROUTER_CHOICES = (ORACLE, *ROUTER_CHOICES)
 SPLITS = get_args(Split)
-MODEL_FIELDS = {"embedding": "embedding_model_id", "llm": "llm_model"}
+MODEL_FIELDS = {"embedding": "embedding_model_id", "llm": "llm_model", "gen": "gen_model"}
 RESULTS_DIR = ROOT / "eval" / "results"
 TUNING_RESULT = "embedding_threshold.json"
 TUNING_SPLIT = "dev"
@@ -96,6 +120,11 @@ ROUTER_TABLE = "router.md"
 E2E_RESULTS = "e2e_*.json"
 E2E_TABLE = "e2e.md"
 ORACLE_RESULT = f"e2e_{ORACLE}.json"
+NOTHING_TO_SUMMARIZE = "nothing to summarize: no clause was found"
+LLM_FAILED = "error: the language model did not answer: {error}"
+NOT_FOUND = "error: {name} was not found in this contract"
+NOT_IN_CACHE = "error: {name} is not in the analysis of this contract"
+EXPLANATION_WITHHELD = "Explanation withheld: {reason}."
 PASSAGES_MESSAGE = "Passages of the contract closest to the question:"
 WARM_UP_QUESTION = "Is there an arbitration clause?"
 CLEAR_LINE = "\r\033[K"
@@ -305,6 +334,20 @@ def _llm_settings(settings: Settings) -> str:
     return f"LLM_BACKEND={settings.llm_backend}, LLM_MODEL={settings.llm_model}"
 
 
+def _gen_settings(settings: Settings) -> str:
+    return f"LLM_BACKEND={settings.llm_backend}, GEN_MODEL={settings.gen_model}"
+
+
+def _gen_client(command: str, settings: Settings) -> LLMClient | None:
+    client = build_gen_client(settings)
+    if client is None:
+        print(
+            f"error: {command} needs a generation model ({_gen_settings(settings)})",
+            file=sys.stderr,
+        )
+    return client
+
+
 def _asked_router(
     choice: str | None, settings: Settings, clause_types: list[ClauseType]
 ) -> Router | None:
@@ -377,6 +420,98 @@ def _cmd_ask(args: argparse.Namespace) -> int:
     print(_render(result, names))
     if args.types is None:
         print(f"\nrouter: {route.kind} · {route.latency_ms:.0f} ms")
+    return 0
+
+
+def _summary(
+    cache: DocumentCache,
+    items: list[AnswerItem],
+    client: LLMClient,
+    fresh: bool,
+    settings: Settings,
+) -> Summary:
+    store = SummaryStore(settings.cache_dir / SUMMARY_DIR)
+    key = (cache.doc_id, client.model, settings.tau_low, settings.tau_high)
+    saved = None if fresh else store.load(*key)
+    if saved is not None:
+        return saved
+    summary = request_summary(
+        cache.doc_id, items, client, settings.tau_low, settings.tau_high, attempts=APP_ATTEMPTS
+    )
+    # A withheld summary is not saved, so the next run asks the model again.
+    if summary.text is not None:
+        store.save(summary)
+    return summary
+
+
+def _cmd_summarize(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    cache = _load_cache(args.target, settings)
+    if cache is None:
+        return EXIT_ERROR
+    client = _gen_client("summarize", settings)
+    if client is None:
+        return EXIT_ERROR
+    names = _names(app_clause_types(settings))
+    items = summary_items(
+        cache, names, settings.tau_low, settings.tau_high, _extra_names(settings)
+    )
+    if not items:
+        print(NOTHING_TO_SUMMARIZE, file=sys.stderr)
+        return EXIT_ERROR
+    try:
+        summary = _summary(cache, items, client, args.fresh, settings)
+    except LLMError as error:
+        print(LLM_FAILED.format(error=error), file=sys.stderr)
+        return EXIT_ERROR
+    print(summary.model_dump_json(indent=JSON_INDENT) if args.json else render_summary(summary))
+    return 0
+
+
+def _explainable_quote(name: str, cache: DocumentCache, settings: Settings) -> str | None:
+    if name not in cache.clauses:
+        print(NOT_IN_CACHE.format(name=name), file=sys.stderr)
+        return None
+    items = compose(cache, [name], settings.tau_low, settings.tau_high, _extra_names(settings))
+    [item], _ = verify_quotes(items, cache.text)
+    if item.citation is None:
+        print(NOT_FOUND.format(name=name), file=sys.stderr)
+        return None
+    return item.citation.quote
+
+
+def _render_explanation(explanation: Explanation) -> str:
+    if explanation.text is None:
+        return EXPLANATION_WITHHELD.format(reason=explanation.reason)
+    language = LANGUAGES[explanation.language].split(",")[0]
+    return f"**{explanation.clause_type}** · {language}\n{explanation.text}"
+
+
+def _cmd_explain(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    names = _names(app_clause_types(settings))
+    if args.type not in names:
+        print(f"error: unknown clause types: {args.type}", file=sys.stderr)
+        print("\n".join(names), file=sys.stderr)
+        return EXIT_USAGE
+    cache = _load_cache(args.target, settings)
+    if cache is None:
+        return EXIT_ERROR
+    quote = _explainable_quote(args.type, cache, settings)
+    if quote is None:
+        return EXIT_ERROR
+    client = _gen_client("explain", settings)
+    if client is None:
+        return EXIT_ERROR
+    try:
+        explanation = request_explanation(args.type, quote, args.language, client)
+    except LLMError as error:
+        print(LLM_FAILED.format(error=error), file=sys.stderr)
+        return EXIT_ERROR
+    if args.json:
+        print(explanation.model_dump_json(indent=JSON_INDENT))
+    else:
+        print(_render_explanation(explanation))
     return 0
 
 
@@ -510,6 +645,11 @@ def _cmd_e2e_eval(args: argparse.Namespace) -> int:
     return _publish_e2e_table()
 
 
+def _demo_caches(settings: Settings) -> dict[str, DocumentCache]:
+    paths = sorted(settings.demo_cache_dir.glob("*.json"))
+    return {path.stem: read_cache(path, settings) for path in paths}
+
+
 def _phrasing_line(report: PhrasingReport, path: Path) -> str:
     replies = report.calls - report.llm_failures
     rate = "n/a" if report.violation_rate is None else f"{report.violation_rate:.3f}"
@@ -527,12 +667,42 @@ def _cmd_phrase_eval(args: argparse.Namespace) -> int:
         print(f"error: phrase-eval needs an LLM ({_llm_settings(settings)})", file=sys.stderr)
         return EXIT_ERROR
     questions = load_questions(settings.router_eval_path)
-    paths = sorted(settings.demo_cache_dir.glob("*.json"))
-    caches = {path.stem: read_cache(path, settings) for path in paths}
+    caches = _demo_caches(settings)
     report = evaluate_phrasing(client, questions, caches, settings.tau_low, settings.tau_high)
     name = f"phrasing_{_slug(report.model)}.json"
     path = _write_result(name, report.model_dump_json(indent=JSON_INDENT))
     print(_phrasing_line(report, path))
+    return 0
+
+
+def _summary_line(report: SummaryReport, path: Path) -> str:
+    mean = "n/a"
+    if report.mean_latency_ms is not None:
+        mean = f"{report.mean_latency_ms / MS_PER_S:.1f} s"
+    return (
+        f"summary-eval: {report.model} · {report.documents} documents · "
+        f"{report.withheld} withheld · {report.retried} retried · "
+        f"{report.llm_failures} failures · mean {mean} "
+        f"→ {_relative(path)}"
+    )
+
+
+def _cmd_summary_eval(args: argparse.Namespace) -> int:
+    settings = _with_model(load_settings(), "gen", args.model)
+    client = _gen_client("summary-eval", settings)
+    if client is None:
+        return EXIT_ERROR
+    report = evaluate_summaries(
+        client,
+        _demo_caches(settings),
+        _names(app_clause_types(settings)),
+        settings.tau_low,
+        settings.tau_high,
+        _extra_names(settings),
+    )
+    name = f"summary_{_slug(report.model)}.json"
+    path = _write_result(name, report.model_dump_json(indent=JSON_INDENT))
+    print(_summary_line(report, path))
     return 0
 
 
@@ -590,6 +760,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         settings,
         PassageSearch(load_encoder(settings.embedding_model_id)),
         _extra_names(settings),
+        gen=build_gen_client(settings),
     )
     launch_app(build_app(services), services, share=args.share, port=args.port)
     return 0
@@ -631,6 +802,11 @@ def _add_evaluation_commands(commands: argparse._SubParsersAction) -> None:
     )
     phrase_eval.add_argument("--model", help="LLM model instead of the configured one")
     phrase_eval.set_defaults(func=_cmd_phrase_eval)
+    summary_eval = commands.add_parser(
+        "summary-eval", help="check that generated summaries quote only verified text"
+    )
+    summary_eval.add_argument("--model", help="generation model instead of the configured one")
+    summary_eval.set_defaults(func=_cmd_summary_eval)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -657,6 +833,21 @@ def _parser() -> argparse.ArgumentParser:
     )
     ask.add_argument("--json", action="store_true", help="print the answer as JSON")
     ask.set_defaults(func=_cmd_ask)
+    summarize = commands.add_parser(
+        "summarize", help="write a short summary from the clauses found in a document"
+    )
+    summarize.add_argument("target", help="document, cache file or sha256: document id")
+    summarize.add_argument("--json", action="store_true", help="print the summary as JSON")
+    summarize.add_argument(
+        "--fresh", action="store_true", help="ask the model again instead of using the saved summary"
+    )
+    summarize.set_defaults(func=_cmd_summarize)
+    explain = commands.add_parser("explain", help="restate one clause in plain language")
+    explain.add_argument("target", help="document, cache file or sha256: document id")
+    explain.add_argument("--type", required=True, help="clause type to restate")
+    explain.add_argument("--language", choices=list(LANGUAGES), default=DEFAULT_LANGUAGE)
+    explain.add_argument("--json", action="store_true", help="print the explanation as JSON")
+    explain.set_defaults(func=_cmd_explain)
     _add_evaluation_commands(commands)
     check = commands.add_parser("check", help="load the model and answer one question")
     check.set_defaults(func=_cmd_check)

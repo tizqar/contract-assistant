@@ -1,0 +1,43 @@
+{
+  "model": "qwen3.5:4b",
+  "documents": 3,
+  "withheld": 0,
+  "retried": 0,
+  "llm_failures": 0,
+  "mean_latency_ms": 12745.889652675638,
+  "records": [
+    {
+      "document": "long_outsourcing_agreement",
+      "items": 38,
+      "chars": 2086,
+      "sentences": 10,
+      "quoted_spans": 1,
+      "unfaithful_spans": [],
+      "withheld": false,
+      "attempts": 1,
+      "latency_ms": 16868.658083010814
+    },
+    {
+      "document": "medium_sponsorship_agreement",
+      "items": 35,
+      "chars": 1733,
+      "sentences": 7,
+      "quoted_spans": 1,
+      "unfaithful_spans": [],
+      "withheld": false,
+      "attempts": 1,
+      "latency_ms": 11817.233792011393
+    },
+    {
+      "document": "short_supply_agreement",
+      "items": 25,
+      "chars": 1417,
+      "sentences": 6,
+      "quoted_spans": 0,
+      "unfaithful_spans": [],
+      "withheld": false,
+      "attempts": 1,
+      "latency_ms": 9551.777083004708
+    }
+  ]
+}
