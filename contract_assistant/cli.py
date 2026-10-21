@@ -79,6 +79,24 @@ from contract_assistant.extract.extractor import Extractor, ModelNotFoundError
 from contract_assistant.extract.windowing import assert_sliding_windows
 from contract_assistant.feedback import FEEDBACK_FILE, dump_json, read_feedback
 from contract_assistant.feedback import summary as feedback_counts
+from contract_assistant.fulltext import APP_ATTEMPTS as FULLTEXT_ATTEMPTS
+from contract_assistant.fulltext import (
+    FULLTEXT_DIR,
+    FullTextStore,
+    FullTextSummary,
+    Progress,
+    write_fulltext,
+)
+from contract_assistant.fulltext import render_markdown as render_fulltext
+from contract_assistant.obligations import APP_ATTEMPTS as OBLIGATION_ATTEMPTS
+from contract_assistant.obligations import (
+    OBLIGATIONS_DIR,
+    ObligationSheet,
+    ObligationStore,
+    obligation_items,
+    request_obligations,
+)
+from contract_assistant.obligations import render_markdown as render_obligations
 from contract_assistant.passage_answer import APP_ATTEMPTS as PASSAGE_ATTEMPTS
 from contract_assistant.passage_answer import request_passage_answer
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
@@ -181,6 +199,10 @@ FEEDBACK_LINE = "{at} {verdict} {doc_id} {question}"
 DOC_ID_WIDTH = 16
 NO_SAVED_SUMMARY = "no saved summary; run summarize first"
 NO_SAVED_TERMS = "no saved key terms; run term-sheet first"
+NO_SAVED_OBLIGATIONS = "no saved obligations; run obligations first"
+NO_SAVED_FULLTEXT = "no saved full-text overview; run fulltext first"
+NO_OBLIGATIONS = "error: no clause with an obligation was found"
+PROGRESS_LINE = "{stage} · {done}/{total}"
 REPORTS_DIR = "reports"
 NO_BACKEND = "none"
 PASSAGES_MESSAGE = "Passages of the contract closest to the question:"
@@ -681,6 +703,100 @@ def _cmd_term_sheet(args: argparse.Namespace) -> int:
     return 0
 
 
+def _obligation_sheet(
+    cache: DocumentCache,
+    items: list[AnswerItem],
+    client: LLMClient,
+    fresh: bool,
+    settings: Settings,
+) -> ObligationSheet:
+    store = ObligationStore(settings.cache_dir / OBLIGATIONS_DIR)
+    key = (cache.doc_id, client.model, settings.tau_low, settings.tau_high)
+    saved = None if fresh else store.load(*key)
+    if saved is not None:
+        return saved
+    sheet = request_obligations(
+        cache.doc_id,
+        items,
+        client,
+        settings.tau_low,
+        settings.tau_high,
+        attempts=OBLIGATION_ATTEMPTS,
+    )
+    if sheet.reason is None:
+        store.save(sheet)
+    return sheet
+
+
+def _cmd_obligations(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    client = _gen_client("obligations", settings)
+    if client is None:
+        return EXIT_ERROR
+    cache = _load_cache(args.target, settings)
+    if cache is None:
+        return EXIT_ERROR
+    items = obligation_items(
+        cache,
+        _names(app_clause_types(settings)),
+        settings.tau_low,
+        settings.tau_high,
+        _extra_names(settings),
+    )
+    if not items:
+        print(NO_OBLIGATIONS, file=sys.stderr)
+        return EXIT_ERROR
+    try:
+        sheet = _obligation_sheet(cache, items, client, args.fresh, settings)
+    except LLMError as error:
+        print(LLM_FAILED.format(error=error), file=sys.stderr)
+        return EXIT_ERROR
+    print(sheet.model_dump_json(indent=JSON_INDENT) if args.json else render_obligations(sheet))
+    return 0
+
+
+def _fulltext_summary(
+    cache: DocumentCache, client: LLMClient, fresh: bool, settings: Settings
+) -> FullTextSummary | None:
+    store = FullTextStore(settings.cache_dir / FULLTEXT_DIR)
+    key = (cache.doc_id, client.model, settings.tau_low, settings.tau_high)
+    saved = None if fresh else store.load(*key)
+    if saved is not None:
+        return saved
+    summary = None
+    for outcome in write_fulltext(
+        cache, client, settings.tau_low, settings.tau_high, attempts=FULLTEXT_ATTEMPTS
+    ):
+        if isinstance(outcome, Progress):
+            print(PROGRESS_LINE.format(**outcome.model_dump()), file=sys.stderr)
+        else:
+            summary = outcome
+    if summary is not None and summary.text is not None:
+        store.save(summary)
+    return summary
+
+
+def _cmd_fulltext(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    client = _gen_client("fulltext", settings)
+    if client is None:
+        return EXIT_ERROR
+    cache = _load_cache(args.target, settings)
+    if cache is None:
+        return EXIT_ERROR
+    try:
+        summary = _fulltext_summary(cache, client, args.fresh, settings)
+    except LLMError as error:
+        print(LLM_FAILED.format(error=error), file=sys.stderr)
+        return EXIT_ERROR
+    if summary is None:
+        return EXIT_ERROR
+    print(
+        summary.model_dump_json(indent=JSON_INDENT) if args.json else render_fulltext(summary)
+    )
+    return 0
+
+
 def _dates_sheet(cache: DocumentCache, settings: Settings) -> TermSheet | None:
     key = (cache.doc_id, settings.gen_model, settings.tau_low, settings.tau_high)
     saved = TermSheetStore(settings.cache_dir / TERM_SHEET_DIR).load(*key)
@@ -815,7 +931,9 @@ def _cmd_compare(args: argparse.Namespace) -> int:
     )
     client = build_gen_client(settings)
     try:
-        sheets = [_compared_sheet(cache, client, args.fresh, settings) for cache in (left, right)]
+        sheets = [
+            _compared_sheet(cache, client, args.fresh, settings) for cache in (left, right)
+        ]
     except LLMError as error:
         print(LLM_FAILED.format(error=error), file=sys.stderr)
         return EXIT_ERROR
@@ -854,6 +972,12 @@ def _cmd_report(args: argparse.Namespace) -> int:
         print(NO_SAVED_SUMMARY, file=sys.stderr)
     if sheet is None:
         print(NO_SAVED_TERMS, file=sys.stderr)
+    obligations = ObligationStore(settings.cache_dir / OBLIGATIONS_DIR).load(*key)
+    fulltext = FullTextStore(settings.cache_dir / FULLTEXT_DIR).load(*key)
+    if obligations is None:
+        print(NO_SAVED_OBLIGATIONS, file=sys.stderr)
+    if fulltext is None:
+        print(NO_SAVED_FULLTEXT, file=sys.stderr)
     name = Path(cache.source.filename).stem
     report = build_report(
         cache,
@@ -863,6 +987,8 @@ def _cmd_report(args: argparse.Namespace) -> int:
         extras,
         summary=summary,
         sheet=sheet,
+        obligations=obligations,
+        fulltext=fulltext,
         flags=review(cache, rules, settings.tau_low, settings.tau_high, extras),
         definitions=find_definitions(cache.text, cache.page_starts),
         model=None if settings.llm_backend == NO_BACKEND else settings.gen_model,
@@ -1219,6 +1345,8 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     gen = build_gen_client(settings)
     summaries = SummaryStore(settings.cache_dir / SUMMARY_DIR)
     term_sheets = TermSheetStore(settings.cache_dir / TERM_SHEET_DIR)
+    obligation_store = ObligationStore(settings.cache_dir / OBLIGATIONS_DIR)
+    fulltext_store = FullTextStore(settings.cache_dir / FULLTEXT_DIR)
     extras = _extra_names(settings)
     services = Services(
         store,
@@ -1231,13 +1359,23 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         gen=gen,
         summaries=summaries,
         term_sheets=term_sheets,
+        obligations=obligation_store,
+        fulltexts=fulltext_store,
         rules=load_rules(known_types=[clause.name for clause in app_types]),
     )
     if gen is not None and not args.no_precompute:
         print(PRECOMPUTE_NOTICE, file=sys.stderr)
         names = [clause.name for clause in app_types]
         run_in_background(
-            precompute_all, store, settings, names, gen, summaries, term_sheets, extras
+            precompute_all,
+            store,
+            settings,
+            names,
+            gen,
+            summaries,
+            term_sheets,
+            extras,
+            obligation_store,
         )
     launch_app(build_app(services), services, share=args.share, port=args.port)
     return 0
@@ -1349,6 +1487,30 @@ def _parser() -> argparse.ArgumentParser:
         "--fresh", action="store_true", help="ask the model again instead of using saved sheets"
     )
     term_sheet.set_defaults(func=_cmd_term_sheet)
+    obligations = commands.add_parser(
+        "obligations", help="list who must, may or must not do what, by party"
+    )
+    obligations.add_argument("target", help="document, cache file or sha256: document id")
+    obligations.add_argument(
+        "--json", action="store_true", help="print the obligations as JSON"
+    )
+    obligations.add_argument(
+        "--fresh",
+        action="store_true",
+        help="ask the model again instead of using the saved list",
+    )
+    obligations.set_defaults(func=_cmd_obligations)
+    fulltext = commands.add_parser(
+        "fulltext", help="summarize the whole text section by section"
+    )
+    fulltext.add_argument("target", help="document, cache file or sha256: document id")
+    fulltext.add_argument("--json", action="store_true", help="print the overview as JSON")
+    fulltext.add_argument(
+        "--fresh",
+        action="store_true",
+        help="ask the model again instead of using the saved overview",
+    )
+    fulltext.set_defaults(func=_cmd_fulltext)
     review_parser = commands.add_parser(
         "review", help="flag review points from the clauses found, with no model"
     )

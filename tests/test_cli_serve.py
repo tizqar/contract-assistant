@@ -2,6 +2,8 @@ import pytest
 
 from contract_assistant import cli
 from contract_assistant.background import precompute_all
+from contract_assistant.fulltext import FullTextStore
+from contract_assistant.obligations import ObligationStore
 from contract_assistant.summary import SummaryStore
 from contract_assistant.term_sheet import TermSheetStore
 from contract_assistant.ui import app
@@ -61,3 +63,16 @@ def test_serve_skips_the_precompute_without_a_generation_client(served):
 def test_serve_passes_the_review_rules_to_the_app(served):
     cli.main(["serve"])
     assert served["launched"]["services"].rules
+
+
+def test_serve_passes_the_obligation_and_full_text_stores_to_the_app(served):
+    cli.main(["serve"])
+    services = served["launched"]["services"]
+    assert isinstance(services.obligations, ObligationStore)
+    assert isinstance(services.fulltexts, FullTextStore)
+
+
+def test_serve_gives_the_obligation_store_to_the_precompute(served):
+    cli.main(["serve"])
+    services = served["launched"]["services"]
+    assert served["background"][0][1][7] is services.obligations

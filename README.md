@@ -86,7 +86,7 @@ make term-sheet-eval # term-sheet-eval
 make passage-eval # passage-eval
 ```
 
-`serve` prepares the summaries and key terms of the cached contracts in the background at
+`serve` prepares the summaries, key terms and obligations of the cached contracts in the background at
 start-up and after an upload; `serve --no-precompute` turns it off. Generated text appears in
 the web app as it is written and is checked when complete. A Stop button cancels a running
 request.
@@ -138,7 +138,7 @@ The test split has 30 questions. qwen3.5:4b is the default router on these numbe
 embedding router at its tuned threshold (0.58) stays the fallback.
 
 The other commands are `contract-assistant import-demo | extract | show | definitions | summarize | term-sheet |
-review | compare | dates | portfolio | feedback | report | explain | check | serve`.
+obligations | fulltext | review | compare | dates | portfolio | feedback | report | explain | check | serve`.
 `extract` adds the extra clause types to an existing cache without re-extracting the 41.
 
 ## How answers read
@@ -277,6 +277,29 @@ missing ones. It writes `eval/results/term_sheet_<model>.json`. `passage-eval` a
 out-of-scope evaluation questions on the three demo contracts and counts the answers
 shown, the withheld ones and the questions without passages. It writes
 `eval/results/passages_<model>.json`.
+
+### Obligations and the full-text overview
+
+The obligations table lists who must, may or must not do what. The language model tags up
+to 16 clauses, the ones found first, and gives for each entry the party, the modality and
+the words of the clause that say what. The party and the words are copied verbatim from the
+clause or the entry is dropped, and the number of dropped entries is shown under the table.
+The web app highlights an entry in the document. An obligation list is saved under
+`cache/obligations/`; a withheld one is not saved.
+
+The full-text overview covers what the 49 clause types miss. The language model summarizes
+the text section by section over passages of about 6,000 characters. Each section's
+sentences are checked against that section, and the overview is checked against the section
+summaries. It takes about 50 s for the short demo contract and a few minutes for a long
+one. It is saved under `cache/fulltext/` like the summary. Both appear in the report.
+
+```bash
+contract-assistant obligations demo/short_supply_agreement.txt
+contract-assistant fulltext demo/short_supply_agreement.txt
+```
+
+`--json` prints either result as JSON and `--fresh` asks the model again. `fulltext` prints
+the section it is writing to stderr.
 
 ## Review, comparison and report
 
