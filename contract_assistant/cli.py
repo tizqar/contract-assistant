@@ -100,6 +100,13 @@ from contract_assistant.obligations import render_markdown as render_obligations
 from contract_assistant.passage_answer import APP_ATTEMPTS as PASSAGE_ATTEMPTS
 from contract_assistant.passage_answer import request_passage_answer
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
+from contract_assistant.pdf_view import (
+    DOCUMENTS_DIR,
+    PageError,
+    copy_path,
+    keep_copy,
+    page_image,
+)
 from contract_assistant.portfolio import portfolio_rows, to_csv
 from contract_assistant.portfolio import render_markdown as render_portfolio
 from contract_assistant.report import build_report, write_report
@@ -166,6 +173,9 @@ DEFINITION_HEADING = "**Definition: {term}** · p. {page}"
 DEFINITIONS_HEADER = ("| Term | Defined as | Page |", "| --- | --- | --- |")
 ELLIPSIS = "…"
 PRECOMPUTE_NOTICE = "precomputing summaries and key terms in the background"
+PAGES_DIR = "pages"
+TEXT_FILE_ERROR = "error: {name} is a text file; it has no pages to show"
+NO_COPY_ERROR = "error: no PDF copy of this document; run extract on the PDF again"
 EXIT_ERROR = 1
 EXIT_NO_MODEL = 2
 EXIT_USAGE = 2
@@ -286,6 +296,8 @@ def _extract_file(
 ) -> tuple[str, Extractor | None]:
     doc = load_document(path)
     doc_id = doc_id_of(doc.text)
+    if path.suffix.lower() == ".pdf":
+        keep_copy(path, settings.cache_dir / DOCUMENTS_DIR, doc_id)
     existing = _existing_cache(path, doc_id, args, settings, store)
     if existing and not _missing_types(existing[0], settings):
         return f"{path.name}: cache hit -> {_relative(existing[1])}", extractor
@@ -387,6 +399,31 @@ def _cmd_show(args: argparse.Namespace) -> int:
     width = max(len(name) for name in names)
     for name in names:
         print(_row(name, width, cache))
+    return 0
+
+
+def _cmd_page(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    cache = _load_cache(args.target, settings)
+    if cache is None:
+        return EXIT_ERROR
+    if cache.source.kind != "pdf":
+        print(TEXT_FILE_ERROR.format(name=cache.source.filename), file=sys.stderr)
+        return EXIT_ERROR
+    copy = copy_path(settings.cache_dir / DOCUMENTS_DIR, cache.doc_id)
+    if not copy.exists():
+        print(NO_COPY_ERROR, file=sys.stderr)
+        return EXIT_ERROR
+    try:
+        image = page_image(copy, args.page, args.quote)
+    except PageError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    name = f"{cache.doc_id.removeprefix(DOC_ID_PREFIX)}-{args.page}.png"
+    out = args.out or settings.cache_dir / PAGES_DIR / name
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(image)
+    print(_relative(out))
     return 0
 
 
@@ -1450,6 +1487,12 @@ def _parser() -> argparse.ArgumentParser:
     show = commands.add_parser("show", help="show the cached result of a document")
     show.add_argument("target", help="document, cache file or sha256: document id")
     show.set_defaults(func=_cmd_show)
+    page = commands.add_parser("page", help="render a page of a PDF with a passage boxed")
+    page.add_argument("target", help="document, cache file or sha256: document id")
+    page.add_argument("page", type=int, help="page number, from 1")
+    page.add_argument("--quote", help="passage to box on the page")
+    page.add_argument("--out", type=Path, help="file to write; default under the cache folder")
+    page.set_defaults(func=_cmd_page)
     ask = commands.add_parser("ask", help="answer a question about an extracted document")
     ask.add_argument("target", help="document, cache file or sha256: document id")
     ask.add_argument("question", nargs="?", default="", help="the question to answer")

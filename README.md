@@ -113,6 +113,15 @@ related passages instead. A question about a defined term is answered from the c
 own definition, with no router and no model; `--types` skips that lookup.
 `definitions` prints the defined terms of a document as a table, or as JSON with `--json`.
 
+`page` renders one page of a PDF as an image:
+
+```bash
+contract-assistant page contract.pdf 3 --quote "governed by the laws"
+```
+
+It writes a PNG with the quote boxed to `cache/pages/` (or to `--out`) and prints the path.
+It needs the copy that `extract` keeps of the PDF; a text file has no pages.
+
 The evaluations use the 41 CUAD clause types only:
 
 ```bash
@@ -137,7 +146,7 @@ contract-assistant passage-eval                                # answers vs. the
 The test split has 30 questions. qwen3.5:4b is the default router on these numbers; the
 embedding router at its tuned threshold (0.58) stays the fallback.
 
-The other commands are `contract-assistant import-demo | extract | show | definitions | summarize | term-sheet |
+The other commands are `contract-assistant import-demo | extract | show | page | definitions | summarize | term-sheet |
 obligations | fulltext | review | compare | dates | portfolio | feedback | report | explain | check | serve`.
 `extract` adds the extra clause types to an existing cache without re-extracting the 41.
 
@@ -183,7 +192,10 @@ numbers (`p. n/a`); a PDF gives the page.
 
 The web app labels the same tiers Found, Verify and Not found, shows each passage
 highlighted in the contract, and lists all 49 clause types by topic in a clause checklist.
-The thresholds and the model details are in their own tabs.
+The thresholds and the model details are in their own tabs. For a PDF uploaded through the
+app or analysed with `extract`, the Document tab also shows the page of the PDF with the
+passage boxed, rendered from a copy kept under `cache/documents/`; a checkbox hides the page.
+The demo contracts are text files and show the excerpt only.
 
 | | |
 |---|---|
