@@ -63,6 +63,7 @@ from contract_assistant.ui.views import (
     fulltext_markdown,
     highlighted_quote,
     obligation_rows,
+    page_of,
     passage_choices,
     passage_citation,
     review_rows,
@@ -1057,3 +1058,16 @@ def test_fulltext_markdown_gives_the_reason_when_withheld():
     assert fulltext_markdown(summary) == (
         "The overview is not shown because no section could be summarized."
     )
+
+
+def test_page_of_maps_offsets_to_one_based_pages():
+    starts = [0, 10, 25]
+    assert [page_of(starts, offset) for offset in (0, 9, 10, 24, 25, 99)] == [1, 1, 2, 2, 3, 3]
+
+
+def test_page_of_is_page_one_without_page_starts():
+    assert page_of([], 5) == 1
+
+
+def test_technical_details_name_the_documents_folder(settings):
+    assert "cache/documents/" in technical_markdown(settings, "llm")

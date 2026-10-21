@@ -1,5 +1,6 @@
 import dataclasses
 import inspect
+import io
 import json
 import socket
 from types import SimpleNamespace
@@ -7,7 +8,9 @@ from typing import get_type_hints
 
 import gradio as gr
 import pytest
+from fpdf import FPDF
 from gradio_client import Client
+from PIL import Image
 
 from contract_assistant import cli
 from contract_assistant.answer import Answer, GeneratedAnswer, Passage
@@ -17,10 +20,12 @@ from contract_assistant.extract.extractor import Extractor
 from contract_assistant.feedback import FEEDBACK_FILE
 from contract_assistant.fulltext import FullTextSummary
 from contract_assistant.obligations import ObligationSheet
+from contract_assistant.pdf import load_document
+from contract_assistant.pdf_view import DOCUMENTS_DIR, copy_path, keep_copy
 from contract_assistant.router.base import RouteResult, Turn
 from contract_assistant.router.clients import LLMError
 from contract_assistant.search import PassageSearch
-from contract_assistant.store import Store
+from contract_assistant.store import SourceInfo, Store
 from contract_assistant.term_sheet import FIELDS, INVALID_REASON, LABELS, TermSheet
 from contract_assistant.ui import app
 from contract_assistant.ui.app import (
@@ -1625,3 +1630,106 @@ def test_build_report_files_includes_the_saved_obligations_and_overview(
     assert "the obligations" not in status and "overview" not in status
     text = next((settings.cache_dir / "reports").glob("*.md")).read_text()
     assert "pay the invoices within thirty days" in text and OVERVIEW_REPLY in text
+
+
+PAGE_ONE = "Alpha supplies the goods."
+PAGE_TWO = "Beta pays within thirty days."
+
+
+def write_pdf(path, lines: list[str]):
+    pdf = FPDF()
+    pdf.set_font("Helvetica", size=12)
+    for line in lines:
+        pdf.add_page()
+        pdf.cell(text=line)
+    pdf.output(str(path))
+    return path
+
+
+@pytest.fixture
+def pdf_path(tmp_path):
+    return write_pdf(tmp_path / "contract.pdf", [PAGE_ONE, PAGE_TWO])
+
+
+@pytest.fixture
+def pdf_cache(pdf_path, settings):
+    doc = load_document(pdf_path)
+    cache = make_cache(doc.text, settings)
+    source = SourceInfo(filename="x.pdf", kind="pdf", n_chars=len(doc.text), n_pages=2)
+    return cache.model_copy(update={"source": source, "page_starts": doc.page_starts})
+
+
+@pytest.fixture
+def kept_copy(pdf_path, pdf_cache, settings):
+    return keep_copy(pdf_path, settings.cache_dir / DOCUMENTS_DIR, pdf_cache.doc_id)
+
+
+def test_upload_of_a_new_pdf_keeps_a_copy(make_services, settings, clause_types, pdf_path):
+    extractor = Extractor(slow_fake_qa(0), clause_types, settings, "fake")
+    doc_id = app.doc_id_of(load_document(pdf_path).text)
+    handlers = Handlers(make_services(extractor))
+    handlers.extract_upload(str(pdf_path), progress=lambda *a, **k: None)
+    kept = copy_path(settings.cache_dir / DOCUMENTS_DIR, doc_id)
+    assert kept.read_bytes() == pdf_path.read_bytes()
+    assert len(list(settings.cache_dir.glob("*.json"))) == 1
+
+
+def test_upload_of_a_text_keeps_no_copy(make_services, settings, clause_types, tmp_path):
+    extractor = Extractor(slow_fake_qa(0), clause_types, settings, "fake")
+    path = tmp_path / "new.txt"
+    path.write_text(TEXT, encoding="utf-8")
+    Handlers(make_services(extractor)).extract_upload(
+        str(path), progress=lambda *a, **k: None
+    )
+    assert not (settings.cache_dir / DOCUMENTS_DIR).exists()
+
+
+def test_page_for_view_shows_the_page_of_the_highlighted_passage(handlers, pdf_cache, kept_copy):
+    image = handlers.page_for_view([("x", None), (PAGE_TWO, "Term")], pdf_cache, True)
+    assert (image.visible, image.label) == (True, "Page 2")
+
+
+def test_page_for_view_without_a_highlight_shows_page_one(handlers, pdf_cache, kept_copy):
+    image = handlers.page_for_view([(PAGE_ONE, None)], pdf_cache, True)
+    assert (image.visible, image.label) == (True, "Page 1")
+
+
+def test_page_for_view_hides_the_image_for_a_text_contract(handlers, law_cache):
+    assert handlers.page_for_view([(TEXT, None)], law_cache, True).visible is False
+
+
+def test_page_for_view_hides_the_image_when_switched_off(handlers, pdf_cache, kept_copy):
+    assert handlers.page_for_view([(PAGE_ONE, None)], pdf_cache, False).visible is False
+
+
+def test_page_for_view_hides_the_image_without_a_kept_copy(handlers, pdf_cache):
+    assert handlers.page_for_view([(PAGE_ONE, None)], pdf_cache, True).visible is False
+
+
+def test_page_for_view_renders_the_same_passage_once(
+    handlers, pdf_cache, kept_copy, monkeypatch
+):
+    calls = []
+    monkeypatch.setattr(
+        app, "page_image", lambda *args: calls.append(args) or app_png()
+    )
+    for _ in range(2):
+        handlers.page_for_view([(PAGE_TWO, "Term")], pdf_cache, True)
+    assert len(calls) == 1
+
+
+def app_png() -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (4, 4)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def test_document_tab_has_the_page_checkbox_and_image(make_services):
+    demo = build_app(make_services())
+    assert find_component(demo, "show-page").value is True
+    assert find_component(demo, "page-image").visible is False
+
+
+def test_technical_tab_names_the_documents_folder(make_services):
+    texts = component_values(build_app(make_services()))
+    assert any("cache/documents/" in text for text in texts)

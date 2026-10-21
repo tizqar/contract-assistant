@@ -7,9 +7,11 @@ import time
 from collections import OrderedDict
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
 
 import gradio as gr
+from PIL import Image
 
 from contract_assistant.answer import (
     Answer,
@@ -61,6 +63,13 @@ from contract_assistant.obligations import (
 from contract_assistant.passage_answer import APP_ATTEMPTS as PASSAGE_ATTEMPTS
 from contract_assistant.passage_answer import generated_answer_from, passage_request
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
+from contract_assistant.pdf_view import (
+    DOCUMENTS_DIR,
+    PageError,
+    copy_path,
+    keep_copy,
+    page_image,
+)
 from contract_assistant.portfolio import headers as portfolio_headers
 from contract_assistant.portfolio import portfolio_rows, to_csv
 from contract_assistant.portfolio import table as portfolio_table
@@ -120,6 +129,7 @@ from contract_assistant.ui.views import (
     fulltext_markdown,
     highlighted_quote,
     obligation_rows,
+    page_of,
     passage_choices,
     passage_citation,
     review_rows,
@@ -151,6 +161,7 @@ REPORTS_DIR = "reports"
 PORTFOLIO_CSV = "portfolio.csv"
 FEEDBACK_THANKS = "Noted, thank you."
 SERBIAN = "sr"
+PAGE_LABEL = "Page {page}"
 WRITING_OBLIGATIONS = "Reading the obligations. This can take half a minute."
 WRITING_FULLTEXT = "Writing the overview · {stage} · {elapsed} s"
 MERGING_STAGE = "merging the sections"
@@ -496,6 +507,7 @@ class Handlers:
             known_types=[clause_type.name for clause_type in services.clause_types]
         )
         self.definitions: OrderedDict[str, list[Definition]] = OrderedDict()
+        self.rendered: tuple[tuple[str, int, str | None], bytes] | None = None
 
     @guarded
     def open_document(
@@ -1132,6 +1144,7 @@ class Handlers:
             extended = extractor.extend(cached, report)
             if extended is not cached:
                 services.store.save(extended)
+                self._keep_pdf(path, doc_id)
                 self._precompute(extended)
                 return self._selected(doc_id), ANALYSIS_UPDATED, doc_id
         if cached is not None:
@@ -1142,8 +1155,39 @@ class Handlers:
             return gr.skip()
         analysed = extractor.extract(doc, report)
         services.store.save(analysed)
+        self._keep_pdf(path, doc_id)
         self._precompute(analysed)
         return self._selected(doc_id), "Analysis complete", None
+
+    def _keep_pdf(self, path: str, doc_id: str) -> None:
+        if Path(path).suffix.lower() == ".pdf":
+            keep_copy(Path(path), self.services.settings.cache_dir / DOCUMENTS_DIR, doc_id)
+
+    @guarded
+    def page_for_view(self, segments: object, cache: DocumentCache | None, show: bool):
+        """Render the PDF page of the passage in the view, boxed; hide the image otherwise."""
+        hidden = gr.Image(visible=False)
+        if not show or cache is None or cache.source.kind != "pdf":
+            return hidden
+        copy = copy_path(self.services.settings.cache_dir / DOCUMENTS_DIR, cache.doc_id)
+        if not copy.exists():
+            return hidden
+        marked = highlighted_quote(segments)
+        quote = marked[0] if marked else None
+        offset = cache.text.find(quote) if quote else -1
+        if offset < 0:
+            quote, page = None, 1
+        else:
+            page = page_of(cache.page_starts, offset)
+        key = (cache.doc_id, page, quote)
+        if self.rendered is None or self.rendered[0] != key:
+            try:
+                self.rendered = (key, page_image(copy, page, quote))
+            except PageError:
+                logger.warning("page %s of %s cannot be shown", page, cache.doc_id)
+                return hidden
+        image = Image.open(BytesIO(self.rendered[1]))
+        return gr.Image(value=image, visible=True, label=PAGE_LABEL.format(page=page))
 
     @guarded
     def reload_extended(
@@ -1554,6 +1598,17 @@ def build_app(services: Services) -> gr.Blocks:
                         show_label=False,
                         elem_id="view",
                     )
+                    show_page = gr.Checkbox(
+                        value=True, label="Show the PDF page", elem_id="show-page"
+                    )
+                    page_view = gr.Image(
+                        label="Page",
+                        elem_id="page-image",
+                        visible=False,
+                        type="pil",
+                        interactive=False,
+                        buttons=[],
+                    )
                     with gr.Accordion("Defined terms", open=False, elem_id="terms"):
                         definitions_table = gr.Dataframe(
                             headers=DEFINITION_HEADERS,
@@ -1808,6 +1863,13 @@ def build_app(services: Services) -> gr.Blocks:
             [portfolio_table_view, portfolio_csv],
             api_name="portfolio",
         )
+        for trigger in (view.change, show_page.change):
+            trigger(
+                handlers.page_for_view,
+                inputs=[view, cache_state, show_page],
+                outputs=[page_view],
+                api_visibility="private",
+            )
         chat.like(
             handlers.feedback,
             inputs=[cache_state, answer_state],

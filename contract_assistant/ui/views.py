@@ -174,6 +174,10 @@ GENERATED_ANSWER_WITHHELD = "The language model's answer is not shown because {r
 MATCHING_BACKENDS = {"ollama": "Ollama"}
 OPENAI_BACKEND = "an OpenAI-compatible API"
 GENERATION_OFF = "off"
+PAGE_IMAGE_LINE = (
+    "- **Page images:** drawn from the PDF copy kept in `cache/documents/`; "
+    "text uploads show an excerpt instead"
+)
 FEEDBACK_LINE = (
     "- **Feedback:** thumbs up and down on answers are stored in `cache/feedback.jsonl` "
     "for the evaluation and never leave this computer"
@@ -463,6 +467,11 @@ def _widen_right(text: str, position: int) -> int:
     return len(text) if position + MAX_WIDEN_CHARS >= len(text) else position
 
 
+def page_of(page_starts: list[int], offset: int) -> int:
+    """Return the 1-based page that holds a character offset; page 1 without page starts."""
+    return max(bisect_right(page_starts, offset), 1)
+
+
 def _page_window(cache: DocumentCache, citation: Citation | None) -> tuple[int, int, int, int]:
     starts = cache.page_starts
     first = 1 if citation is None else bisect_right(starts, citation.start)
@@ -510,6 +519,7 @@ def technical_markdown(
         names = ", ".join(display_name(name) for name in sorted(unvalidated))
         lines.append(f"- **Not validated on test data:** {names}")
     lines.append(FEEDBACK_LINE)
+    lines.append(PAGE_IMAGE_LINE)
     return "\n".join(lines)
 
 
