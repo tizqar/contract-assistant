@@ -406,3 +406,43 @@ def test_routed_question_builds_no_generation_client(monkeypatch, capsys):
     install_router(monkeypatch, fixed_router("embedding"))
     monkeypatch.setattr(cli, "build_gen_client", refuse_router)
     assert main(["ask", str(DEMO_TEXT), QUESTION]) == 0
+
+
+def test_definition_question_prints_the_heading_and_the_quote(capsys):
+    assert main(["ask", str(DEMO_TEXT), "What is an RMA?"]) == 0
+    output = capsys.readouterr().out
+    assert "**Definition: RMA** · p. n/a\n> " in output
+    assert 'Return Material Authorization ("RMA") number' in output
+
+
+def test_definition_question_prints_the_definition_router_line_and_builds_no_router(capsys):
+    assert main(["ask", str(DEMO_TEXT), "What is an RMA?"]) == 0
+    assert capsys.readouterr().out.splitlines()[-2:] == ["", "router: definition · 0 ms"]
+
+
+def test_definition_question_json_carries_the_definition(capsys):
+    assert main(["ask", str(DEMO_TEXT), "What is an RMA?", "--json"]) == 0
+    result = Answer.model_validate_json(capsys.readouterr().out)
+    assert result.definition is not None
+    assert result.definition.term == "RMA"
+    assert result.route.kind == "definition"
+    assert result.items == []
+
+
+def test_definition_question_about_an_undefined_term_routes_as_before(monkeypatch, capsys):
+    question = "What is the Universe?"
+    route = RouteResult(clause_types=["Parties"], kind="embedding", latency_ms=LATENCY_MS)
+    router = FixedRouter({question: route})
+    router.kind = "embedding"
+    install_router(monkeypatch, router)
+    assert main(["ask", str(DEMO_TEXT), question, "--json"]) == 0
+    result = Answer.model_validate_json(capsys.readouterr().out)
+    assert result.definition is None
+    assert result.route.kind == "embedding"
+
+
+def test_types_never_look_up_definitions(capsys):
+    assert main(["ask", str(DEMO_TEXT), "What is an RMA?", "--types", "Parties", "--json"]) == 0
+    result = Answer.model_validate_json(capsys.readouterr().out)
+    assert result.definition is None
+    assert result.route.kind == "explicit"

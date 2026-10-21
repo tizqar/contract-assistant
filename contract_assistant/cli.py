@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from contract_assistant.answer import (
     Answer,
     AnswerItem,
+    Definition,
     Passage,
     answer,
     blockquote,
@@ -34,6 +35,7 @@ from contract_assistant.clause_types import (
     load_extra_clause_types,
 )
 from contract_assistant.config import ROOT, Settings, load_settings
+from contract_assistant.definitions import find_definitions, lookup
 from contract_assistant.evaluation.e2e import (
     ORACLE,
     E2EReport,
@@ -129,6 +131,10 @@ DEMO_DOCUMENTS = ROOT / "demo" / "demo_documents.json"
 CHECK_DOCUMENT = ROOT / "demo" / "short_supply_agreement.txt"
 CHECK_CLAUSE = "Governing Law"
 QUOTE_WIDTH = 80
+DEFINITION_WIDTH = 120
+NO_DEFINITIONS = "no defined terms found"
+DEFINITION_HEADING = "**Definition: {term}** · p. {page}"
+DEFINITIONS_HEADER = ("| Term | Defined as | Page |", "| --- | --- | --- |")
 ELLIPSIS = "…"
 PRECOMPUTE_NOTICE = "precomputing summaries and key terms in the background"
 EXIT_ERROR = 1
@@ -305,11 +311,11 @@ def _load_cache(target: str, settings: Settings) -> DocumentCache | None:
     return cache
 
 
-def _quote(text: str) -> str:
+def _quote(text: str, width: int = QUOTE_WIDTH) -> str:
     text = re.sub(r"\s+", " ", text).strip()
-    if len(text) <= QUOTE_WIDTH:
+    if len(text) <= width:
         return text
-    return text[: QUOTE_WIDTH - len(ELLIPSIS)] + ELLIPSIS
+    return text[: width - len(ELLIPSIS)] + ELLIPSIS
 
 
 def _row(name: str, width: int, cache: DocumentCache) -> str:
@@ -408,7 +414,53 @@ def _route(
     return None if router is None else router.route(args.question)
 
 
+def _definition_row(definition: Definition) -> str:
+    page = "n/a" if definition.page is None else definition.page
+    quote = _quote(definition.quote, DEFINITION_WIDTH).replace("|", "\\|")
+    return f"| {definition.term} | {quote} | {page} |"
+
+
+def _cmd_definitions(args: argparse.Namespace) -> int:
+    cache = _load_cache(args.target, load_settings())
+    if cache is None:
+        return EXIT_ERROR
+    definitions = find_definitions(cache.text, cache.page_starts)
+    if not definitions:
+        print(NO_DEFINITIONS)
+    elif args.json:
+        print(json.dumps([d.model_dump(mode="json") for d in definitions], indent=JSON_INDENT))
+    else:
+        print("\n".join([*DEFINITIONS_HEADER, *map(_definition_row, definitions)]))
+    return 0
+
+
+def _definition_answer(
+    args: argparse.Namespace, cache: DocumentCache, settings: Settings
+) -> Answer | None:
+    definition = lookup(find_definitions(cache.text, cache.page_starts), args.question)
+    if definition is None:
+        return None
+    route = RouteResult(clause_types=[], kind="definition", latency_ms=0.0)
+    return Answer(
+        question=args.question,
+        route=route,
+        tau_low=settings.tau_low,
+        tau_high=settings.tau_high,
+        items=[],
+        dropped_quotes=0,
+        definition=definition,
+    )
+
+
+def _render_definition(definition: Definition) -> str:
+    page = "n/a" if definition.page is None else definition.page
+    heading = DEFINITION_HEADING.format(term=definition.term, page=page)
+    return f"{heading}\n{blockquote(definition.quote)}"
+
+
 def _render(result: Answer, names: list[str]) -> str:
+    if result.definition is not None:
+        return _render_definition(result.definition)
     text = render_markdown(result, names)
     if not result.passages:
         return text
@@ -458,6 +510,9 @@ def _cmd_ask(args: argparse.Namespace) -> int:
     cache = _load_cache(args.target, settings)
     if cache is None:
         return EXIT_ERROR
+    result = None if args.types is not None else _definition_answer(args, cache, settings)
+    if result is not None:
+        return _print_answer(result, names, args)
     route = _route(args, settings, clause_types)
     if route is None:
         return EXIT_ERROR
@@ -472,11 +527,16 @@ def _cmd_ask(args: argparse.Namespace) -> int:
     )
     if args.types is None and not route.clause_types:
         result = _with_generated(_with_passages(result, cache, settings), settings)
+    return _print_answer(result, names, args)
+
+
+def _print_answer(result: Answer, names: list[str], args: argparse.Namespace) -> int:
     if args.json:
         print(result.model_dump_json(indent=JSON_INDENT))
         return 0
     print(_render(result, names))
     if args.types is None:
+        route = result.route
         print(f"\nrouter: {route.kind} · {route.latency_ms:.0f} ms")
     return 0
 
@@ -494,7 +554,12 @@ def _summary(
     if saved is not None:
         return saved
     summary = request_summary(
-        cache.doc_id, items, client, settings.tau_low, settings.tau_high, attempts=SUMMARY_ATTEMPTS
+        cache.doc_id,
+        items,
+        client,
+        settings.tau_low,
+        settings.tau_high,
+        attempts=SUMMARY_ATTEMPTS,
     )
     # A withheld summary is not saved, so the next run asks the model again.
     if summary.text is not None:
@@ -561,7 +626,9 @@ def _sheets(
         if cache is None:
             return None
         name = Path(cache.source.filename).stem
-        items = term_sheet_items(cache, settings.tau_low, settings.tau_high, _extra_names(settings))
+        items = term_sheet_items(
+            cache, settings.tau_low, settings.tau_high, _extra_names(settings)
+        )
         if not items:
             print(NO_KEY_TERMS.format(name=name), file=sys.stderr)
             return None
@@ -1037,13 +1104,19 @@ def _parser() -> argparse.ArgumentParser:
     )
     ask.add_argument("--json", action="store_true", help="print the answer as JSON")
     ask.set_defaults(func=_cmd_ask)
+    definitions = commands.add_parser("definitions", help="list the terms a contract defines")
+    definitions.add_argument("target", help="document, cache file or sha256: document id")
+    definitions.add_argument("--json", action="store_true", help="print the terms as JSON")
+    definitions.set_defaults(func=_cmd_definitions)
     summarize = commands.add_parser(
         "summarize", help="write a short summary from the clauses found in a document"
     )
     summarize.add_argument("target", help="document, cache file or sha256: document id")
     summarize.add_argument("--json", action="store_true", help="print the summary as JSON")
     summarize.add_argument(
-        "--fresh", action="store_true", help="ask the model again instead of using the saved summary"
+        "--fresh",
+        action="store_true",
+        help="ask the model again instead of using the saved summary",
     )
     summarize.set_defaults(func=_cmd_summarize)
     term_sheet = commands.add_parser(

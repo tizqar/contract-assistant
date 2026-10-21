@@ -19,6 +19,10 @@ extractor, without retraining, and are never marked Found because no gold data e
 validate their thresholds. A question that matches no clause type gets up to three related
 passages of the contract, shown verbatim and labelled as not a clause match.
 
+The chat remembers the earlier questions of a conversation, so follow-ups such as "and the
+notice period?" or "explain that" work. A question about a defined term ("What is an RMA?")
+is answered with the sentence of the contract that defines it, without any model.
+
 The app can also write a short summary from the clauses it found, fill in a term sheet of
 key terms, restate one clause in plain English or Serbian, and answer a question that
 matches no clause from the passages closest to it. This text is generated and labelled as
@@ -98,12 +102,16 @@ minutes, because a cold load takes longer than the 10 s limit per question.
 contract-assistant ask demo/short_supply_agreement.txt \
     "who are the parties and which law governs?"
 contract-assistant ask demo/short_supply_agreement.txt --types "Governing Law,Exclusivity"
+contract-assistant ask demo/short_supply_agreement.txt "What is an RMA?"
+contract-assistant definitions demo/long_outsourcing_agreement.txt
 ```
 
 With a question, the router picks the clause types; `--router embedding|llm` asks for one
 router and fails if it is not available. `--types` names the clause types and loads no
 model. `--json` prints the answer as JSON. A question that matches no clause type prints
-related passages instead.
+related passages instead. A question about a defined term is answered from the contract's
+own definition, with no router and no model; `--types` skips that lookup.
+`definitions` prints the defined terms of a document as a table, or as JSON with `--json`.
 
 The evaluations use the 41 CUAD clause types only:
 
@@ -129,7 +137,7 @@ contract-assistant passage-eval                                # answers vs. the
 The test split has 30 questions. qwen3.5:4b is the default router on these numbers; the
 embedding router at its tuned threshold (0.58) stays the fallback.
 
-The other commands are `contract-assistant import-demo | extract | show | summarize | term-sheet |
+The other commands are `contract-assistant import-demo | extract | show | definitions | summarize | term-sheet |
 explain | check | serve`.
 `extract` adds the extra clause types to an existing cache without re-extracting the 41.
 
@@ -187,6 +195,20 @@ The thresholds and the model details are in their own tabs.
 | The Summary tab, written from the clauses found. | The highlighted passage restated in plain Serbian. |
 | ![The key terms of a contract](docs/screenshots/terms.png) | ![An answer written from the passages](docs/screenshots/generated.png) |
 | The key terms, each a verbatim value from a clause found. | A question outside the clause types, answered from the related passages. |
+
+### Defined terms and chat commands
+
+Defined terms are found by pattern: `("Term")`, `(the "Term")` and `"Term" means ...`. The web
+app lists them in the Document tab under "Defined terms". A definition question is answered
+from the defining sentence, verbatim with its page, and labelled Definition.
+
+| command | effect |
+|---|---|
+| `explain that`, optionally `in Serbian` | restates the last passage shown |
+| `summarize`, `summary of this contract` | writes the summary into the chat |
+
+Both are generated and labelled as such. The router sees the last four turns of the
+conversation and resolves references to them. The evaluations still score single questions.
 
 ## Summary, key terms and explanations
 
