@@ -26,6 +26,7 @@ from contract_assistant.answer import (
     restrict_to_cache,
     verify_quotes,
 )
+from contract_assistant.background import precompute_all, run_in_background
 from contract_assistant.clause_types import (
     ClauseType,
     app_clause_types,
@@ -129,6 +130,7 @@ CHECK_DOCUMENT = ROOT / "demo" / "short_supply_agreement.txt"
 CHECK_CLAUSE = "Governing Law"
 QUOTE_WIDTH = 80
 ELLIPSIS = "…"
+PRECOMPUTE_NOTICE = "precomputing summaries and key terms in the background"
 EXIT_ERROR = 1
 EXIT_NO_MODEL = 2
 EXIT_USAGE = 2
@@ -930,6 +932,10 @@ def _cmd_serve(args: argparse.Namespace) -> int:
             f"uploads need the extractor model in {settings.extractor_path}",
             file=sys.stderr,
         )
+    gen = build_gen_client(settings)
+    summaries = SummaryStore(settings.cache_dir / SUMMARY_DIR)
+    term_sheets = TermSheetStore(settings.cache_dir / TERM_SHEET_DIR)
+    extras = _extra_names(settings)
     services = Services(
         store,
         router,
@@ -937,9 +943,17 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         app_types,
         settings,
         PassageSearch(load_encoder(settings.embedding_model_id)),
-        _extra_names(settings),
-        gen=build_gen_client(settings),
+        extras,
+        gen=gen,
+        summaries=summaries,
+        term_sheets=term_sheets,
     )
+    if gen is not None and not args.no_precompute:
+        print(PRECOMPUTE_NOTICE, file=sys.stderr)
+        names = [clause.name for clause in app_types]
+        run_in_background(
+            precompute_all, store, settings, names, gen, summaries, term_sheets, extras
+        )
     launch_app(build_app(services), services, share=args.share, port=args.port)
     return 0
 
@@ -1055,6 +1069,11 @@ def _parser() -> argparse.ArgumentParser:
     serve = commands.add_parser("serve", help="start the web app")
     serve.add_argument("--share", action="store_true", help="create a public Gradio link")
     serve.add_argument("--port", type=int, help="port to listen on")
+    serve.add_argument(
+        "--no-precompute",
+        action="store_true",
+        help="do not prepare summaries and key terms in the background",
+    )
     serve.set_defaults(func=_cmd_serve)
     return parser
 

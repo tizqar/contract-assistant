@@ -7,9 +7,9 @@ explicit *"not found"*.
 The expensive model (a fine-tuned 150M-parameter encoder, trained in the companion
 `cuad-encoder` repo) runs **once at upload** and extracts all 41 CUAD clause types with
 character offsets. Every later question is a cache lookup: a router only maps the question
-to clause types and never writes legal content. The router is Qwen3-1.7B served by Ollama,
-constrained to the clause type names; without Ollama an embedding router
-(bge-base-en-v1.5) routes instead. Quotes are verified against the source text before they
+to clause types and never writes legal content. One local model, qwen3.5:4b served by
+Ollama, routes the questions (constrained to the clause type names) and writes the generated
+text; without Ollama an embedding router (bge-base-en-v1.5) routes instead. Quotes are verified against the source text before they
 are shown.
 
 The app also checks eight common clause types that CUAD does not have (Payment Terms,
@@ -35,12 +35,12 @@ cp .env.example .env
 
 The `api` extra (`openai`) is optional. The Makefile expects the environment in `.venv/`.
 
-The LLM router needs Ollama and the model. This step is optional:
+The language model router needs Ollama and the model. This step is optional:
 
 ```bash
 brew install ollama && brew services start ollama
-ollama pull qwen3:1.7b      # qwen3:4b for the comparison row
-ollama pull qwen3.5:4b      # summaries and explanations
+ollama pull qwen3.5:4b      # routing, summaries, key terms, explanations and answers
+ollama pull qwen3:1.7b      # optional: the comparison row of the router evaluation
 ```
 
 `LLM_BACKEND` in `.env` selects the router: `ollama` (default), `openai` (an
@@ -51,12 +51,13 @@ router alone. When the LLM fails on a single question, the embedding router rout
 question.
 
 `GEN_MODEL` (default `qwen3.5:4b`), `GEN_TIMEOUT_S` (120) and `GEN_NUM_CTX` (8192) select
-the generation model. It uses `LLM_BACKEND` like the router. It answers in free text, so it
-needs no JSON-schema support. This matters because Ollama's MLX runtime in the Homebrew
-build (Ollama 0.40, the default for gemma4 and qwen3.5 on Apple Silicon) has no structured
-output and returns 501 for the router's schema-constrained calls. The router therefore
-stays on `qwen3:1.7b` (llama.cpp runtime) while generation uses `qwen3.5:4b`. Without the
-generation model the app runs with the Summary and Explain buttons off.
+the generation model. It uses `LLM_BACKEND` like the router. The router and the generation
+use the same model by default, which keeps one model in memory on a 16 GB machine.
+`LLM_MODEL` may name another router model. The Ollama client sends the JSON schema as a
+grammar where the runner supports it (llama.cpp) and puts it into the prompt where it does
+not (the MLX runtime in the Homebrew build), and it validates the reply either way.
+`GEN_NUM_CTX` is the context size of both clients. Without the generation model the app runs
+with the Summary and Explain buttons off.
 
 ## Model weights
 
@@ -80,6 +81,11 @@ make summary-eval # summary-eval
 make term-sheet-eval # term-sheet-eval
 make passage-eval # passage-eval
 ```
+
+`serve` prepares the summaries and key terms of the cached contracts in the background at
+start-up and after an upload; `serve --no-precompute` turns it off. Generated text appears in
+the web app as it is written and is checked when complete. A Stop button cancels a running
+request.
 
 The first `make demo` loads the embedding model and downloads it if it is not cached. With
 Ollama, the app loads the router model at start-up (up to 120 s) and keeps it loaded for 30
@@ -111,6 +117,17 @@ contract-assistant summary-eval                                # summaries vs. t
 contract-assistant term-sheet-eval                             # term sheets vs. CUAD's gold
 contract-assistant passage-eval                                # answers vs. the passages
 ```
+
+### Router evaluation
+
+| router | model | F1 | out-of-scope acc. | exact-set acc. | median ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| embedding | BAAI/bge-base-en-v1.5 | 0.626 | 0.400 | 0.400 | 11 |
+| llm | qwen3:1.7b | 0.666 | 0.800 | 0.500 | 189 |
+| llm | qwen3.5:4b | 0.933 | 1.000 | 0.800 | 554 |
+
+The test split has 30 questions. qwen3.5:4b is the default router on these numbers; the
+embedding router at its tuned threshold (0.58) stays the fallback.
 
 The other commands are `contract-assistant import-demo | extract | show | summarize | term-sheet |
 explain | check | serve`.
@@ -200,6 +217,10 @@ verified and numbers are checked, with one corrected retry, or the answer is wit
 the reason. The chat labels it Generated and says it is not a clause match. This is the
 free-answer option that was left out on 18 October 2026 for breaking the verbatim
 guarantee. It is now added behind the checks and the label.
+
+The web app streams the summary, the explanation and the answer from passages. The text
+shown is final only after the check at the end: a first reply that fails the check is
+replaced by the second attempt.
 
 The explanation restates one highlighted passage in at most two sentences, in English or
 Serbian. It is withheld when it quotes text that is not in the clause or names a number the
