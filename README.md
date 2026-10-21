@@ -37,7 +37,7 @@ uv venv && uv pip install -e ".[dev]"     # or: python -m venv .venv && pip inst
 cp .env.example .env
 ```
 
-The `api` extra (`openai`) is optional. The Makefile expects the environment in `.venv/`.
+The report export needs `python-docx`, which is a dependency. The `api` extra (`openai`) is optional. The Makefile expects the environment in `.venv/`.
 
 The language model router needs Ollama and the model. This step is optional:
 
@@ -138,7 +138,7 @@ The test split has 30 questions. qwen3.5:4b is the default router on these numbe
 embedding router at its tuned threshold (0.58) stays the fallback.
 
 The other commands are `contract-assistant import-demo | extract | show | definitions | summarize | term-sheet |
-explain | check | serve`.
+review | compare | report | explain | check | serve`.
 `extract` adds the extra clause types to an existing cache without re-extracting the 41.
 
 ## How answers read
@@ -195,6 +195,8 @@ The thresholds and the model details are in their own tabs.
 | The Summary tab, written from the clauses found. | The highlighted passage restated in plain Serbian. |
 | ![The key terms of a contract](docs/screenshots/terms.png) | ![An answer written from the passages](docs/screenshots/generated.png) |
 | The key terms, each a verbatim value from a clause found. | A question outside the clause types, answered from the related passages. |
+| ![The review flags of a contract](docs/screenshots/review.png) | ![Two contracts compared](docs/screenshots/compare.png) |
+| Review flags from the rule file, each resting on a clause found. | Two contracts side by side, differing rows marked. |
 
 ### Defined terms and chat commands
 
@@ -270,6 +272,34 @@ missing ones. It writes `eval/results/term_sheet_<model>.json`. `passage-eval` a
 out-of-scope evaluation questions on the three demo contracts and counts the answers
 shown, the withheld ones and the questions without passages. It writes
 `eval/results/passages_<model>.json`.
+
+## Review, comparison and report
+
+The review flags come from `data/review_rules.json`: 18 rules of four kinds. A rule flags a
+clause type that is missing, present, present together with others (all present), or present
+without another one (present without). The check is rule-based and uses no model. Each flag
+shows the clauses it rests on, with their quotes. A flag that rests on one of the extra
+clause types is marked as not validated. The file can be edited; a rule that names an
+unknown clause type is rejected with a message at start-up.
+
+The Compare tab and `compare a b` put the key terms and the clause checklist of two
+contracts side by side. Rows that differ are marked with "≠". The clause table needs no
+model. The key terms need the two term sheets, which are read from the saved ones or
+written with the generation model; without a model, only the clause table is printed.
+
+The report gathers the summary, the key terms, the review flags, the clauses found with
+their quotes and pages, and the defined terms, with a disclaimer. It is written as DOCX and
+as Markdown from the saved parts: nothing is generated, and a missing summary or key terms
+list is noted and left out.
+
+```bash
+contract-assistant review demo/short_supply_agreement.txt
+contract-assistant compare demo/short_supply_agreement.txt demo/long_outsourcing_agreement.txt
+contract-assistant report demo/short_supply_agreement.txt
+```
+
+`review` and `compare` take `--json`; `compare` takes `--fresh` to ask the model again.
+`report` writes to `cache/reports/` unless `--out` names a folder.
 
 ## Demo documents
 

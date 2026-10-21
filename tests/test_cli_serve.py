@@ -56,3 +56,8 @@ def test_serve_skips_the_precompute_without_a_generation_client(served):
     served["gen"] = None
     assert cli.main(["serve"]) == 0
     assert served["background"] == []
+
+
+def test_serve_passes_the_review_rules_to_the_app(served):
+    cli.main(["serve"])
+    assert served["launched"]["services"].rules

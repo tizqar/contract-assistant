@@ -34,6 +34,8 @@ from contract_assistant.clause_types import (
     load_clause_types,
     load_extra_clause_types,
 )
+from contract_assistant.compare import compare_checklists, compare_terms
+from contract_assistant.compare import render_markdown as render_comparison
 from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.definitions import find_definitions, lookup
 from contract_assistant.evaluation.e2e import (
@@ -76,6 +78,9 @@ from contract_assistant.extract.windowing import assert_sliding_windows
 from contract_assistant.passage_answer import APP_ATTEMPTS as PASSAGE_ATTEMPTS
 from contract_assistant.passage_answer import request_passage_answer
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
+from contract_assistant.report import build_report, write_report
+from contract_assistant.review import RuleFileError, load_rules, review
+from contract_assistant.review import render_markdown as render_flags
 from contract_assistant.router.base import Router, RouteResult
 from contract_assistant.router.clients import LLMClient, LLMError
 from contract_assistant.router.factory import (
@@ -160,6 +165,11 @@ NOT_FOUND = "error: {name} was not found in this contract"
 NOT_IN_CACHE = "error: {name} is not in the analysis of this contract"
 EXPLANATION_WITHHELD = "Explanation withheld: {reason}."
 NO_KEY_TERMS = "error: no key-term clause was found in {name}"
+NO_TERM_COMPARISON = "key terms need a generation model ({settings})"
+NO_SAVED_SUMMARY = "no saved summary; run summarize first"
+NO_SAVED_TERMS = "no saved key terms; run term-sheet first"
+REPORTS_DIR = "reports"
+NO_BACKEND = "none"
 PASSAGES_MESSAGE = "Passages of the contract closest to the question:"
 GENERATED_MESSAGE = (
     "Answer written by the language model from the passages below "
@@ -656,6 +666,111 @@ def _cmd_term_sheet(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_review(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    cache = _load_cache(args.target, settings)
+    if cache is None:
+        return EXIT_ERROR
+    try:
+        rules = load_rules(known_types=_names(app_clause_types(settings)))
+    except RuleFileError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    flags = review(cache, rules, settings.tau_low, settings.tau_high, _extra_names(settings))
+    if args.json:
+        print(json.dumps([flag.model_dump(mode="json") for flag in flags], indent=JSON_INDENT))
+    else:
+        print(render_flags(flags))
+    return 0
+
+
+def _compared_sheet(
+    cache: DocumentCache, client: LLMClient | None, fresh: bool, settings: Settings
+) -> TermSheet | None:
+    items = term_sheet_items(cache, settings.tau_low, settings.tau_high, _extra_names(settings))
+    if not items:
+        return None
+    if client is not None:
+        return _term_sheet(cache, items, client, fresh, settings)
+    store = TermSheetStore(settings.cache_dir / TERM_SHEET_DIR)
+    key = (cache.doc_id, settings.gen_model, settings.tau_low, settings.tau_high)
+    return None if fresh else store.load(*key)
+
+
+def _cmd_compare(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    left = _load_cache(args.left, settings)
+    right = _load_cache(args.right, settings)
+    if left is None or right is None:
+        return EXIT_ERROR
+    checklist = compare_checklists(
+        left,
+        right,
+        _names(app_clause_types(settings)),
+        settings.tau_low,
+        settings.tau_high,
+        _extra_names(settings),
+    )
+    client = build_gen_client(settings)
+    try:
+        sheets = [_compared_sheet(cache, client, args.fresh, settings) for cache in (left, right)]
+    except LLMError as error:
+        print(LLM_FAILED.format(error=error), file=sys.stderr)
+        return EXIT_ERROR
+    if client is None and not all(sheets):
+        print(NO_TERM_COMPARISON.format(settings=_gen_settings(settings)), file=sys.stderr)
+    terms = compare_terms(*sheets) if all(sheets) else []
+    documents = [Path(cache.source.filename).stem for cache in (left, right)]
+    if args.json:
+        data = {
+            "documents": documents,
+            "terms": [row.model_dump(mode="json") for row in terms],
+            "clauses": [row.model_dump(mode="json") for row in checklist],
+        }
+        print(json.dumps(data, indent=JSON_INDENT))
+    else:
+        print(render_comparison((documents[0], documents[1]), checklist, terms))
+    return 0
+
+
+def _cmd_report(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    cache = _load_cache(args.target, settings)
+    if cache is None:
+        return EXIT_ERROR
+    names = _names(app_clause_types(settings))
+    extras = _extra_names(settings)
+    try:
+        rules = load_rules(known_types=names)
+    except RuleFileError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    key = (cache.doc_id, settings.gen_model, settings.tau_low, settings.tau_high)
+    summary = SummaryStore(settings.cache_dir / SUMMARY_DIR).load(*key)
+    sheet = TermSheetStore(settings.cache_dir / TERM_SHEET_DIR).load(*key)
+    if summary is None:
+        print(NO_SAVED_SUMMARY, file=sys.stderr)
+    if sheet is None:
+        print(NO_SAVED_TERMS, file=sys.stderr)
+    name = Path(cache.source.filename).stem
+    report = build_report(
+        cache,
+        name,
+        settings,
+        names,
+        extras,
+        summary=summary,
+        sheet=sheet,
+        flags=review(cache, rules, settings.tau_low, settings.tau_high, extras),
+        definitions=find_definitions(cache.text, cache.page_starts),
+        model=None if settings.llm_backend == NO_BACKEND else settings.gen_model,
+    )
+    out_dir = args.out or settings.cache_dir / REPORTS_DIR
+    for path in write_report(report, out_dir, name):
+        print(_relative(path))
+    return 0
+
+
 def _explainable_quote(name: str, cache: DocumentCache, settings: Settings) -> str | None:
     if name not in cache.clauses:
         print(NOT_IN_CACHE.format(name=name), file=sys.stderr)
@@ -1014,6 +1129,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         gen=gen,
         summaries=summaries,
         term_sheets=term_sheets,
+        rules=load_rules(known_types=[clause.name for clause in app_types]),
     )
     if gen is not None and not args.no_precompute:
         print(PRECOMPUTE_NOTICE, file=sys.stderr)
@@ -1130,6 +1246,28 @@ def _parser() -> argparse.ArgumentParser:
         "--fresh", action="store_true", help="ask the model again instead of using saved sheets"
     )
     term_sheet.set_defaults(func=_cmd_term_sheet)
+    review_parser = commands.add_parser(
+        "review", help="flag review points from the clauses found, with no model"
+    )
+    review_parser.add_argument("target", help="document, cache file or sha256: document id")
+    review_parser.add_argument("--json", action="store_true", help="print the flags as JSON")
+    review_parser.set_defaults(func=_cmd_review)
+    compare = commands.add_parser(
+        "compare", help="put the key terms and clauses of two documents side by side"
+    )
+    compare.add_argument("left", help="document, cache file or sha256: document id")
+    compare.add_argument("right", help="document, cache file or sha256: document id")
+    compare.add_argument("--json", action="store_true", help="print the comparison as JSON")
+    compare.add_argument(
+        "--fresh", action="store_true", help="ask the model again instead of using saved sheets"
+    )
+    compare.set_defaults(func=_cmd_compare)
+    report = commands.add_parser(
+        "report", help="write a Markdown and a DOCX report from the saved analysis"
+    )
+    report.add_argument("target", help="document, cache file or sha256: document id")
+    report.add_argument("--out", type=Path, help="folder for the report files")
+    report.set_defaults(func=_cmd_report)
     explain = commands.add_parser("explain", help="restate one clause in plain language")
     explain.add_argument("target", help="document, cache file or sha256: document id")
     explain.add_argument("--type", required=True, help="clause type to restate")
