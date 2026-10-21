@@ -15,7 +15,7 @@ from contract_assistant.evaluation.e2e import (
     markdown_table,
 )
 from contract_assistant.evaluation.questions import EvalQuestion
-from contract_assistant.router.base import RouteResult
+from contract_assistant.router.base import RouteResult, Turn
 from contract_assistant.store import import_harness_preds
 from tests.support.caches import make_cache
 from tests.support.fakes import FixedRouter
@@ -478,6 +478,12 @@ def test_unknown_question_raises(tmp_path):
 
 def test_oracle_router_returns_the_gold_types():
     route = OracleRouter(QUESTIONS).route(END_QUESTION)
+    assert route.clause_types == [END, TERMINATION]
+
+
+def test_oracle_router_ignores_the_earlier_turns():
+    turns = [Turn(question=LAW_QUESTION, clause_types=[LAW])]
+    route = OracleRouter(QUESTIONS).route(END_QUESTION, turns)
     assert route.clause_types == [END, TERMINATION]
 
 

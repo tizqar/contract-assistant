@@ -86,7 +86,7 @@ class FakeRouter:
     def __init__(self):
         self.names = [c.name for c in app_clause_types(load_settings())]
 
-    def route(self, question: str) -> RouteResult:
+    def route(self, question: str, turns=()) -> RouteResult:
         started = time.perf_counter()
         lowered = question.lower()
         first_seen: dict[str, int] = {}
@@ -113,9 +113,11 @@ class FixedRouter:
     def __init__(self, routes: dict[str, RouteResult]):
         self.routes = routes
         self.questions: list[str] = []
+        self.turns: list[list] = []
 
-    def route(self, question: str) -> RouteResult:
+    def route(self, question: str, turns=()) -> RouteResult:
         self.questions.append(question)
+        self.turns.append(list(turns))
         return self.routes[question]
 
 

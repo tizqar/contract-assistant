@@ -7,15 +7,31 @@ import pytest
 from contract_assistant.clause_types import load_clause_types
 from contract_assistant.config import Settings
 from contract_assistant.evaluation.questions import load_questions
-from contract_assistant.router.base import RouteResult
+from contract_assistant.router.base import RouteResult, Turn
 from contract_assistant.router.clients import LLMError
-from contract_assistant.router.llm import EXAMPLES, MS_PER_S, LLMRouter, route_schema
+from contract_assistant.router.llm import (
+    CONTEXT_FOOTER,
+    CONTEXT_HEADER,
+    CURRENT_QUESTION,
+    EXAMPLES,
+    MAX_TURNS,
+    MS_PER_S,
+    NO_TYPES,
+    LLMRouter,
+    route_schema,
+    user_message,
+)
 from tests.support.fakes import FakeLLMClient, FixedRouter
 
 QUESTION = "Which law governs this agreement?"
 EMPTY_REPLY = '{"clause_types": []}'
 FALLBACK_ROUTE = RouteResult(clause_types=["Parties"], kind="embedding", latency_ms=1.0)
 FAILED_ATTEMPT_S = 0.05
+ARROW = "\u2192"
+TURNS = [
+    Turn(question="Which law governs?", clause_types=["Governing Law"]),
+    Turn(question="Who are the parties?", clause_types=["Parties", "Agreement Date"]),
+]
 
 
 class SlowFailingClient:
@@ -144,6 +160,59 @@ def test_system_prompt_shows_each_worked_example_with_its_json_output(types):
 def test_user_message_is_the_question_as_given(types):
     _, user, _ = sent_request(types)
     assert user == QUESTION
+
+
+def test_user_message_without_turns_is_the_question_alone():
+    assert user_message(QUESTION, ()) == QUESTION
+
+
+def test_user_message_with_turns_lists_them_then_the_current_question():
+    assert user_message("and the notice period?", TURNS) == "\n".join(
+        [
+            CONTEXT_HEADER,
+            f"- Which law governs? {ARROW} Governing Law",
+            f"- Who are the parties? {ARROW} Parties, Agreement Date",
+            "",
+            CONTEXT_FOOTER,
+            "",
+            f"{CURRENT_QUESTION}and the notice period?",
+        ]
+    )
+
+
+def test_user_message_shows_none_for_a_turn_without_types():
+    turns = [Turn(question="How many pages?", clause_types=[])]
+    assert f"- How many pages? {ARROW} {NO_TYPES}" in user_message(QUESTION, turns)
+
+
+def test_user_message_keeps_only_the_last_turns_in_order():
+    turns = [Turn(question=f"Question {n}", clause_types=["Parties"]) for n in range(6)]
+    listed = [line for line in user_message(QUESTION, turns).splitlines() if line[:1] == "-"]
+    assert len(listed) == MAX_TURNS
+    assert listed == [f"- Question {n} {ARROW} Parties" for n in range(6 - MAX_TURNS, 6)]
+    assert "Question 0" not in user_message(QUESTION, turns)
+    assert "Question 1" not in user_message(QUESTION, turns)
+
+
+def test_route_sends_the_message_with_turns_as_the_user_content(types):
+    client = FakeLLMClient([EMPTY_REPLY])
+    LLMRouter(client, FixedRouter({}), types).route(QUESTION, TURNS)
+    assert client.calls[0][1] == user_message(QUESTION, TURNS)
+
+
+def test_route_keeps_the_system_prompt_when_turns_are_given(types):
+    client = FakeLLMClient([EMPTY_REPLY, EMPTY_REPLY])
+    router = LLMRouter(client, FixedRouter({}), types)
+    router.route(QUESTION)
+    router.route(QUESTION, TURNS)
+    assert client.calls[0][0] == client.calls[1][0] == router.system
+
+
+def test_fallback_gets_the_question_without_turns(types):
+    fallback = FixedRouter({QUESTION: FALLBACK_ROUTE})
+    LLMRouter(FakeLLMClient(["not json"]), fallback, types).route(QUESTION, TURNS)
+    assert fallback.questions == [QUESTION]
+    assert fallback.turns == [[]]
 
 
 def test_schema_is_route_schema_of_the_names_in_file_order(types):

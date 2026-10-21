@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
@@ -11,7 +12,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 from contract_assistant.clause_types import ClauseType
-from contract_assistant.router.base import RouteResult
+from contract_assistant.router.base import RouteResult, Turn
 
 EMBEDDING_MAX_TYPES = 5
 QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
@@ -84,8 +85,8 @@ class EmbeddingRouter:
             for index, name in enumerate(self.names)
         }
 
-    def route(self, question: str) -> RouteResult:
-        """Return the types scoring at least the threshold, best first."""
+    def route(self, question: str, turns: Sequence[Turn] = ()) -> RouteResult:
+        """Return the types scoring at least the threshold, best first; turns are not used."""
         start = time.perf_counter()
         chosen = select_types(self.scores(question), self.threshold, self.max_types)
         return RouteResult(

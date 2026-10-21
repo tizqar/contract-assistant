@@ -53,6 +53,16 @@ class Passage(BaseModel):
     end: int
 
 
+class Definition(BaseModel):
+    """A term the contract defines and the sentence that defines it, a verbatim slice."""
+
+    term: str
+    quote: str
+    page: int | None
+    start: int
+    end: int
+
+
 class GeneratedAnswer(BaseModel):
     """An answer the language model wrote from the related passages, or why it is withheld."""
 
@@ -75,6 +85,7 @@ class Answer(BaseModel):
     dropped_quotes: int
     passages: list[Passage] = []
     generated: GeneratedAnswer | None = None
+    definition: Definition | None = None
 
 
 def _check_thresholds(tau_low: float, tau_high: float) -> None:

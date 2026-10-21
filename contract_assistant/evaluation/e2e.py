@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import statistics
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
 
@@ -13,7 +14,7 @@ from contract_assistant.answer import Answer, AnswerItem, Status, answer
 from contract_assistant.clause_types import ClauseType
 from contract_assistant.cuad_match import RELAXED_CLAUSE_TYPES, is_match
 from contract_assistant.evaluation.questions import EvalQuestion, QuestionKind
-from contract_assistant.router.base import RouteKind, Router, RouteResult
+from contract_assistant.router.base import RouteKind, Router, RouteResult, Turn
 from contract_assistant.store import DocumentCache
 
 Policy = Literal["found", "shown"]
@@ -110,8 +111,8 @@ class OracleRouter:
     def __init__(self, questions: list[EvalQuestion]):
         self.gold = {question.question: question.gold for question in questions}
 
-    def route(self, question: str) -> RouteResult:
-        """Return the gold clause types of the question."""
+    def route(self, question: str, turns: Sequence[Turn] = ()) -> RouteResult:
+        """Return the gold clause types of the question; turns are not used."""
         return RouteResult(clause_types=self.gold[question], kind=ORACLE, latency_ms=0.0)
 
 

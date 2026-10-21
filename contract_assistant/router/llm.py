@@ -5,17 +5,29 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections.abc import Sequence
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
 from contract_assistant.clause_types import ClauseType
-from contract_assistant.router.base import Router, RouteResult
+from contract_assistant.router.base import Router, RouteResult, Turn
 from contract_assistant.router.clients import LLMClient, LLMError
 
 logger = logging.getLogger(__name__)
 
 MS_PER_S = 1000
+# Earlier turns given to the model; older ones are dropped.
+MAX_TURNS = 4
+NO_TYPES = "none"
+CONTEXT_HEADER = (
+    "Earlier questions of this conversation and the clause types they asked about:"
+)
+CONTEXT_FOOTER = (
+    "Resolve references in the current question, such as 'that', 'it', 'the same' or "
+    "a bare 'and the ...?', to those earlier questions."
+)
+CURRENT_QUESTION = "Current question: "
 TASK = (
     "Map the user's question about a contract to the clause types it asks about, "
     "choosing only from the list below. "
@@ -69,6 +81,19 @@ def _elapsed_ms(start: float) -> float:
     return (time.perf_counter() - start) * MS_PER_S
 
 
+def user_message(question: str, turns: Sequence[Turn]) -> str:
+    """The question alone, or the last turns of the conversation followed by the question."""
+    recent = list(turns)[-MAX_TURNS:]
+    if not recent:
+        return question
+    lines = [
+        f"- {turn.question} \u2192 {', '.join(turn.clause_types) or NO_TYPES}" for turn in recent
+    ]
+    return "\n".join(
+        [CONTEXT_HEADER, *lines, "", CONTEXT_FOOTER, "", f"{CURRENT_QUESTION}{question}"]
+    )
+
+
 class LLMRouter:
     """Routes a question with a language model and falls back to another router on failure."""
 
@@ -82,11 +107,11 @@ class LLMRouter:
         self.schema = route_schema(names)
         self._reply_model = _build_reply_model(names)
 
-    def route(self, question: str) -> RouteResult:
+    def route(self, question: str, turns: Sequence[Turn] = ()) -> RouteResult:
         """Return the model's clause types, or the fallback's route if the reply fails."""
         start = time.perf_counter()
         try:
-            raw = self.client.complete_json(self.system, question, self.schema)
+            raw = self.client.complete_json(self.system, user_message(question, turns), self.schema)
             reply = self._reply_model.model_validate_json(raw)
         except (LLMError, ValidationError) as error:
             return self._fall_back(question, error, start)

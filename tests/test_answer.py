@@ -2,7 +2,15 @@ from pathlib import Path
 
 import pytest
 
-from contract_assistant.answer import answer, compose, restrict_to_cache, tier, verify_quotes
+from contract_assistant.answer import (
+    Answer,
+    Definition,
+    answer,
+    compose,
+    restrict_to_cache,
+    tier,
+    verify_quotes,
+)
 from contract_assistant.config import Settings
 from contract_assistant.router.base import RouteResult
 from contract_assistant.store import read_cache
@@ -173,3 +181,32 @@ def test_restrict_to_cache_leaves_the_given_route_unchanged(settings):
     route = route_of("Term")
     restrict_to_cache(route, cache)
     assert route.clause_types == ["Term"]
+
+
+DEFINITION = Definition(term="Term", quote=TEXT, page=1, start=0, end=len(TEXT))
+
+
+def make_answer(**fields) -> Answer:
+    return Answer(
+        question="What is Term?",
+        route=route_of(),
+        tau_low=TAU_LOW,
+        tau_high=TAU_HIGH,
+        items=[],
+        dropped_quotes=0,
+        **fields,
+    )
+
+
+def test_definition_holds_term_quote_page_and_offsets():
+    assert (DEFINITION.term, DEFINITION.quote) == ("Term", TEXT)
+    assert (DEFINITION.page, DEFINITION.start, DEFINITION.end) == (1, 0, len(TEXT))
+
+
+def test_answer_definition_defaults_to_none():
+    assert make_answer().definition is None
+
+
+def test_answer_with_a_definition_round_trips_through_json():
+    original = make_answer(definition=DEFINITION)
+    assert Answer.model_validate_json(original.model_dump_json()) == original

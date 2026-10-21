@@ -6,6 +6,7 @@ import pytest
 
 from contract_assistant.clause_types import N_CLAUSE_TYPES, load_clause_types
 from contract_assistant.config import Settings
+from contract_assistant.router.base import Turn
 from contract_assistant.router.embedding import (
     QUERY_INSTRUCTION,
     EmbeddingRouter,
@@ -98,6 +99,15 @@ def test_route_follows_select_types():
     question = "insurance coverage and which law"
     expected = select_types(router.scores(question), router.threshold, router.max_types)
     assert router.route(question).clause_types == expected
+
+
+def test_route_ignores_the_earlier_turns():
+    router = make_router()
+    turns = [Turn(question="Is there insurance?", clause_types=["Insurance"])]
+    question = "which law applies"
+    with_turns = router.route(question, turns)
+    assert with_turns.clause_types == router.route(question).clause_types
+    assert with_turns.kind == "embedding"
 
 
 def test_route_reports_kind_and_latency():
