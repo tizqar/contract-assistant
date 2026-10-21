@@ -15,6 +15,8 @@ from contract_assistant.clause_types import app_clause_types, load_extra_clause_
 from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.extract.extractor import Extractor
 from contract_assistant.feedback import FEEDBACK_FILE
+from contract_assistant.fulltext import FullTextSummary
+from contract_assistant.obligations import ObligationSheet
 from contract_assistant.router.base import RouteResult, Turn
 from contract_assistant.router.clients import LLMError
 from contract_assistant.search import PassageSearch
@@ -29,7 +31,7 @@ from contract_assistant.ui.app import (
     build_app,
     document_choices,
 )
-from contract_assistant.ui.views import SUGGESTED_QUESTIONS, display_name
+from contract_assistant.ui.views import NO_PAGE, SUGGESTED_QUESTIONS, display_name
 from tests.support.caches import make_cache
 from tests.support.fakes import (
     EchoTextClient,
@@ -947,7 +949,7 @@ def test_stop_button_cancels_the_running_events(make_services):
     demo = build_app(make_services(gen=FakeLLMClient([])))
     [stop_fn] = [fn for fn in stop_functions(demo) if fn.cancels]
     assert find_component(demo, "stop").variant == "stop"
-    assert len(stop_fn.cancels) == 1 + len(SUGGESTED_QUESTIONS) + 5
+    assert len(stop_fn.cancels) == 1 + len(SUGGESTED_QUESTIONS) + 7
 
 
 def test_term_status_is_an_output_of_the_term_sheet_button(make_services):
@@ -1000,7 +1002,7 @@ def test_upload_of_a_new_text_starts_precomputing_with_a_model(
     extractor = Extractor(slow_fake_qa(0), clause_types, settings, "fake")
     gen = EchoTextClient()
     upload_new_text(Handlers(make_services(extractor, gen=gen)), tmp_path)
-    [(target, cache, names, client, *_)] = background_calls
+    [(target, cache, names, client, *_), _] = background_calls
     assert target is app.precompute and client is gen
     assert cache.text == TEXT and names == [c.name for c in clause_types]
 
@@ -1236,7 +1238,8 @@ def test_the_review_tab_sits_between_the_summary_and_the_checklist(make_services
     demo = build_app(make_services())
     ids = [tab.id for tab in demo.blocks.values() if isinstance(tab, gr.Tab)]
     assert ids.index("tab-summary") + 1 == ids.index("tab-review")
-    assert ids.index("tab-review") + 1 == ids.index("tab-compare")
+    assert ids.index("tab-review") + 1 == ids.index("tab-obligations")
+    assert ids.index("tab-obligations") + 1 == ids.index("tab-compare")
     assert ids.index("tab-compare") + 1 == ids.index("tab-portfolio")
     assert ids.index("tab-portfolio") + 1 == ids.index("tab-checklist")
 
@@ -1294,7 +1297,8 @@ def test_build_report_files_writes_both_files_from_the_saved_parts(
     last(handlers.summarize(demo_cache, TAU_LOW, TAU_HIGH))
     last(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
     docx, markdown, status = handlers.build_report_files(demo_cache, TAU_LOW, TAU_HIGH)
-    assert docx.visible and markdown.visible and status == app.REPORT_BUILT
+    assert docx.visible and markdown.visible
+    assert status.startswith("Report built without the obligations and the full-text overview")
     folder = settings.cache_dir / "reports"
     assert sorted(path.suffix for path in folder.iterdir()) == [".docx", ".md"]
     assert "No cap on liability found" in next(folder.glob("*.md")).read_text()
@@ -1303,8 +1307,8 @@ def test_build_report_files_writes_both_files_from_the_saved_parts(
 def test_build_report_files_says_what_is_missing(make_services, demo_cache):
     handlers = Handlers(make_services(gen=EchoTextClient()))
     docx, _, status = handlers.build_report_files(demo_cache, TAU_LOW, TAU_HIGH)
-    assert docx.visible and "the summary and the key terms" in status
-    assert "Summary tab" in status
+    assert docx.visible and "the summary, the key terms, the obligations and" in status
+    assert "Summary and Obligations tabs" in status
 
 
 def test_build_report_files_without_a_document_warns(handlers, warnings):
@@ -1427,3 +1431,197 @@ def test_the_summary_tab_has_a_language_dropdown(make_services):
     dropdown = find_component(build_app(make_services()), "summary-language")
     assert dropdown.value == "en"
     assert ("Serbian", "sr") in dropdown.choices
+
+
+PAY_SENTENCE = "The Customer shall pay the invoices within thirty days."
+PAY_TEXT = f"Preamble. {PAY_SENTENCE} Final words."
+PAY_REPLY = json.dumps(
+    [
+        {
+            "clause_type": "Governing Law",
+            "party": "The Customer",
+            "modality": "must",
+            "action": "pay the invoices within thirty days",
+        }
+    ]
+)
+
+
+@pytest.fixture
+def pay_cache(settings):
+    return make_cache(PAY_TEXT, settings, {"Governing Law": [(PAY_SENTENCE, 0.95)]})
+
+
+def cell_event(row: int) -> SimpleNamespace:
+    return SimpleNamespace(index=[row, 0], row_value=[])
+
+
+def test_obligations_yield_a_status_then_the_rows_and_save_the_sheet(
+    make_services, pay_cache, settings
+):
+    handlers = Handlers(make_services(gen=FakeLLMClient([PAY_REPLY])))
+    yields = list(handlers.read_obligations(pay_cache, TAU_LOW, TAU_HIGH))
+    assert yields[0][0] == app.WRITING_OBLIGATIONS
+    status, rows, note, _ = yields[-1]
+    assert status == "" and note == ""
+    assert rows == [
+        [
+            "The Customer",
+            "must",
+            "pay the invoices within thirty days",
+            "Governing Law",
+            NO_PAGE,
+        ]
+    ]
+    [path] = (settings.cache_dir / "obligations").glob("*.json")
+    assert ObligationSheet.model_validate_json(path.read_text()).doc_id == pay_cache.doc_id
+
+
+def test_obligations_again_make_no_model_call(make_services, pay_cache):
+    client = FakeLLMClient([PAY_REPLY])
+    handlers = Handlers(make_services(gen=client))
+    last(handlers.read_obligations(pay_cache, TAU_LOW, TAU_HIGH))
+    calls = len(client.text_calls) + len(client.calls)
+    last(handlers.read_obligations(pay_cache, TAU_LOW, TAU_HIGH))
+    assert calls > 0 and len(client.text_calls) + len(client.calls) == calls
+
+
+def test_obligations_note_counts_the_dropped_entries(make_services, pay_cache):
+    invented = {
+        "clause_type": "Governing Law",
+        "party": "Mars",
+        "modality": "must",
+        "action": "x",
+    }
+    reply = json.dumps([*json.loads(PAY_REPLY), invented])
+    handlers = Handlers(make_services(gen=FakeLLMClient([reply])))
+    _, rows, note, _ = last(handlers.read_obligations(pay_cache, TAU_LOW, TAU_HIGH))
+    assert len(rows) == 1
+    assert note == "1 entries of the language model were not in the clauses and were dropped"
+
+
+def test_obligations_with_an_invalid_reply_twice_show_the_reason_and_are_not_saved(
+    make_services, pay_cache, settings
+):
+    handlers = Handlers(make_services(gen=FakeLLMClient(["no json", "still none"])))
+    status, rows, *_ = last(handlers.read_obligations(pay_cache, TAU_LOW, TAU_HIGH))
+    assert rows == [] and "not the JSON list" in status
+    assert not (settings.cache_dir / "obligations").exists()
+
+
+def test_obligations_without_a_model_warn(make_services, pay_cache, warnings):
+    assert is_skip(last(Handlers(make_services()).read_obligations(pay_cache, TAU_LOW, TAU_HIGH)))
+    assert warnings == [app.SUMMARIES_OFF]
+
+
+def test_obligations_without_a_clause_say_so(make_services, settings, infos):
+    cache = make_cache(TEXT, settings, {})
+    handlers = Handlers(make_services(gen=FakeLLMClient([])))
+    assert is_skip(last(handlers.read_obligations(cache, TAU_LOW, TAU_HIGH)))
+    assert infos == [app.NO_OBLIGATION_CLAUSES]
+
+
+def test_obligations_warn_when_the_model_does_not_answer(make_services, pay_cache, warnings):
+    handlers = Handlers(make_services(gen=FakeLLMClient([LLMError("down"), LLMError("down")])))
+    assert is_skip(last(handlers.read_obligations(pay_cache, TAU_LOW, TAU_HIGH))[1])
+    assert warnings == [app.GENERATION_FAILED]
+
+
+def test_selecting_an_obligation_highlights_its_action(make_services, pay_cache):
+    handlers = Handlers(make_services(gen=FakeLLMClient([PAY_REPLY])))
+    sheet = last(handlers.read_obligations(pay_cache, TAU_LOW, TAU_HIGH))[3]
+    _, segments, tab = handlers.show_obligation(sheet, pay_cache, cell_event(0))
+    assert highlighted(segments) == [("pay the invoices within thirty days", "Governing Law")]
+    assert tab.selected == DOCUMENT_TAB
+
+
+def test_selecting_an_obligation_before_reading_gives_an_info(handlers, pay_cache, infos):
+    assert is_skip(handlers.show_obligation(None, pay_cache, cell_event(0)))
+    assert infos == [app.NO_OBLIGATION_SELECTED]
+
+
+def test_upload_of_a_new_text_also_precomputes_the_obligations(
+    make_services, settings, clause_types, tmp_path, background_calls
+):
+    extractor = Extractor(slow_fake_qa(0), clause_types, settings, "fake")
+    upload_new_text(Handlers(make_services(extractor, gen=EchoTextClient())), tmp_path)
+    assert [call[0] for call in background_calls] == [
+        app.precompute,
+        app.precompute_obligations,
+    ]
+
+
+FULLTEXT_TEXT = "Preamble. The Customer shall pay the invoices within thirty days. Final words."
+SECTION_REPLY = "The Customer pays the invoices."
+OVERVIEW_REPLY = "The customer pays invoices."
+
+
+@pytest.fixture
+def small_cache(settings):
+    return make_cache(FULLTEXT_TEXT, settings, {})
+
+
+def test_fulltext_yields_progress_then_the_overview_and_section_rows_and_saves(
+    make_services, small_cache, settings
+):
+    client = FakeLLMClient([SECTION_REPLY, OVERVIEW_REPLY])
+    handlers = Handlers(make_services(gen=client))
+    yields = list(handlers.fulltext(small_cache, TAU_LOW, TAU_HIGH))
+    assert yields[0][0].startswith("Writing the overview · section 1 of 1 · ")
+    assert "merging the sections" in yields[1][0]
+    status, overview, rows, _ = yields[-1]
+    assert status == "" and OVERVIEW_REPLY in overview
+    assert rows == [["1", NO_PAGE, SECTION_REPLY]]
+    [path] = (settings.cache_dir / "fulltext").glob("*.json")
+    assert FullTextSummary.model_validate_json(path.read_text()).text == OVERVIEW_REPLY
+
+
+def test_a_saved_fulltext_makes_no_model_call(make_services, small_cache):
+    client = FakeLLMClient([SECTION_REPLY, OVERVIEW_REPLY])
+    handlers = Handlers(make_services(gen=client))
+    last(handlers.fulltext(small_cache, TAU_LOW, TAU_HIGH))
+    calls = len(client.text_calls)
+    yields = list(handlers.fulltext(small_cache, TAU_LOW, TAU_HIGH))
+    assert len(yields) == 1 and len(client.text_calls) == calls
+
+
+def test_fulltext_without_a_model_warns(make_services, small_cache, warnings):
+    assert is_skip(last(Handlers(make_services()).fulltext(small_cache, TAU_LOW, TAU_HIGH)))
+    assert warnings == [app.SUMMARIES_OFF]
+
+
+def test_fulltext_with_an_unfaithful_section_is_withheld_and_not_saved(
+    make_services, small_cache, settings
+):
+    reply = 'The text says "Mars is red".'
+    handlers = Handlers(make_services(gen=FakeLLMClient([reply, reply])))
+    _, overview, rows, _ = last(handlers.fulltext(small_cache, TAU_LOW, TAU_HIGH))
+    assert "not shown" in overview and rows[0][2].startswith("withheld: ")
+    assert not (settings.cache_dir / "fulltext").exists()
+
+
+def test_selecting_a_section_highlights_its_span(make_services, small_cache):
+    client = FakeLLMClient([SECTION_REPLY, OVERVIEW_REPLY])
+    handlers = Handlers(make_services(gen=client))
+    summary = last(handlers.fulltext(small_cache, TAU_LOW, TAU_HIGH))[3]
+    _, segments, tab = handlers.show_section(summary, small_cache, cell_event(0))
+    assert highlighted(segments) == [(FULLTEXT_TEXT, "Section 1")]
+    assert tab.selected == DOCUMENT_TAB
+
+
+def test_selecting_a_section_before_writing_gives_an_info(handlers, small_cache, infos):
+    assert is_skip(handlers.show_section(None, small_cache, cell_event(0)))
+    assert infos == [app.NO_SECTION_SELECTED]
+
+
+def test_build_report_files_includes_the_saved_obligations_and_overview(
+    make_services, pay_cache, settings
+):
+    client = FakeLLMClient([PAY_REPLY, SECTION_REPLY, OVERVIEW_REPLY])
+    handlers = Handlers(make_services(gen=client))
+    last(handlers.read_obligations(pay_cache, TAU_LOW, TAU_HIGH))
+    last(handlers.fulltext(pay_cache, TAU_LOW, TAU_HIGH))
+    _, _, status = handlers.build_report_files(pay_cache, TAU_LOW, TAU_HIGH)
+    assert "the obligations" not in status and "overview" not in status
+    text = next((settings.cache_dir / "reports").glob("*.md")).read_text()
+    assert "pay the invoices within thirty days" in text and OVERVIEW_REPLY in text

@@ -23,6 +23,8 @@ from contract_assistant.compare import DIFFERS, SAME, ChecklistRow, TermRow
 from contract_assistant.config import Settings
 from contract_assistant.dates import KeyDate
 from contract_assistant.explain import DEFAULT_LANGUAGE, LANGUAGES, Explanation
+from contract_assistant.fulltext import FullTextSummary
+from contract_assistant.obligations import ObligationSheet, by_party
 from contract_assistant.review import Flag
 from contract_assistant.store import DocumentCache
 from contract_assistant.summary import MS_PER_S, Summary
@@ -185,6 +187,14 @@ STREAMING_LINE = (
 )
 WRITING_STATUS = "{what} · {elapsed} ▌"
 RETRY_STATUS = "The first reply was not shown because {reason}; asking again · {elapsed} ▌"
+
+FULLTEXT_WITHHELD_TEXT = "The overview is not shown because {reason}."
+FULLTEXT_META_TEXT = (
+    "Written by the language model {model} from {count} section(s) in {seconds} s. "
+    "Each section was checked against its own text, the overview against the section summaries."
+)
+SECTION_WITHHELD = "withheld: {reason}"
+SECTION_LABEL = "Section {number}"
 
 SEVERITY_LABELS = {"high": "High", "medium": "Medium", "low": "Low"}
 FLAG_UNVALIDATED_TEXT = " (not validated on test data)"
@@ -677,4 +687,45 @@ def compare_clause_rows(rows: list[ChecklistRow]) -> list[list[str]]:
             DIFFERS if row.differs else SAME,
         ]
         for row in rows
+    ]
+
+
+def obligation_rows(sheet: ObligationSheet) -> list[list[str]]:
+    """Return one row per obligation, grouped by party: party, modality, action, clause, page."""
+    return [
+        [
+            obligation.party,
+            obligation.modality,
+            " ".join(obligation.action.split()),
+            display_name(obligation.clause_type),
+            NO_PAGE if obligation.page is None else str(obligation.page),
+        ]
+        for obligations in by_party(sheet).values()
+        for obligation in obligations
+    ]
+
+
+def fulltext_markdown(summary: FullTextSummary) -> str:
+    """Return the Markdown shown for a full-text overview: its text, or why it is withheld."""
+    if summary.text is None:
+        return FULLTEXT_WITHHELD_TEXT.format(reason=summary.reason)
+    meta = FULLTEXT_META_TEXT.format(
+        model=summary.model,
+        count=len(summary.sections),
+        seconds=round(summary.latency_ms / MS_PER_S),
+    )
+    return f"{summary.text}\n\n<small>{meta}</small>"
+
+
+def section_rows(summary: FullTextSummary) -> list[list[str]]:
+    """Return one row per section: its number, its page and its summary or why it is withheld."""
+    return [
+        [
+            str(number),
+            NO_PAGE if section.page is None else str(section.page),
+            section.text
+            if section.text is not None
+            else SECTION_WITHHELD.format(reason=section.reason),
+        ]
+        for number, section in enumerate(summary.sections, start=1)
     ]

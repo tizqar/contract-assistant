@@ -19,6 +19,8 @@ from contract_assistant.compare import ChecklistRow, TermRow
 from contract_assistant.config import ROOT, Settings
 from contract_assistant.dates import KeyDate
 from contract_assistant.explain import Explanation
+from contract_assistant.fulltext import FullTextSummary, SectionSummary
+from contract_assistant.obligations import Obligation, ObligationSheet
 from contract_assistant.review import Flag
 from contract_assistant.router.base import RouteResult
 from contract_assistant.store import read_cache
@@ -58,10 +60,13 @@ from contract_assistant.ui.views import (
     document_view,
     elapsed_text,
     explanation_markdown,
+    fulltext_markdown,
     highlighted_quote,
+    obligation_rows,
     passage_choices,
     passage_citation,
     review_rows,
+    section_rows,
     sources_json,
     streaming_markdown,
     summary_markdown,
@@ -967,3 +972,88 @@ def test_summary_markdown_says_when_it_is_written_in_serbian():
 
 def test_summary_markdown_in_english_does_not_name_a_language():
     assert "written in" not in summary_markdown(summary_of())
+
+
+def obligation(party="The Customer", action="pay  the\ninvoices", page=2) -> Obligation:
+    return Obligation(
+        party=party,
+        modality="must",
+        action=action,
+        clause_type="Governing Law",
+        page=page,
+        start=0,
+        end=5,
+    )
+
+
+def obligation_sheet(obligations) -> ObligationSheet:
+    return ObligationSheet(
+        doc_id="d",
+        model="gen-1",
+        tau_low=0.2,
+        tau_high=0.8,
+        latency_ms=1.0,
+        items=[],
+        obligations=obligations,
+    )
+
+
+def test_obligation_rows_show_party_modality_collapsed_action_clause_and_page():
+    rows = obligation_rows(obligation_sheet([obligation()]))
+    assert rows == [["The Customer", "must", "pay the invoices", "Governing Law", "2"]]
+
+
+def test_obligation_rows_group_the_entries_by_party():
+    sheet = obligation_sheet(
+        [obligation("A"), obligation("B", page=None), obligation("A", action="act")]
+    )
+    rows = obligation_rows(sheet)
+    assert [row[0] for row in rows] == ["A", "A", "B"]
+    assert rows[2][4] == NO_PAGE
+
+
+def test_obligation_rows_of_an_empty_sheet_are_empty():
+    assert obligation_rows(obligation_sheet([])) == []
+
+
+def fulltext_summary(sections, text="Overview.", reason=None) -> FullTextSummary:
+    return FullTextSummary(
+        doc_id="d",
+        model="gen-1",
+        tau_low=0.2,
+        tau_high=0.8,
+        latency_ms=3000.0,
+        sections=sections,
+        text=text,
+        reason=reason,
+    )
+
+
+def test_section_rows_number_the_sections_and_show_page_and_text():
+    sections = [
+        SectionSummary(start=0, end=5, page=1, text="First.", attempts=1),
+        SectionSummary(start=5, end=9, page=None, text="Second.", attempts=1),
+    ]
+    assert section_rows(fulltext_summary(sections)) == [
+        ["1", "1", "First."],
+        ["2", NO_PAGE, "Second."],
+    ]
+
+
+def test_section_rows_say_why_a_section_is_withheld():
+    section = SectionSummary(start=0, end=5, page=1, text=None, reason="it was off", attempts=2)
+    assert section_rows(fulltext_summary([section]))[0][2] == "withheld: it was off"
+
+
+def test_fulltext_markdown_names_the_model_sections_and_seconds():
+    section = SectionSummary(start=0, end=5, page=1, text="First.", attempts=1)
+    markdown = fulltext_markdown(fulltext_summary([section]))
+    assert markdown.startswith("Overview.")
+    assert "gen-1" in markdown and "1 section(s) in 3 s" in markdown
+
+
+def test_fulltext_markdown_gives_the_reason_when_withheld():
+    summary = fulltext_summary([], text=None, reason="no section could be summarized")
+    assert fulltext_markdown(summary) == (
+        "The overview is not shown because no section could be summarized."
+    )

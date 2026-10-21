@@ -13,13 +13,19 @@ import gradio as gr
 
 from contract_assistant.answer import (
     Answer,
+    Citation,
     Definition,
     Passage,
     Status,
     answer,
     restrict_to_cache,
 )
-from contract_assistant.background import precompute, run_in_background, warm
+from contract_assistant.background import (
+    precompute,
+    precompute_obligations,
+    run_in_background,
+    warm,
+)
 from contract_assistant.clause_types import ClauseType
 from contract_assistant.compare import compare_checklists, compare_terms
 from contract_assistant.config import Settings
@@ -33,8 +39,25 @@ from contract_assistant.explain import (
 )
 from contract_assistant.extract.extractor import Extractor
 from contract_assistant.feedback import FEEDBACK_FILE, Feedback, now, record_feedback
+from contract_assistant.fulltext import APP_ATTEMPTS as FULLTEXT_ATTEMPTS
+from contract_assistant.fulltext import (
+    FULLTEXT_DIR,
+    FullTextStore,
+    FullTextSummary,
+    Progress,
+    write_fulltext,
+)
 from contract_assistant.generation import Generation, Request, stream
 from contract_assistant.intents import Intent, detect_intent
+from contract_assistant.obligations import APP_ATTEMPTS as OBLIGATION_ATTEMPTS
+from contract_assistant.obligations import (
+    OBLIGATIONS_DIR,
+    ObligationSheet,
+    ObligationStore,
+    by_party,
+    obligation_items,
+    request_obligations,
+)
 from contract_assistant.passage_answer import APP_ATTEMPTS as PASSAGE_ATTEMPTS
 from contract_assistant.passage_answer import generated_answer_from, passage_request
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
@@ -77,6 +100,7 @@ from contract_assistant.ui.views import (
     DEFINITION_VALUE,
     PASSAGE_PREFIX,
     RELATED_LABEL,
+    SECTION_LABEL,
     STATUS_LABELS,
     SUGGESTED_QUESTIONS,
     chat_reply,
@@ -93,10 +117,13 @@ from contract_assistant.ui.views import (
     document_view,
     explanation_markdown,
     flag_title,
+    fulltext_markdown,
     highlighted_quote,
+    obligation_rows,
     passage_choices,
     passage_citation,
     review_rows,
+    section_rows,
     sources_json,
     streaming_markdown,
     summary_markdown,
@@ -124,6 +151,10 @@ REPORTS_DIR = "reports"
 PORTFOLIO_CSV = "portfolio.csv"
 FEEDBACK_THANKS = "Noted, thank you."
 SERBIAN = "sr"
+WRITING_OBLIGATIONS = "Reading the obligations. This can take half a minute."
+WRITING_FULLTEXT = "Writing the overview · {stage} · {elapsed} s"
+MERGING_STAGE = "merging the sections"
+OVERVIEW_STAGE = "overview"
 TERM_SHEET_STATUS = "Extracting the key terms. This can take up to half a minute."
 ASK_OTHER_OUTPUTS = 7
 MAX_REMEMBERED_TURNS = 8
@@ -140,6 +171,7 @@ DOCUMENT_TAB = "tab-document"
 SUMMARY_TAB = "tab-summary"
 CHECKLIST_TAB = "tab-checklist"
 REVIEW_TAB = "tab-review"
+OBLIGATIONS_TAB = "tab-obligations"
 COMPARE_TAB = "tab-compare"
 PORTFOLIO_TAB = "tab-portfolio"
 SETTINGS_TAB = "tab-settings"
@@ -225,11 +257,41 @@ TERMS_NEED_MODEL = "they need the language model, which is off"
 TERMS_NEED_CLAUSES = "no clause they are read from was found in {name}"
 TERMS_FAILED = "the language model did not answer"
 REPORT_INTRO = (
-    "The report holds the saved summary and key terms, the review flags, the clauses found and "
-    "the defined terms. Nothing is generated when it is built."
+    "The report holds the saved summary, key terms, obligations and full-text overview, "
+    "the review flags, the clauses found and the defined terms. "
+    "Nothing is generated when it is built."
 )
-REPORT_BUILT = "Report built from the saved summary and key terms."
-REPORT_MISSING = "Report built without {missing}. Make {them} in the Summary tab, then build the report again."
+REPORT_BUILT = "Report built from the saved summary, key terms, obligations and overview."
+REPORT_MISSING = (
+    "Report built without {missing}. Make {them} in the Summary and Obligations tabs, "
+    "then build the report again."
+)
+OBLIGATIONS_INTRO = (
+    "Who must, may or must not do what, read by the language model from the clauses found "
+    "in this contract. The party and the words of each entry are copied word for word from "
+    "the clause; entries that are not are dropped. Up to 16 clauses are read, the ones found "
+    "first. Select a row to see the words in the document."
+)
+OBLIGATION_HEADERS = ["Party", "", "What", "Clause", "Page"]
+OBLIGATIONS_DROPPED = (
+    "{count} entries of the language model were not in the clauses and were dropped"
+)
+OBLIGATIONS_WITHHELD = "The obligations are not shown because {reason}."
+NO_OBLIGATIONS = "None of the clauses found states an obligation the language model could read."
+NO_OBLIGATION_CLAUSES = (
+    "No clause was found in this contract, so there are no obligations to read."
+)
+NO_OBLIGATION_SELECTED = "Read the obligations first."
+FULLTEXT_HEADING = "### Full-text overview"
+FULLTEXT_INTRO = (
+    "An overview of the whole text, written section by section by the language model. "
+    "Each section's sentences are checked against that section, and the overview against the "
+    "section summaries. It covers what the clause types do not. A long contract takes a few "
+    "minutes; the section summaries are saved for next time."
+)
+SECTION_HEADERS = ["Section", "Page", "Summary"]
+SECTIONS_MAX_HEIGHT = 320
+NO_SECTION_SELECTED = "Write the overview first."
 NOTHING_TO_SUMMARIZE = "No clause was found in this contract, so there is nothing to summarize."
 NOTHING_HIGHLIGHTED = (
     "Nothing is highlighted. Ask a question or select a clause in the checklist first."
@@ -337,6 +399,8 @@ class Services:
     summaries: SummaryStore | None = None
     term_sheets: TermSheetStore | None = None
     rules: Sequence[Rule] = ()
+    obligations: ObligationStore | None = None
+    fulltexts: FullTextStore | None = None
 
 
 def guarded(handler: Callable) -> Callable:
@@ -421,6 +485,12 @@ class Handlers:
         )
         self.term_sheets = services.term_sheets or TermSheetStore(
             services.settings.cache_dir / TERM_SHEET_DIR
+        )
+        self.obligations = services.obligations or ObligationStore(
+            services.settings.cache_dir / OBLIGATIONS_DIR
+        )
+        self.fulltexts = services.fulltexts or FullTextStore(
+            services.settings.cache_dir / FULLTEXT_DIR
         )
         self.rules = services.rules or load_rules(
             known_types=[clause_type.name for clause_type in services.clause_types]
@@ -701,15 +771,22 @@ class Handlers:
         if cache is None:
             gr.Warning(SELECT_CONTRACT)
             return gr.skip()
-        summary = sheet = None
+        summary = sheet = obligations = fulltext = None
         if gen is not None:
-            summary = self.summaries.load(cache.doc_id, gen.model, tau_low, tau_high)
-            sheet = self.term_sheets.load(cache.doc_id, gen.model, tau_low, tau_high)
+            keys = (cache.doc_id, gen.model, tau_low, tau_high)
+            summary = self.summaries.load(*keys)
+            sheet = self.term_sheets.load(*keys)
+            obligations = self.obligations.load(*keys)
+            fulltext = self.fulltexts.load(*keys)
         missing = []
         if summary is None or summary.text is None:
             missing.append("the summary")
         if sheet is None:
             missing.append("the key terms")
+        if obligations is None:
+            missing.append("the obligations")
+        if fulltext is None or fulltext.text is None:
+            missing.append("the full-text overview")
         report = build_report(
             cache,
             document_name(cache.source.filename),
@@ -723,6 +800,8 @@ class Handlers:
             tau_low=tau_low,
             tau_high=tau_high,
             model=gen.model if gen else None,
+            obligations=obligations,
+            fulltext=fulltext,
         )
         stem = f"{cache.doc_id.removeprefix(DOC_ID_PREFIX)}-{tau_high}-{tau_low}"
         markdown_path, docx_path = write_report(
@@ -731,7 +810,7 @@ class Handlers:
         status = REPORT_BUILT
         if missing:
             status = REPORT_MISSING.format(
-                missing=" and ".join(missing), them="it" if len(missing) == 1 else "them"
+                missing=_listed(missing), them="it" if len(missing) == 1 else "them"
             )
         return (
             gr.DownloadButton(value=str(docx_path), visible=True),
@@ -834,6 +913,135 @@ class Handlers:
             "",
             date_rows(key_dates(sheet)),
         )
+
+    @guarded
+    def read_obligations(self, cache: DocumentCache | None, tau_low: float, tau_high: float):
+        """Read who must, may or must not do what from the clauses, reusing a saved sheet."""
+        services = self.services
+        gen = services.gen
+        if cache is None:
+            gr.Warning(SELECT_CONTRACT)
+            yield gr.skip()
+            return
+        if gen is None:
+            gr.Warning(SUMMARIES_OFF)
+            yield gr.skip()
+            return
+        names = [clause_type.name for clause_type in services.clause_types]
+        try:
+            items = obligation_items(cache, names, tau_low, tau_high, services.unvalidated)
+        except ValueError as error:
+            gr.Warning(str(error))
+            yield gr.skip()
+            return
+        if not items:
+            gr.Info(NO_OBLIGATION_CLAUSES)
+            yield gr.skip()
+            return
+        sheet = self.obligations.load(cache.doc_id, gen.model, tau_low, tau_high)
+        if sheet is None:
+            yield WRITING_OBLIGATIONS, gr.skip(), gr.skip(), gr.skip()
+            try:
+                sheet = request_obligations(
+                    cache.doc_id, items, gen, tau_low, tau_high, attempts=OBLIGATION_ATTEMPTS
+                )
+            except LLMError:
+                logger.exception("obligations of %s failed", cache.doc_id)
+                gr.Warning(GENERATION_FAILED)
+                yield "", gr.skip(), gr.skip(), gr.skip()
+                return
+            # A withheld sheet is not saved, so the next click asks the model again.
+            if sheet.reason is None:
+                self.obligations.save(sheet)
+        if sheet.reason is not None:
+            yield OBLIGATIONS_WITHHELD.format(reason=sheet.reason), [], "", sheet.model_dump()
+            return
+        note = OBLIGATIONS_DROPPED.format(count=len(sheet.rejected)) if sheet.rejected else ""
+        status = "" if sheet.obligations else NO_OBLIGATIONS
+        yield status, obligation_rows(sheet), note, sheet.model_dump()
+
+    @guarded
+    def show_obligation(
+        self, sheet: dict | None, cache: DocumentCache | None, evt: gr.SelectData
+    ):
+        """Show the words of the selected obligation in the Document tab."""
+        if cache is None or sheet is None:
+            gr.Info(NO_OBLIGATION_SELECTED)
+            return gr.skip()
+        shown = ObligationSheet.model_validate(sheet)
+        ordered = [item for group in by_party(shown).values() for item in group]
+        index = evt.index[0] if isinstance(evt.index, (list, tuple)) else evt.index
+        if not 0 <= index < len(ordered):
+            return gr.skip()
+        obligation = ordered[index]
+        citation = Citation(
+            quote=obligation.action,
+            page=obligation.page,
+            conf=1.0,
+            start=obligation.start,
+            end=obligation.end,
+        )
+        label, segments = document_view(cache, obligation.clause_type, citation)
+        return label, segments, show_tab(DOCUMENT_TAB)
+
+    @guarded
+    def fulltext(self, cache: DocumentCache | None, tau_low: float, tau_high: float):
+        """Write an overview of the whole text section by section, reusing a saved one."""
+        gen = self.services.gen
+        if cache is None:
+            gr.Warning(SELECT_CONTRACT)
+            yield gr.skip()
+            return
+        if gen is None:
+            gr.Warning(SUMMARIES_OFF)
+            yield gr.skip()
+            return
+        summary = self.fulltexts.load(cache.doc_id, gen.model, tau_low, tau_high)
+        if summary is None:
+            started = time.perf_counter()
+            try:
+                for step in write_fulltext(
+                    cache, gen, tau_low, tau_high, attempts=FULLTEXT_ATTEMPTS
+                ):
+                    if isinstance(step, Progress):
+                        yield _progress_status(step, started), gr.skip(), gr.skip(), gr.skip()
+                    else:
+                        summary = step
+            except LLMError:
+                logger.exception("full-text overview of %s failed", cache.doc_id)
+                gr.Warning(GENERATION_FAILED)
+                yield "", gr.skip(), gr.skip(), gr.skip()
+                return
+            # A withheld overview is not saved, so the next click asks the model again.
+            if summary is not None and summary.text is not None:
+                self.fulltexts.save(summary)
+        if summary is None:
+            yield "", gr.skip(), [], None
+            return
+        yield "", fulltext_markdown(summary), section_rows(summary), summary.model_dump()
+
+    @guarded
+    def show_section(
+        self, summary: dict | None, cache: DocumentCache | None, evt: gr.SelectData
+    ):
+        """Show the span of the selected section in the Document tab."""
+        if cache is None or summary is None:
+            gr.Info(NO_SECTION_SELECTED)
+            return gr.skip()
+        shown = FullTextSummary.model_validate(summary)
+        index = evt.index[0] if isinstance(evt.index, (list, tuple)) else evt.index
+        if not 0 <= index < len(shown.sections):
+            return gr.skip()
+        section = shown.sections[index]
+        citation = Citation(
+            quote=cache.text[section.start : section.end],
+            page=section.page,
+            conf=1.0,
+            start=section.start,
+            end=section.end,
+        )
+        label, segments = document_view(cache, SECTION_LABEL.format(number=index + 1), citation)
+        return label, segments, show_tab(DOCUMENT_TAB)
 
     @guarded
     def feedback(self, cache: DocumentCache | None, last: Answer | None, evt: gr.LikeData):
@@ -1163,6 +1371,16 @@ class Handlers:
             settings.tau_high,
             services.unvalidated,
         )
+        run_in_background(
+            precompute_obligations,
+            cache,
+            names,
+            services.gen,
+            self.obligations,
+            settings.tau_low,
+            settings.tau_high,
+            services.unvalidated,
+        )
 
     def _cached(self, doc_id: str) -> DocumentCache | None:
         try:
@@ -1172,6 +1390,15 @@ class Handlers:
 
     def _selected(self, doc_id: str) -> gr.Dropdown:
         return gr.Dropdown(choices=document_choices(self.services.store), value=doc_id)
+
+
+def _listed(parts: list[str]) -> str:
+    return parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} and {parts[-1]}"
+
+
+def _progress_status(step: Progress, started: float) -> str:
+    stage = MERGING_STAGE if step.stage == OVERVIEW_STAGE else step.stage
+    return WRITING_FULLTEXT.format(stage=stage, elapsed=f"{time.perf_counter() - started:.0f}")
 
 
 def _reporter(progress: gr.Progress) -> Callable[[int, int, str], None]:
@@ -1267,6 +1494,8 @@ def build_app(services: Services) -> gr.Blocks:
         refresh_state = gr.State(None)
         review_state = gr.State([])
         flag_state = gr.State(None)
+        obligations_state = gr.State(None)
+        fulltext_state = gr.State(None)
         with gr.Column(elem_id="top"):
             gr.Markdown(f"# Contract Assistant\n\n{INTRO}", elem_id="header")
             gr.Markdown(DISCLAIMER, elem_id="disclaimer")
@@ -1370,6 +1599,24 @@ def build_app(services: Services) -> gr.Blocks:
                             interactive=services.gen is not None,
                         )
                     summary_output = gr.Markdown(elem_id="summary")
+                    gr.Markdown(FULLTEXT_HEADING)
+                    gr.Markdown(FULLTEXT_INTRO, elem_id="fulltext-intro")
+                    fulltext_button = gr.Button(
+                        "Write the full-text overview",
+                        elem_id="fulltext",
+                        interactive=services.gen is not None,
+                    )
+                    fulltext_status = gr.Markdown(elem_id="fulltext-status")
+                    fulltext_output = gr.Markdown(elem_id="fulltext-overview")
+                    with gr.Accordion("Section summaries", open=False, elem_id="sections"):
+                        sections_table = gr.Dataframe(
+                            headers=SECTION_HEADERS,
+                            datatype=["str", "str", "str"],
+                            interactive=False,
+                            wrap=True,
+                            max_height=SECTIONS_MAX_HEIGHT,
+                            elem_id="sections-table",
+                        )
                     gr.Markdown(TERMS_INTRO, elem_id="terms-intro")
                     term_sheet_button = gr.Button(
                         "Extract key terms",
@@ -1420,6 +1667,22 @@ def build_app(services: Services) -> gr.Blocks:
                         interactive=services.gen is not None,
                     )
                     flag_explanation = gr.Markdown(elem_id="flag-explanation")
+                with gr.Tab("Obligations", id=OBLIGATIONS_TAB):
+                    gr.Markdown(OBLIGATIONS_INTRO, elem_id="obligations-intro")
+                    obligations_button = gr.Button(
+                        "Read the obligations",
+                        elem_id="obligations",
+                        interactive=services.gen is not None,
+                    )
+                    obligations_status = gr.Markdown(elem_id="obligations-status")
+                    obligations_table = gr.Dataframe(
+                        headers=OBLIGATION_HEADERS,
+                        datatype=["str"] * len(OBLIGATION_HEADERS),
+                        interactive=False,
+                        wrap=True,
+                        elem_id="obligations-table",
+                    )
+                    obligations_note = gr.Markdown(elem_id="obligations-note")
                 with gr.Tab("Compare", id=COMPARE_TAB):
                     gr.Markdown(COMPARE_INTRO, elem_id="compare-intro")
                     compare_with = gr.Dropdown(
@@ -1668,6 +1931,34 @@ def build_app(services: Services) -> gr.Blocks:
                 api_name="compare",
             )
         )
+        running.append(
+            obligations_button.click(
+                handlers.read_obligations,
+                [cache_state, tau_low, tau_high],
+                [obligations_status, obligations_table, obligations_note, obligations_state],
+                api_name="obligations",
+            )
+        )
+        running.append(
+            fulltext_button.click(
+                handlers.fulltext,
+                [cache_state, tau_low, tau_high],
+                [fulltext_status, fulltext_output, sections_table, fulltext_state],
+                api_name="fulltext",
+            )
+        )
+        obligations_table.select(
+            handlers.show_obligation,
+            [obligations_state, cache_state],
+            [view_label, view, tabs],
+            api_name="show_obligation",
+        ).then(None, None, None, js=SCROLL_TO_HIGHLIGHT)
+        sections_table.select(
+            handlers.show_section,
+            [fulltext_state, cache_state],
+            [view_label, view, tabs],
+            api_name="show_section",
+        ).then(None, None, None, js=SCROLL_TO_HIGHLIGHT)
         report_button.click(
             handlers.build_report_files,
             [cache_state, tau_low, tau_high],
