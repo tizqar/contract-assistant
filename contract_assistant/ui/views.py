@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from bisect import bisect_right
 from collections.abc import Collection
 from pathlib import Path
@@ -162,6 +163,12 @@ GENERATED_ANSWER_WITHHELD = "The language model's answer is not shown because {r
 MATCHING_BACKENDS = {"ollama": "Ollama"}
 OPENAI_BACKEND = "an OpenAI-compatible API"
 GENERATION_OFF = "off"
+STREAMING_LINE = (
+    "- **Generated text:** shown as it is written, then checked against the contract "
+    "when complete; text that fails the check is withheld"
+)
+WRITING_STATUS = "{what} · {elapsed} ▌"
+RETRY_STATUS = "The first reply was not shown because {reason}; asking again · {elapsed} ▌"
 
 Segments = list[tuple[str, str | None]]
 
@@ -434,6 +441,8 @@ def technical_markdown(
         f"- **Verify from:** {_percent(settings.tau_low)} confidence ({settings.tau_source})",
         f"- **Summaries and explanations:** {_generation(settings, gen_model)}",
     ]
+    if gen_model is not None:
+        lines.append(STREAMING_LINE)
     if unvalidated:
         names = ", ".join(display_name(name) for name in sorted(unvalidated))
         lines.append(f"- **Not validated on test data:** {names}")
@@ -523,6 +532,23 @@ def explanation_markdown(explanation: Explanation) -> str:
     heading = EXPLANATION_HEADING.format(name=name, language=language)
     meta = EXPLANATION_META_TEXT.format(model=explanation.model)
     return f"{heading}\n\n{explanation.text}\n\n<small>{meta}</small>"
+
+
+def elapsed_text(started: float) -> str:
+    """Return the whole seconds since started, a time.perf_counter value, as "4 s"."""
+    return f"{time.perf_counter() - started:.0f} s"
+
+
+def streaming_markdown(
+    what: str, text: str, started: float, previous_reason: str | None = None
+) -> str:
+    """Return a status line with the elapsed time, then the text written so far."""
+    elapsed = elapsed_text(started)
+    if previous_reason is None:
+        status = WRITING_STATUS.format(what=what, elapsed=elapsed)
+    else:
+        status = RETRY_STATUS.format(reason=previous_reason, elapsed=elapsed)
+    return f"{status}\n\n{text}" if text else status
 
 
 def term_rows(sheet: TermSheet) -> list[list[str]]:

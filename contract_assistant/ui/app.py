@@ -1,21 +1,35 @@
 """Gradio app: layout and event wiring over the view functions."""
 
 import functools
+import inspect
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
 import gradio as gr
 
-from contract_assistant.answer import Answer, GeneratedAnswer, Status, answer, restrict_to_cache
+from contract_assistant.answer import (
+    Answer,
+    Passage,
+    Status,
+    answer,
+    restrict_to_cache,
+)
+from contract_assistant.background import precompute, run_in_background, warm
 from contract_assistant.clause_types import ClauseType
 from contract_assistant.config import Settings
-from contract_assistant.explain import DEFAULT_LANGUAGE, LANGUAGES, request_explanation
+from contract_assistant.explain import (
+    DEFAULT_LANGUAGE,
+    LANGUAGES,
+    explanation_from,
+    explanation_request,
+)
 from contract_assistant.extract.extractor import Extractor
+from contract_assistant.generation import Generation, Request, stream
 from contract_assistant.passage_answer import APP_ATTEMPTS as PASSAGE_ATTEMPTS
-from contract_assistant.passage_answer import request_passage_answer
+from contract_assistant.passage_answer import generated_answer_from, passage_request
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
 from contract_assistant.router.base import Router
 from contract_assistant.router.clients import LLMClient, LLMError
@@ -31,8 +45,9 @@ from contract_assistant.summary import (
     APP_ATTEMPTS,
     SUMMARY_DIR,
     SummaryStore,
-    request_summary,
+    summary_from,
     summary_items,
+    summary_request,
 )
 from contract_assistant.term_sheet import APP_ATTEMPTS as TERM_SHEET_ATTEMPTS
 from contract_assistant.term_sheet import (
@@ -59,6 +74,7 @@ from contract_assistant.ui.views import (
     passage_choices,
     passage_citation,
     sources_json,
+    streaming_markdown,
     summary_markdown,
     technical_markdown,
     term_rows,
@@ -73,6 +89,12 @@ TABLE_MAX_HEIGHT = 460
 CHAT_HEIGHT = 400
 UPLOAD_HEIGHT = 120
 SLIDER_STEP = 0.01
+KEEP_WARM_S = 1500  # Ollama unloads an idle model after 30 minutes; load it again before then.
+WRITING_SUMMARY = "Writing the summary"
+WRITING_EXPLANATION = "Writing the explanation"
+WRITING_ANSWER = "Writing the answer from the passages"
+TERM_SHEET_STATUS = "Extracting the key terms. This can take up to half a minute."
+ASK_OTHER_OUTPUTS = 6
 UNEXPECTED_ERROR = "Something went wrong; see the server log."
 DAMAGED_ANALYSIS = "The saved analysis of this contract is damaged or inconsistent."
 NO_MODEL = (
@@ -225,6 +247,18 @@ class Services:
 
 def guarded(handler: Callable) -> Callable:
     """Turn an unexpected exception into a warning and an unchanged page."""
+    if inspect.isgeneratorfunction(handler):
+
+        @functools.wraps(handler)
+        def stream_wrapper(*args, **kwargs):
+            try:
+                yield from handler(*args, **kwargs)
+            except Exception:
+                logger.exception("handler %s failed", handler.__name__)
+                gr.Warning(UNEXPECTED_ERROR)
+                yield gr.skip()
+
+        return stream_wrapper
 
     @functools.wraps(handler)
     def wrapper(*args, **kwargs):
@@ -236,6 +270,19 @@ def guarded(handler: Callable) -> Callable:
             return gr.skip()
 
     return wrapper
+
+
+def _stream_checked(
+    client: LLMClient, what: str, request: Request, attempts: int
+) -> Iterator[str | Generation]:
+    """Yield the status and growing text as Markdown, then the Generation the request ends with."""
+    started = time.perf_counter()
+    yield streaming_markdown(what, "", started)
+    for item in stream(client, request, attempts):
+        if isinstance(item, Generation):
+            yield item
+        else:
+            yield streaming_markdown(what, item.text, started, item.previous_reason)
 
 
 def document_choices(store: Store) -> list[tuple[str, str]]:
@@ -327,30 +374,30 @@ class Handlers:
         """Route a question, answer it from the analysis and show the first passage."""
         if not question or not question.strip():
             gr.Warning("Type a question first.")
-            return gr.skip()
+            yield gr.skip()
+            return
         if cache is None:
             gr.Warning(SELECT_CONTRACT)
-            return gr.skip()
+            yield gr.skip()
+            return
         services = self.services
         route = restrict_to_cache(services.router.route(question), cache)
         try:
             result = answer(question, route, cache, tau_low, tau_high, services.unvalidated)
         except ValueError as error:
             gr.Warning(str(error))
-            return gr.skip()
+            yield gr.skip()
+            return
+        asked = [*(history or []), {"role": "user", "content": question}]
         if not route.clause_types:
             passages = services.search.search(cache, question)
-            generated = self._generated_answer(question, passages)
+            generated = yield from self._stream_answer(question, passages, asked)
             result = result.model_copy(update={"passages": passages, "generated": generated})
-        history = [
-            *(history or []),
-            {"role": "user", "content": question},
-            {"role": "assistant", "content": chat_reply(result, services.unvalidated)},
-        ]
+        reply = {"role": "assistant", "content": chat_reply(result, services.unvalidated)}
         picker, label, segments = _citation_updates(result, cache)
-        return (
+        yield (
             "",
-            history,
+            [*asked, reply],
             result,
             picker,
             label,
@@ -432,32 +479,42 @@ class Handlers:
         gen = services.gen
         if cache is None:
             gr.Warning(SELECT_CONTRACT)
-            return gr.skip()
+            yield gr.skip()
+            return
         if gen is None:
             gr.Warning(SUMMARIES_OFF)
-            return gr.skip()
+            yield gr.skip()
+            return
         names = [clause_type.name for clause_type in services.clause_types]
         try:
             items = summary_items(cache, names, tau_low, tau_high, services.unvalidated)
         except ValueError as error:
             gr.Warning(str(error))
-            return gr.skip()
+            yield gr.skip()
+            return
         if not items:
-            return NOTHING_TO_SUMMARIZE
+            yield NOTHING_TO_SUMMARIZE
+            return
         summary = self.summaries.load(cache.doc_id, gen.model, tau_low, tau_high)
         if summary is None:
+            request = summary_request(cache.doc_id, items)
             try:
-                summary = request_summary(
-                    cache.doc_id, items, gen, tau_low, tau_high, attempts=APP_ATTEMPTS
-                )
+                for step in _stream_checked(gen, WRITING_SUMMARY, request, APP_ATTEMPTS):
+                    if isinstance(step, Generation):
+                        summary = summary_from(
+                            step, cache.doc_id, items, gen, tau_low, tau_high
+                        )
+                    else:
+                        yield step
             except LLMError:
                 logger.exception("summary of %s failed", cache.doc_id)
                 gr.Warning(GENERATION_FAILED)
-                return gr.skip()
+                yield gr.skip()
+                return
             # A withheld summary is not saved, so the next click asks the model again.
             if summary.text is not None:
                 self.summaries.save(summary)
-        return summary_markdown(summary, services.unvalidated)
+        yield summary_markdown(summary, services.unvalidated)
 
     @guarded
     def term_sheet(self, cache: DocumentCache | None, tau_low: float, tau_high: float):
@@ -466,20 +523,25 @@ class Handlers:
         gen = services.gen
         if cache is None:
             gr.Warning(SELECT_CONTRACT)
-            return gr.skip()
+            yield gr.skip()
+            return
         if gen is None:
             gr.Warning(SUMMARIES_OFF)
-            return gr.skip()
+            yield gr.skip()
+            return
         try:
             items = term_sheet_items(cache, tau_low, tau_high, services.unvalidated)
         except ValueError as error:
             gr.Warning(str(error))
-            return gr.skip()
+            yield gr.skip()
+            return
         if not items:
             gr.Info(NO_TERM_CLAUSES)
-            return gr.skip()
+            yield gr.skip()
+            return
         sheet = self.term_sheets.load(cache.doc_id, gen.model, tau_low, tau_high)
         if sheet is None:
+            yield gr.skip(), gr.skip(), TERM_SHEET_STATUS
             try:
                 sheet = request_term_sheet(
                     cache.doc_id, items, gen, tau_low, tau_high, attempts=TERM_SHEET_ATTEMPTS
@@ -487,15 +549,17 @@ class Handlers:
             except LLMError:
                 logger.exception("term sheet of %s failed", cache.doc_id)
                 gr.Warning(GENERATION_FAILED)
-                return gr.skip()
+                yield gr.skip(), gr.skip(), ""
+                return
             # A withheld term sheet is not saved, so the next click asks the model again.
             if sheet.reason is None:
                 self.term_sheets.save(sheet)
         if sheet.reason is not None:
             gr.Warning(TERM_SHEET_WITHHELD.format(reason=sheet.reason))
-            return term_rows(sheet), gr.DownloadButton(visible=False)
+            yield term_rows(sheet), gr.DownloadButton(visible=False), ""
+            return
         path = self.term_sheets.path_of(sheet)
-        return term_rows(sheet), gr.DownloadButton(value=str(path), visible=True)
+        yield term_rows(sheet), gr.DownloadButton(value=str(path), visible=True), ""
 
     @guarded
     def explain(self, segments: list | None, language: str, cache: DocumentCache | None):
@@ -503,23 +567,32 @@ class Handlers:
         gen = self.services.gen
         if cache is None:
             gr.Warning(SELECT_CONTRACT)
-            return gr.skip()
+            yield gr.skip()
+            return
         if gen is None:
             gr.Warning(SUMMARIES_OFF)
-            return gr.skip()
+            yield gr.skip()
+            return
         highlight = highlighted_quote(segments)
         if highlight is None:
             gr.Info(NOTHING_HIGHLIGHTED)
-            return gr.skip()
+            yield gr.skip()
+            return
         quote, label = highlight
         clause_type = self.clause_by_name.get(label, label)
+        request = explanation_request(clause_type, quote, language)
         try:
-            explanation = request_explanation(clause_type, quote, language, gen)
+            for step in _stream_checked(gen, WRITING_EXPLANATION, request, 1):
+                if isinstance(step, Generation):
+                    explanation = explanation_from(step, clause_type, quote, language, gen)
+                else:
+                    yield step
         except LLMError:
             logger.exception("explanation of %s failed", clause_type)
             gr.Warning(GENERATION_FAILED)
-            return gr.skip()
-        return explanation_markdown(explanation)
+            yield gr.skip()
+            return
+        yield explanation_markdown(explanation)
 
     @guarded
     def extract_upload(self, path: str | None, progress: gr.Progress = gr.Progress()):  # noqa: B008
@@ -541,6 +614,7 @@ class Handlers:
             extended = extractor.extend(cached, report)
             if extended is not cached:
                 services.store.save(extended)
+                self._precompute(extended)
                 return self._selected(doc_id), ANALYSIS_UPDATED, doc_id
         if cached is not None:
             gr.Info(f"{document_name(doc.filename)}: already analysed")
@@ -548,7 +622,9 @@ class Handlers:
         if extractor is None:
             gr.Warning(NO_MODEL)
             return gr.skip()
-        services.store.save(extractor.extract(doc, report))
+        analysed = extractor.extract(doc, report)
+        services.store.save(analysed)
+        self._precompute(analysed)
         return self._selected(doc_id), "Analysis complete", None
 
     @guarded
@@ -561,15 +637,48 @@ class Handlers:
         result = self.open_document(doc_id, tau_low, tau_high, status_filter)
         return (*result, None) if isinstance(result, tuple) else result
 
-    def _generated_answer(self, question: str, passages: list) -> GeneratedAnswer | None:
+    @guarded
+    def keep_warm(self):
+        """Load the language models again so that Ollama does not unload them while idle."""
+        services = self.services
+        warm([services.gen, getattr(services.router, "client", None)])
+
+    def _stream_answer(
+        self, question: str, passages: list[Passage], asked: list[dict]
+    ) -> Iterator[tuple]:
         gen = self.services.gen
         if gen is None or not passages:
             return None
+        request = passage_request(question, passages)
+        generated = None
         try:
-            return request_passage_answer(question, passages, gen, attempts=PASSAGE_ATTEMPTS)
+            for step in _stream_checked(gen, WRITING_ANSWER, request, PASSAGE_ATTEMPTS):
+                if isinstance(step, Generation):
+                    generated = generated_answer_from(step, passages, gen)
+                else:
+                    writing = {"role": "assistant", "content": step}
+                    yield "", [*asked, writing], *(gr.skip() for _ in range(ASK_OTHER_OUTPUTS))
         except LLMError:
             logger.warning("answer from the passages failed", exc_info=True)
-            return None
+        return generated
+
+    def _precompute(self, cache: DocumentCache) -> None:
+        services = self.services
+        if services.gen is None:
+            return
+        names = [clause_type.name for clause_type in services.clause_types]
+        settings = services.settings
+        run_in_background(
+            precompute,
+            cache,
+            names,
+            services.gen,
+            self.summaries,
+            self.term_sheets,
+            settings.tau_low,
+            settings.tau_high,
+            services.unvalidated,
+        )
 
     def _cached(self, doc_id: str) -> DocumentCache | None:
         try:
@@ -672,6 +781,7 @@ def build_app(services: Services) -> gr.Blocks:
                         elem_id="question",
                     )
                     ask = gr.Button("Ask", variant="primary", scale=1, elem_id="ask")
+                    stop = gr.Button("Stop", elem_id="stop", variant="stop", size="sm", scale=0)
                 with gr.Row(elem_id="suggestions"):
                     suggestions = [
                         gr.Button(text, size="sm", variant="secondary")
@@ -727,6 +837,7 @@ def build_app(services: Services) -> gr.Blocks:
                         elem_id="term-sheet",
                         interactive=services.gen is not None,
                     )
+                    term_status = gr.Markdown(elem_id="term-status")
                     term_table = gr.Dataframe(
                         headers=TERM_HEADERS,
                         datatype=["str", "str", "str", "str"],
@@ -810,20 +921,26 @@ def build_app(services: Services) -> gr.Blocks:
         )
         ask_outputs = [question, chat, answer_state, picker, view_label, view, sources, tabs]
         ask_inputs = [chat, cache_state, tau_low, tau_high]
-        gr.on(
-            triggers=[ask.click, question.submit],
-            fn=handlers.ask,
-            inputs=[question, *ask_inputs],
-            outputs=ask_outputs,
-            api_name="ask",
-        ).then(None, None, None, js=SCROLL_TO_HIGHLIGHT)
-        for suggestion in suggestions:
+        running = [
+            gr.on(
+                triggers=[ask.click, question.submit],
+                fn=handlers.ask,
+                inputs=[question, *ask_inputs],
+                outputs=ask_outputs,
+                api_name="ask",
+            )
+        ]
+        running.extend(
             suggestion.click(
                 handlers.ask,
                 [suggestion, *ask_inputs],
                 ask_outputs,
                 api_visibility="private",
-            ).then(None, None, None, js=SCROLL_TO_HIGHLIGHT)
+            )
+            for suggestion in suggestions
+        )
+        for event in running:
+            event.then(None, None, None, js=SCROLL_TO_HIGHLIGHT)
         picker.input(
             handlers.pick_citation,
             [picker, answer_state, cache_state],
@@ -857,24 +974,33 @@ def build_app(services: Services) -> gr.Blocks:
         table.select(
             handlers.show_row, [cache_state], [view_label, view, tabs], api_name="show_row"
         ).then(None, None, None, js=SCROLL_TO_HIGHLIGHT)
-        summarize.click(
-            handlers.summarize,
-            [cache_state, tau_low, tau_high],
-            [summary_output],
-            api_name="summarize",
+        running.append(
+            summarize.click(
+                handlers.summarize,
+                [cache_state, tau_low, tau_high],
+                [summary_output],
+                api_name="summarize",
+            )
         )
-        term_sheet_button.click(
-            handlers.term_sheet,
-            [cache_state, tau_low, tau_high],
-            [term_table, term_download],
-            api_name="term_sheet",
+        running.append(
+            term_sheet_button.click(
+                handlers.term_sheet,
+                [cache_state, tau_low, tau_high],
+                [term_table, term_download, term_status],
+                api_name="term_sheet",
+            )
         )
-        explain.click(
-            handlers.explain,
-            [view, language, cache_state],
-            [explanation],
-            api_name="explain",
+        running.append(
+            explain.click(
+                handlers.explain,
+                [view, language, cache_state],
+                [explanation],
+                api_name="explain",
+            )
         )
+        stop.click(None, None, None, cancels=running, api_visibility="private")
+        keep_warm = gr.Timer(KEEP_WARM_S)
+        keep_warm.tick(handlers.keep_warm, None, None, api_visibility="private")
         extract.click(
             handlers.extract_upload,
             [upload],

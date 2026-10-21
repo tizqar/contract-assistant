@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import re
+import time
 
 import pytest
 
@@ -44,11 +45,13 @@ from contract_assistant.ui.views import (
     document_name,
     document_title,
     document_view,
+    elapsed_text,
     explanation_markdown,
     highlighted_quote,
     passage_choices,
     passage_citation,
     sources_json,
+    streaming_markdown,
     summary_markdown,
     technical_markdown,
     term_rows,
@@ -688,7 +691,10 @@ def with_generated(generated: GeneratedAnswer | None) -> Answer:
 
 def test_reply_shows_the_generated_answer_before_the_passages():
     reply = chat_reply(with_generated(generated_of()))
-    assert '<span class="tier tier-generated">Generated</span> **Answer from the passages**' in reply
+    assert (
+        '<span class="tier tier-generated">Generated</span> **Answer from the passages**'
+        in reply
+    )
     assert reply.index("Payable in sixty days.") < reply.index("does not match a clause")
     assert "Written by the language model gen-1 from the passages below." in reply
     assert "This is not a clause match." in reply
@@ -753,3 +759,37 @@ def test_term_row_not_stated_has_no_clause_and_no_page():
 def test_term_row_not_verified_names_the_rejected_value():
     row = term_rows(sheet_of(rejected={"governing_law": ["Mars"]}))[-1]
     assert row[1].startswith("not verified") and "Mars" in row[1]
+
+
+def test_elapsed_text_counts_whole_seconds_since_the_start():
+    assert elapsed_text(time.perf_counter() - 4.2) == "4 s"
+
+
+def test_streaming_markdown_shows_the_status_then_the_text():
+    started = time.perf_counter() - 4
+    assert streaming_markdown("Writing the summary", "The law", started) == (
+        "Writing the summary · 4 s ▌\n\nThe law"
+    )
+
+
+def test_streaming_markdown_without_text_is_only_the_status():
+    started = time.perf_counter()
+    assert (
+        streaming_markdown("Writing the summary", "", started) == "Writing the summary · 0 s ▌"
+    )
+
+
+def test_streaming_markdown_names_why_it_asks_again():
+    started = time.perf_counter() - 12
+    text = streaming_markdown("Writing the summary", "New text", started, "it is empty")
+    assert text.startswith("The first reply was not shown because it is empty; asking again")
+    assert "· 12 s ▌" in text and text.endswith("New text")
+
+
+def test_technical_details_say_generated_text_is_streamed_and_checked(settings):
+    text = technical_markdown(settings, "embedding", gen_model="gen-1")
+    assert "shown as it is written, then checked" in text
+
+
+def test_technical_details_without_a_model_do_not_mention_streaming(settings):
+    assert "shown as it is written" not in technical_markdown(settings, "embedding")

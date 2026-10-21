@@ -99,6 +99,10 @@ def highlighted(segments: list[tuple[str, str | None]]) -> list[tuple[str, str]]
     return [(text, label) for text, label in segments if label]
 
 
+def last(stream):
+    return list(stream)[-1]
+
+
 def is_skip(value) -> bool:
     return value == gr.skip()
 
@@ -157,7 +161,9 @@ def test_open_document_resets_the_page(handlers, demo_cache):
 
 def test_ask_cites_the_governing_law_clause(make_services, settings):
     cache = make_cache(TEXT, settings, {"Governing Law": [(LAW_SENTENCE, 0.95)]})
-    result = Handlers(make_services()).ask("which law governs?", [], cache, TAU_LOW, TAU_HIGH)
+    result = last(
+        Handlers(make_services()).ask("which law governs?", [], cache, TAU_LOW, TAU_HIGH)
+    )
     textbox, history, _, picker, _, segments, sources, _ = result
     assert textbox == ""
     assert "tier-found" in history[-1]["content"]
@@ -168,27 +174,27 @@ def test_ask_cites_the_governing_law_clause(make_services, settings):
 
 def test_ask_with_two_types_offers_both_and_shows_the_first(handlers, demo_cache):
     question = "who are the parties and which law governs?"
-    result = handlers.ask(question, [], demo_cache, TAU_LOW, TAU_HIGH)
-    _, history, last, picker, _, segments, _, _ = result
+    result = last(handlers.ask(question, [], demo_cache, TAU_LOW, TAU_HIGH))
+    _, history, answered, picker, _, segments, _, _ = result
     assert picker.choices == [("Parties", "Parties"), ("Governing Law", "Governing Law")]
     assert picker.value == "Parties"
     assert highlighted(segments)[0][1] == "Parties"
-    assert len(history) == 2 and len(last.items) == 2
+    assert len(history) == 2 and len(answered.items) == 2
 
 
 def test_ask_keeps_earlier_messages(handlers, demo_cache):
-    first = handlers.ask("which law governs?", [], demo_cache, TAU_LOW, TAU_HIGH)
-    second = handlers.ask("who are the parties?", first[1], demo_cache, TAU_LOW, TAU_HIGH)
+    first = last(handlers.ask("which law governs?", [], demo_cache, TAU_LOW, TAU_HIGH))
+    second = last(handlers.ask("who are the parties?", first[1], demo_cache, TAU_LOW, TAU_HIGH))
     assert len(second[1]) == 4
 
 
 def test_ask_records_the_slider_thresholds(handlers, demo_cache):
-    result = handlers.ask("which law governs?", [], demo_cache, 0.2, 0.7)
+    result = last(handlers.ask("which law governs?", [], demo_cache, 0.2, 0.7))
     assert (result[2].tau_low, result[2].tau_high) == (0.2, 0.7)
 
 
 def test_ask_switches_to_the_document_tab(handlers, demo_cache):
-    result = handlers.ask("which law governs?", [], demo_cache, TAU_LOW, TAU_HIGH)
+    result = last(handlers.ask("which law governs?", [], demo_cache, TAU_LOW, TAU_HIGH))
     assert result[-1].selected == DOCUMENT_TAB
 
 
@@ -208,30 +214,30 @@ def test_suggested_questions_are_asked_through_the_ask_handler(make_services):
 
 
 def test_ask_without_a_citation_hides_the_picker(handlers, demo_cache):
-    result = handlers.ask("tell me a joke", [], demo_cache, TAU_LOW, TAU_HIGH)
+    result = last(handlers.ask("tell me a joke", [], demo_cache, TAU_LOW, TAU_HIGH))
     assert result[3].visible is False
     assert is_skip(result[5])
 
 
 def test_empty_question_warns_and_changes_nothing(handlers, demo_cache, warnings):
-    assert is_skip(handlers.ask("  ", [], demo_cache, TAU_LOW, TAU_HIGH))
+    assert is_skip(last(handlers.ask("  ", [], demo_cache, TAU_LOW, TAU_HIGH)))
     assert warnings == ["Type a question first."]
 
 
 def test_ask_without_a_document_warns(handlers, warnings):
-    assert is_skip(handlers.ask("which law governs?", [], None, TAU_LOW, TAU_HIGH))
+    assert is_skip(last(handlers.ask("which law governs?", [], None, TAU_LOW, TAU_HIGH)))
     assert warnings == ["Select a contract first."]
 
 
 def test_ask_with_inverted_thresholds_warns(handlers, demo_cache, warnings):
-    assert is_skip(handlers.ask("which law governs?", [], demo_cache, 0.9, 0.1))
+    assert is_skip(last(handlers.ask("which law governs?", [], demo_cache, 0.9, 0.1)))
     assert len(warnings) == 1
 
 
 def test_pick_citation_shows_the_chosen_type(handlers, demo_cache):
     question = "who are the parties and which law governs?"
-    last = handlers.ask(question, [], demo_cache, TAU_LOW, TAU_HIGH)[2]
-    _, segments = handlers.pick_citation("Governing Law", last, demo_cache)
+    answered = last(handlers.ask(question, [], demo_cache, TAU_LOW, TAU_HIGH))[2]
+    _, segments = handlers.pick_citation("Governing Law", answered, demo_cache)
     assert highlighted(segments)[0][1] == "Governing Law"
 
 
@@ -364,7 +370,7 @@ def test_unexpected_exception_becomes_a_warning(make_services, demo_cache, warni
             raise RuntimeError("boom")
 
     handlers = Handlers(make_services(router=BrokenRouter()))
-    result = handlers.ask("which law governs?", [], demo_cache, TAU_LOW, TAU_HIGH)
+    result = last(handlers.ask("which law governs?", [], demo_cache, TAU_LOW, TAU_HIGH))
     assert is_skip(result)
     assert warnings == [app.UNEXPECTED_ERROR]
 
@@ -386,6 +392,7 @@ def test_serve_builds_the_services_without_a_model(monkeypatch, tmp_path, capsys
     monkeypatch.setattr(cli, "build_router", lambda *args: FakeRouter())
     gen = EchoTextClient()
     monkeypatch.setattr(cli, "build_gen_client", lambda settings: gen)
+    monkeypatch.setattr(cli, "run_in_background", lambda *args: None)
     monkeypatch.setattr(
         app,
         "launch_app",
@@ -436,7 +443,7 @@ def test_ask_fills_passages_for_an_empty_route(make_services, settings):
     cache = make_cache(TEXT, settings)
     handlers = Handlers(make_services(router=route_to()))
     handlers.services.search.search = lambda cache, question: [passage()]
-    result = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)
+    result = last(handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH))
     assert len(result[2].passages) == 1
     assert "tier-related" in result[1][-1]["content"]
 
@@ -449,20 +456,20 @@ def test_ask_leaves_passages_empty_when_the_route_has_clause_types(make_services
     cache = make_cache(TEXT, settings, {"Governing Law": [(LAW_SENTENCE, 0.95)]})
     handlers = Handlers(make_services(router=route_to("Governing Law")))
     handlers.services.search.search = lambda cache, question: [passage()]
-    assert handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)[2].passages == []
+    assert last(handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH))[2].passages == []
 
 
 def test_ask_about_a_type_missing_from_an_older_cache_does_not_raise(make_services):
     cache = make_cache(TEXT, load_settings(), {"Governing Law": []})
     handlers = Handlers(make_services(router=route_to("Payment Terms")))
-    result = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)
+    result = last(handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH))
     assert result[2].items == []
 
 
 def test_ask_caps_an_unvalidated_type_at_verify(make_services, settings):
     cache = payment_cache(settings)
     handlers = Handlers(make_services(router=route_to("Payment Terms")))
-    reply = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)[1][-1]["content"]
+    reply = last(handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH))[1][-1]["content"]
     assert "tier-check" in reply and "tier-found" not in reply
     assert "Not validated on test data" in reply
 
@@ -473,7 +480,7 @@ def test_ask_with_passages_lists_them_in_the_picker_and_shows_the_first(
     cache = make_cache(TEXT, settings)
     handlers = Handlers(make_services(router=route_to()))
     handlers.services.search.search = lambda cache, question: [passage(10), passage(20)]
-    result = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)
+    result = last(handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH))
     picker, segments = result[3], result[5]
     assert [label for label, _ in picker.choices] == ["Related passage 1", "Related passage 2"]
     assert highlighted(segments)[0][1] == "Related passage"
@@ -484,7 +491,7 @@ def test_pick_citation_shows_the_chosen_related_passage(make_services, settings)
     cache = make_cache(TEXT, settings)
     handlers = Handlers(make_services(router=route_to()))
     handlers.services.search.search = lambda cache, question: [passage(0), passage(10)]
-    result = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)
+    result = last(handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH))
     value = result[3].choices[1][1]
     _, segments = handlers.pick_citation(value, result[2], cache)
     assert highlighted(segments)[0][0] == TEXT[10:59]
@@ -571,7 +578,7 @@ def component_values(demo: gr.Blocks) -> list[str]:
 
 def test_summarize_returns_the_reply_and_saves_it(make_services, law_cache, settings):
     handlers, client = generating(make_services, [FAITHFUL_REPLY])
-    result = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
+    result = last(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
     assert FAITHFUL_REPLY in result
     assert len(client.text_calls) == 1
     assert len(list((settings.cache_dir / "summaries").glob("*.json"))) == 1
@@ -579,22 +586,22 @@ def test_summarize_returns_the_reply_and_saves_it(make_services, law_cache, sett
 
 def test_summarize_again_with_the_same_thresholds_makes_no_model_call(make_services, law_cache):
     handlers, client = generating(make_services, [FAITHFUL_REPLY])
-    first = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
-    second = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
+    first = last(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
+    second = last(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
     assert len(client.text_calls) == 1
     assert second == first
 
 
 def test_summarize_with_other_thresholds_asks_the_model_again(make_services, law_cache):
     handlers, client = generating(make_services, [FAITHFUL_REPLY, FAITHFUL_REPLY])
-    handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
-    handlers.summarize(law_cache, TAU_LOW, ALTERNATIVE_TAU_HIGH)
+    last(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
+    last(handlers.summarize(law_cache, TAU_LOW, ALTERNATIVE_TAU_HIGH))
     assert len(client.text_calls) == 2
 
 
 def test_summarize_withholds_a_reply_that_misquotes_twice(make_services, law_cache):
     handlers, client = generating(make_services, [MISQUOTING_REPLY, MISQUOTING_REPLY])
-    result = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
+    result = last(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
     assert "not shown" in result
     assert "ends on Friday" not in result
     assert len(client.text_calls) == 2
@@ -602,27 +609,27 @@ def test_summarize_withholds_a_reply_that_misquotes_twice(make_services, law_cac
 
 def test_summarize_shows_the_second_reply_when_the_first_misquotes(make_services, law_cache):
     handlers, client = generating(make_services, [MISQUOTING_REPLY, FAITHFUL_REPLY])
-    result = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
+    result = last(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
     assert FAITHFUL_REPLY in result
     assert len(client.text_calls) == 2
 
 
 def test_summarize_without_a_model_warns(make_services, law_cache, warnings):
-    result = Handlers(make_services()).summarize(law_cache, TAU_LOW, TAU_HIGH)
+    result = last(Handlers(make_services()).summarize(law_cache, TAU_LOW, TAU_HIGH))
     assert is_skip(result)
     assert warnings == [app.SUMMARIES_OFF]
 
 
 def test_summarize_without_a_document_warns(make_services, warnings):
     handlers, client = generating(make_services, [])
-    assert is_skip(handlers.summarize(None, TAU_LOW, TAU_HIGH))
+    assert is_skip(last(handlers.summarize(None, TAU_LOW, TAU_HIGH)))
     assert warnings == [app.SELECT_CONTRACT]
     assert client.text_calls == []
 
 
 def test_summarize_with_inverted_thresholds_warns(make_services, law_cache, warnings):
     handlers, client = generating(make_services, [])
-    assert is_skip(handlers.summarize(law_cache, 0.9, 0.1))
+    assert is_skip(last(handlers.summarize(law_cache, 0.9, 0.1)))
     assert len(warnings) == 1
     assert client.text_calls == []
 
@@ -632,52 +639,54 @@ def test_summarize_without_found_clauses_says_there_is_nothing_to_summarize(
 ):
     handlers, client = generating(make_services, [])
     cache = make_cache(TEXT, settings)
-    assert handlers.summarize(cache, TAU_LOW, TAU_HIGH) == app.NOTHING_TO_SUMMARIZE
+    assert last(handlers.summarize(cache, TAU_LOW, TAU_HIGH)) == app.NOTHING_TO_SUMMARIZE
     assert client.text_calls == []
 
 
 def test_summarize_warns_when_the_model_does_not_answer(make_services, law_cache, warnings):
     handlers, _ = generating(make_services, [LLMError("down")])
-    assert is_skip(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
+    assert is_skip(last(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)))
     assert warnings == [app.GENERATION_FAILED]
 
 
 def test_explain_restates_the_highlighted_quote(make_services, law_cache):
     handlers, client = generating(make_services, ["The law of Vanuatu applies."])
-    result = handlers.explain(view_segments("Governing Law"), "en", law_cache)
+    result = last(handlers.explain(view_segments("Governing Law"), "en", law_cache))
     assert LAW_SENTENCE in client.text_calls[0][1]
     assert "**Governing Law**" in result and "The law of Vanuatu applies." in result
 
 
 def test_explain_keeps_the_related_passage_label(make_services, law_cache):
     handlers, client = generating(make_services, ["The law of Vanuatu applies."])
-    result = handlers.explain(view_segments(app.RELATED_LABEL), "sr", law_cache)
+    result = last(handlers.explain(view_segments(app.RELATED_LABEL), "sr", law_cache))
     assert f"Clause type: {app.RELATED_LABEL}" in client.text_calls[0][1]
     assert f"**{app.RELATED_LABEL}** · in plain Serbian" in result
 
 
 def test_explain_without_a_highlight_says_so(make_services, law_cache, infos):
     handlers, client = generating(make_services, [])
-    assert is_skip(handlers.explain(view_segments(None), "en", law_cache))
+    assert is_skip(last(handlers.explain(view_segments(None), "en", law_cache)))
     assert infos == [app.NOTHING_HIGHLIGHTED]
     assert client.text_calls == []
 
 
 def test_explain_without_a_model_warns(make_services, law_cache, warnings):
-    result = Handlers(make_services()).explain(view_segments("Governing Law"), "en", law_cache)
+    result = last(
+        Handlers(make_services()).explain(view_segments("Governing Law"), "en", law_cache)
+    )
     assert is_skip(result)
     assert warnings == [app.SUMMARIES_OFF]
 
 
 def test_explain_without_a_document_warns(make_services, warnings):
     handlers, _ = generating(make_services, [])
-    assert is_skip(handlers.explain(view_segments("Governing Law"), "en", None))
+    assert is_skip(last(handlers.explain(view_segments("Governing Law"), "en", None)))
     assert warnings == [app.SELECT_CONTRACT]
 
 
 def test_explain_warns_when_the_model_does_not_answer(make_services, law_cache, warnings):
     handlers, _ = generating(make_services, [LLMError("down")])
-    assert is_skip(handlers.explain(view_segments("Governing Law"), "en", law_cache))
+    assert is_skip(last(handlers.explain(view_segments("Governing Law"), "en", law_cache)))
     assert warnings == [app.GENERATION_FAILED]
 
 
@@ -717,10 +726,10 @@ def test_summarize_does_not_save_a_withheld_summary_and_asks_again(
 ):
     replies = [MISQUOTING_REPLY, MISQUOTING_REPLY, FAITHFUL_REPLY]
     handlers, client = generating(make_services, replies)
-    first = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
+    first = last(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
     assert "not shown" in first
     assert not (settings.cache_dir / "summaries").exists()
-    second = handlers.summarize(law_cache, TAU_LOW, TAU_HIGH)
+    second = last(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
     assert FAITHFUL_REPLY in second
     assert len(client.text_calls) == 3
 
@@ -729,7 +738,7 @@ def test_term_sheet_returns_rows_in_field_order_and_a_download(
     make_services, demo_cache, settings
 ):
     handlers = Handlers(make_services(gen=EchoTextClient()))
-    rows, button = handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH)
+    rows, button, _ = last(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
     assert [row[0] for row in rows] == [LABELS[field] for field in FIELDS]
     assert len(rows) == 8
     assert button.visible is True
@@ -741,39 +750,41 @@ def test_term_sheet_returns_rows_in_field_order_and_a_download(
 def test_term_sheet_again_makes_no_model_call(make_services, demo_cache):
     client = EchoTextClient()
     handlers = Handlers(make_services(gen=client))
-    handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH)
+    last(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
     calls = len(client.text_calls)
-    handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH)
+    last(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
     assert calls > 0 and len(client.text_calls) == calls
 
 
 def test_term_sheet_without_a_model_warns(make_services, demo_cache, warnings):
-    assert is_skip(Handlers(make_services()).term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
+    assert is_skip(last(Handlers(make_services()).term_sheet(demo_cache, TAU_LOW, TAU_HIGH)))
     assert warnings == [app.SUMMARIES_OFF]
 
 
 def test_term_sheet_without_a_document_warns(make_services, warnings):
     handlers = Handlers(make_services(gen=EchoTextClient()))
-    assert is_skip(handlers.term_sheet(None, TAU_LOW, TAU_HIGH))
+    assert is_skip(last(handlers.term_sheet(None, TAU_LOW, TAU_HIGH)))
     assert warnings == [app.SELECT_CONTRACT]
 
 
 def test_term_sheet_without_key_term_clauses_says_so(make_services, settings, infos):
     handlers = Handlers(make_services(gen=EchoTextClient()))
     cache = make_cache(TEXT, settings)
-    assert is_skip(handlers.term_sheet(cache, TAU_LOW, TAU_HIGH))
+    assert is_skip(last(handlers.term_sheet(cache, TAU_LOW, TAU_HIGH)))
     assert infos == [app.NO_TERM_CLAUSES]
 
 
 def test_term_sheet_with_inverted_thresholds_warns(make_services, demo_cache, warnings):
     handlers = Handlers(make_services(gen=EchoTextClient()))
-    assert is_skip(handlers.term_sheet(demo_cache, 0.9, 0.1))
+    assert is_skip(last(handlers.term_sheet(demo_cache, 0.9, 0.1)))
     assert len(warnings) == 1
 
 
 def test_term_sheet_warns_when_the_model_does_not_answer(make_services, demo_cache, warnings):
     handlers, _ = generating(make_services, [LLMError("down")])
-    assert is_skip(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
+    assert all(
+        is_skip(value) for value in last(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))[:2]
+    )
     assert warnings == [app.GENERATION_FAILED]
 
 
@@ -781,7 +792,7 @@ def test_term_sheet_withheld_shows_not_stated_hides_the_download_and_is_not_save
     make_services, demo_cache, warnings, settings
 ):
     handlers, _ = generating(make_services, ["no json", "still no json"])
-    rows, button = handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH)
+    rows, button, _ = last(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
     assert {row[1] for row in rows} == {"not stated"}
     assert button.visible is False
     assert warnings == [app.TERM_SHEET_WITHHELD.format(reason=INVALID_REASON)]
@@ -799,7 +810,7 @@ def test_ask_writes_an_answer_from_the_passages(make_services, settings):
     cache = make_cache(TEXT, settings)
     handlers = Handlers(make_services(router=route_to(), gen=EchoTextClient()))
     handlers.services.search.search = lambda cache, question: [passage()]
-    result = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)
+    result = last(handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH))
     assert isinstance(result[2].generated, GeneratedAnswer)
     assert "tier-generated" in result[1][-1]["content"]
 
@@ -809,7 +820,7 @@ def test_ask_keeps_the_passages_when_the_model_does_not_answer(make_services, se
     client = FakeLLMClient([LLMError("down"), LLMError("down")])
     handlers = Handlers(make_services(router=route_to(), gen=client))
     handlers.services.search.search = lambda cache, question: [passage()]
-    result = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)
+    result = last(handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH))
     assert len(result[2].passages) == 1 and result[2].generated is None
     assert "tier-generated" not in result[1][-1]["content"]
 
@@ -818,13 +829,175 @@ def test_ask_without_a_model_has_no_generated_answer(make_services, settings):
     cache = make_cache(TEXT, settings)
     handlers = Handlers(make_services(router=route_to()))
     handlers.services.search.search = lambda cache, question: [passage()]
-    assert handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)[2].generated is None
+    assert last(handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH))[2].generated is None
 
 
 def test_ask_with_clause_types_requests_no_generated_answer(make_services, settings):
     cache = make_cache(TEXT, settings, {"Governing Law": [(LAW_SENTENCE, 0.95)]})
     client = EchoTextClient()
     handlers = Handlers(make_services(router=route_to("Governing Law"), gen=client))
-    result = handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH)
+    result = last(handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH))
     assert result[2].generated is None and client.text_calls == []
 
+
+def test_summarize_streams_the_status_and_the_growing_reply(make_services, law_cache):
+    handlers, _ = generating(make_services, [FAITHFUL_REPLY])
+    yields = list(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
+    assert yields[0].startswith(app.WRITING_SUMMARY)
+    assert any(FAITHFUL_REPLY.split()[0] in text and "▌" in text for text in yields[:-1])
+    assert "▌" not in yields[-1]
+    assert FAITHFUL_REPLY in yields[-1]
+
+
+def test_summarize_shows_that_it_asks_again_when_the_first_reply_is_withheld(
+    make_services, law_cache
+):
+    handlers, _ = generating(make_services, [MISQUOTING_REPLY, FAITHFUL_REPLY])
+    yields = list(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
+    retry = [i for i, text in enumerate(yields) if "asking again" in text]
+    assert retry and "not shown because it quotes text" in yields[retry[0]]
+    assert all("ends on Friday" not in text for text in yields[retry[0] :])
+    assert FAITHFUL_REPLY in yields[-1]
+
+
+def test_summarize_of_a_saved_summary_yields_once(make_services, law_cache):
+    handlers, _ = generating(make_services, [FAITHFUL_REPLY])
+    last(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
+    assert len(list(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))) == 1
+
+
+def test_explain_streams_the_status_and_ends_with_the_checked_text(make_services, law_cache):
+    handlers, _ = generating(make_services, ["The law of Vanuatu applies."])
+    yields = list(handlers.explain(view_segments("Governing Law"), "en", law_cache))
+    assert yields[0].startswith(app.WRITING_EXPLANATION)
+    assert any("The law" in text and "▌" in text for text in yields[:-1])
+    assert "**Governing Law**" in yields[-1] and "▌" not in yields[-1]
+
+
+def passage_handlers(make_services, settings, gen):
+    handlers = Handlers(make_services(router=route_to(), gen=gen))
+    handlers.services.search.search = lambda cache, question: [passage()]
+    return handlers, make_cache(TEXT, settings)
+
+
+def test_ask_streams_the_answer_from_the_passages(make_services, settings):
+    handlers, cache = passage_handlers(
+        make_services, settings, FakeLLMClient([f'It says "{LAW_SENTENCE}".'])
+    )
+    yields = list(handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH))
+    written = [y[1][-1]["content"] for y in yields[:-1]]
+    assert written[0].startswith(app.WRITING_ANSWER)
+    assert any("▌" in text and "It says" in text for text in written)
+    assert all(y[1][-2] == {"role": "user", "content": "q"} for y in yields)
+    assert "tier-generated" in yields[-1][1][-1]["content"]
+
+
+def test_ask_keeps_the_other_outputs_while_the_answer_is_written(make_services, settings):
+    handlers, cache = passage_handlers(
+        make_services, settings, FakeLLMClient([f'It says "{LAW_SENTENCE}".'])
+    )
+    yields = list(handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH))
+    assert all(is_skip(value) for value in yields[0][2:])
+    assert yields[0][0] == ""
+
+
+def test_ask_with_a_route_yields_once(make_services, settings):
+    cache = make_cache(TEXT, settings, {"Governing Law": [(LAW_SENTENCE, 0.95)]})
+    handlers = Handlers(make_services(router=route_to("Governing Law"), gen=EchoTextClient()))
+    assert len(list(handlers.ask("q", [], cache, TAU_LOW, TAU_HIGH))) == 1
+
+
+def test_term_sheet_yields_a_status_and_then_the_rows(make_services, demo_cache):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    yields = list(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
+    assert yields[0][2] == app.TERM_SHEET_STATUS
+    assert len(yields[-1][0]) == 8 and yields[-1][2] == ""
+
+
+def test_error_inside_a_generator_handler_becomes_a_warning_and_one_skip(
+    make_services, law_cache, warnings, monkeypatch
+):
+    handlers, _ = generating(make_services, [FAITHFUL_REPLY])
+    monkeypatch.setattr(app, "summary_items", lambda *a, **k: 1 / 0)
+    yields = list(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
+    assert len(yields) == 1 and is_skip(yields[0])
+    assert warnings == [app.UNEXPECTED_ERROR]
+
+
+def test_guarded_generator_handler_stays_a_generator_function(handlers):
+    assert inspect.isgeneratorfunction(handlers.summarize)
+
+
+def stop_functions(demo: gr.Blocks) -> list:
+    stop = find_component(demo, "stop")
+    return [fn for fn in demo.fns.values() if any(t[0] == stop._id for t in fn.targets)]
+
+
+def test_stop_button_cancels_the_running_events(make_services):
+    demo = build_app(make_services(gen=FakeLLMClient([])))
+    [stop_fn] = [fn for fn in stop_functions(demo) if fn.cancels]
+    assert find_component(demo, "stop").variant == "stop"
+    assert len(stop_fn.cancels) == 1 + len(SUGGESTED_QUESTIONS) + 3
+
+
+def test_term_status_is_an_output_of_the_term_sheet_button(make_services):
+    demo = build_app(make_services(gen=FakeLLMClient([])))
+    status = find_component(demo, "term-status")
+    button = find_component(demo, "term-sheet")
+    [fn] = [f for f in demo.fns.values() if any(t[0] == button._id for t in f.targets)]
+    assert status in fn.outputs
+
+
+def test_keep_warm_loads_every_client_that_can_be_loaded(make_services):
+    loaded = []
+
+    class Loadable(FakeLLMClient):
+        def load(self):
+            loaded.append(self.model)
+
+    router = SimpleNamespace(kind="llm", client=Loadable([], model="router-model"))
+    handlers = Handlers(make_services(router=router, gen=Loadable([], model="gen-model")))
+    handlers.keep_warm()
+    assert loaded == ["gen-model", "router-model"]
+
+
+def test_keep_warm_skips_clients_that_cannot_be_loaded(make_services):
+    Handlers(make_services(gen=FakeLLMClient([]))).keep_warm()
+
+
+def test_keep_warm_runs_on_a_timer(make_services):
+    demo = build_app(make_services())
+    timers = [b for b in demo.blocks.values() if isinstance(b, gr.Timer)]
+    assert [timer.value for timer in timers] == [app.KEEP_WARM_S]
+
+
+@pytest.fixture
+def background_calls(monkeypatch) -> list[tuple]:
+    calls: list[tuple] = []
+    monkeypatch.setattr(app, "run_in_background", lambda *args: calls.append(args))
+    return calls
+
+
+def upload_new_text(handlers, tmp_path):
+    path = tmp_path / "new.txt"
+    path.write_text(TEXT, encoding="utf-8")
+    return handlers.extract_upload(str(path), progress=lambda *a, **k: None)
+
+
+def test_upload_of_a_new_text_starts_precomputing_with_a_model(
+    make_services, settings, clause_types, tmp_path, background_calls
+):
+    extractor = Extractor(slow_fake_qa(0), clause_types, settings, "fake")
+    gen = EchoTextClient()
+    upload_new_text(Handlers(make_services(extractor, gen=gen)), tmp_path)
+    [(target, cache, names, client, *_)] = background_calls
+    assert target is app.precompute and client is gen
+    assert cache.text == TEXT and names == [c.name for c in clause_types]
+
+
+def test_upload_of_a_new_text_does_not_precompute_without_a_model(
+    make_services, settings, clause_types, tmp_path, background_calls
+):
+    extractor = Extractor(slow_fake_qa(0), clause_types, settings, "fake")
+    upload_new_text(Handlers(make_services(extractor)), tmp_path)
+    assert background_calls == []
