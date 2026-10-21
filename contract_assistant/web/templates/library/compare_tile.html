@@ -1,0 +1,3 @@
+{# The dark tile of the comparison: how many clause types and key terms differ. #}
+<span class="tile-value">{{ differ }} <span class="muted tile-unit">of {{ total }} clause types differ</span></span>
+<span class="muted small">{% if terms %}{{ terms_differ }} of {{ terms|length }} key terms differ. Values are copied word for word from the clauses found.{% else %}The key terms are not compared.{% endif %}</span>

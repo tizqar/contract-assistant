@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% import "components.html" as c %}
+{# The portfolio: totals, then one row per analysed contract; a row opens its workspace. #}
+{% block title %}Portfolio · Contract Assistant{% endblock %}
+{% block switcher %}
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/">Workspace</a>
+  <span aria-hidden="true">/</span>
+  <span class="crumb-current" aria-current="page">Portfolio</span>
+</nav>
+{% endblock %}
+{% block actions %}
+<a class="btn" href="/portfolio.csv" download>Export CSV</a>
+{% endblock %}
+{% block main %}
+<main class="page" aria-label="Portfolio">
+  {% if not contracts %}
+  {{ c.notice("No contract has been analysed yet. Open the workspace to add one.") }}
+  {% else %}
+  <div class="stats">
+    <div class="stat">
+      <span class="stat-label">Contracts</span>
+      <span class="stat-value">{{ contracts|length }}</span>
+      <span class="muted small">{{ pdfs }} PDF{{ 's' if pdfs != 1 }}, {{ texts }} text file{{ 's' if texts != 1 }}</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Clauses found</span>
+      <span class="stat-value ink-found">{{ found }}</span>
+      <span class="muted small">of {{ contracts|length * total }} checks across {{ total }} types</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Passages to verify</span>
+      <span class="stat-value ink-check">{{ check }}</span>
+      <span class="muted small">a reader should confirm each</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">High review flags</span>
+      <span class="stat-value ink-high">{{ flags_high }}</span>
+      <span class="muted small">{{ flags_medium }} medium, {{ flags_low }} low</span>
+    </div>
+    {% if deadline %}
+    <a class="stat stat-dark stat-link" href="/documents/{{ deadline.doc_id }}">
+      <span class="stat-label muted">Next notice deadline</span>
+      <span class="stat-value stat-date">{{ deadline.when }}</span>
+      <span class="muted small">{{ deadline.name }}, {{ deadline.source }} before the term ends</span>
+    </a>
+    {% endif %}
+  </div>
+
+  <div class="portfolio-tools">
+    <label class="sr-only" for="portfolio-search">Search contracts</label>
+    <input id="portfolio-search" class="input search" type="search" autocomplete="off"
+           placeholder="Search by name, party or governing law" data-row-search="#portfolio-rows">
+    <div class="chips" role="group" aria-label="Filter the contracts" data-row-filters="#portfolio-rows">
+      <button type="button" class="chip chip-active" data-row-filter="" aria-pressed="true">All</button>
+      <button type="button" class="chip" data-row-filter="high" aria-pressed="false">With high flags</button>
+      <button type="button" class="chip" data-row-filter="renews" aria-pressed="false">With a renewal term</button>
+      <button type="button" class="chip" data-row-filter="nolaw" aria-pressed="false">No governing law</button>
+    </div>
+    <span class="grow"></span>
+    <span class="meta">{% if ws.gen_model %}Every key term is a verbatim slice of a clause.{% else %}The key terms need the language model, which is off.{% endif %}</span>
+  </div>
+
+  <div class="table-scroll">
+    <table class="table portfolio-table">
+      <thead>
+        <tr>
+          <th scope="col">Contract</th>
+          <th scope="col">Coverage of {{ total }} types</th>
+          <th scope="col">Governing law</th>
+          <th scope="col">Notice period</th>
+          <th scope="col">Renewal</th>
+          <th scope="col">Review flags</th>
+        </tr>
+      </thead>
+      <tbody id="portfolio-rows">
+        {% for item in contracts %}
+        {% set row = item.row %}
+        <tr data-href="/documents/{{ row.doc_id }}" data-search="{{ item.search }}"
+            data-high="{{ 1 if row.flags_high else 0 }}" data-renews="{{ 1 if item.renews else 0 }}" data-nolaw="{{ 1 if item.no_law else 0 }}">
+          <td>
+            <a class="link" href="/documents/{{ row.doc_id }}">{{ item.name }}</a>
+            <span class="block meta">{{ 'PDF' if item.kind == 'pdf' else 'Text' }} · {{ row.size }}{% if item.parties %} · {{ item.parties }}{% endif %}</span>
+          </td>
+          <td>
+            <span class="coverage" aria-hidden="true"><span class="found" style="width: {{ item.found_width }}%"></span><span class="check" style="width: {{ item.check_width }}%"></span></span>
+            <span class="block meta">{{ row.found }} found · {{ row.check }} verify · {{ row.not_found }} not found</span>
+          </td>
+          {% for field in ('governing_law', 'notice_period', 'renewal_term') %}
+          {% set value, stated = item.terms[field] %}
+          <td class="{{ 'serif' if stated else 'absent' }}">{{ value }}</td>
+          {% endfor %}
+          <td>
+            <span class="counts">{% for level, count in item.severities %}{{ c.tag(level, count ~ ' ' ~ level) }}{% else %}<span class="muted small">None</span>{% endfor %}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted small" id="portfolio-empty" hidden>No contract matches the search.</p>
+
+  <div class="legend">
+    <span class="legend-item"><span class="swatch swatch-found"></span>Found, confidence {{ '%g' % ws.settings.tau_high }} or above</span>
+    <span class="legend-item"><span class="swatch swatch-check"></span>Verify, a passage to read</span>
+    <span class="legend-item"><span class="swatch swatch-none"></span>Not found</span>
+    <span>Open a row to work on that contract. The counts use the default thresholds.</span>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}

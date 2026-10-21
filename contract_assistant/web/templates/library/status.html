@@ -1,0 +1,3 @@
+{% import "components.html" as c %}
+{# One line of progress or a closing message, for the upload and the comparison streams. #}
+{% if notice is defined and notice %}{{ c.notice(text) }}{% elif spinning %}{{ c.status_line(text) }}{% else %}<p class="status-line">{{ text }}</p>{% endif %}
