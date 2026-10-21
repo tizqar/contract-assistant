@@ -32,6 +32,7 @@ from tests.support.fakes import (
     slow_fake_qa,
 )
 
+LONG_DOC_ID = "sha256:5ace7a03650252f3f2a08d44b3bf4c689d6b9e1bc62a90a455a23bcb4e484b02"
 DEMO_TEXT = ROOT / "demo" / "short_supply_agreement.txt"
 SHORT_DOC_ID = "sha256:6d43065ff242642866da6be6b83f9849ad898e6eea9c1e71b0c2853dd3822c5a"
 LAW_SENTENCE = "This agreement is governed by the laws of Vanuatu."
@@ -152,7 +153,7 @@ def test_document_choices_list_each_document_once(make_services):
 
 def test_open_document_resets_the_page(handlers, demo_cache):
     result = handlers.open_document(SHORT_DOC_ID, TAU_LOW, TAU_HIGH, ALL_CLAUSES)
-    cache, last, chat, title, rows, _, _, _, picker, sources, _, turns, _ = result
+    cache, last, chat, title, rows, _, _, _, picker, sources, _, turns, *_ = result
     assert (cache.doc_id, last, chat, sources, turns) == (SHORT_DOC_ID, None, [], {}, [])
     assert "Short supply agreement" in title
     assert len(rows) == len(demo_cache.clauses)
@@ -273,7 +274,7 @@ def test_tau_high_released_below_tau_low_is_clamped(handlers, demo_cache):
 
 
 def test_reset_restores_the_default_thresholds(handlers, demo_cache, settings):
-    tau_low, tau_high, rows = handlers.reset_thresholds(demo_cache, ALL_CLAUSES)
+    tau_low, tau_high, rows, *_ = handlers.reset_thresholds(demo_cache, ALL_CLAUSES)
     assert (tau_low, tau_high) == (settings.tau_low, settings.tau_high)
     assert len(rows) == len(demo_cache.clauses)
 
@@ -937,7 +938,7 @@ def test_stop_button_cancels_the_running_events(make_services):
     demo = build_app(make_services(gen=FakeLLMClient([])))
     [stop_fn] = [fn for fn in stop_functions(demo) if fn.cancels]
     assert find_component(demo, "stop").variant == "stop"
-    assert len(stop_fn.cancels) == 1 + len(SUGGESTED_QUESTIONS) + 3
+    assert len(stop_fn.cancels) == 1 + len(SUGGESTED_QUESTIONS) + 5
 
 
 def test_term_status_is_an_output_of_the_term_sheet_button(make_services):
@@ -1144,3 +1145,155 @@ def test_the_defined_terms_are_in_a_closed_accordion_with_a_table(make_services)
     demo = build_app(make_services())
     assert find_component(demo, "terms").open is False
     assert find_component(demo, "definitions-table").headers == ["Term", "Defined as", "Page"]
+
+
+def opened_flags(handlers) -> list[dict]:
+    return handlers.open_document(SHORT_DOC_ID, TAU_LOW, TAU_HIGH, ALL_CLAUSES)[14]
+
+
+def flag_event(title: str) -> SimpleNamespace:
+    return SimpleNamespace(index=[0, 1], row_value=["", title, "", ""])
+
+
+def test_open_document_fills_the_review_rows(handlers):
+    rows = handlers.open_document(SHORT_DOC_ID, TAU_LOW, TAU_HIGH, ALL_CLAUSES)[13]
+    assert rows[0][1] == "No cap on liability found"
+    assert "tier-medium" in rows[0][0]
+    assert rows[0][2] == "Cap on Liability (not found)"
+
+
+def test_open_document_keeps_the_flags_and_no_selected_flag(handlers):
+    result = handlers.open_document(SHORT_DOC_ID, TAU_LOW, TAU_HIGH, ALL_CLAUSES)
+    assert result[14][0]["rule"] == "no_liability_cap" and result[15] is None
+
+
+def test_the_threshold_handlers_refresh_the_review_rows(handlers, demo_cache):
+    low = handlers.release_low(0.5, TAU_HIGH, demo_cache, ALL_CLAUSES)
+    high = handlers.release_high(TAU_LOW, 0.95, demo_cache, ALL_CLAUSES)
+    _, _, _, rows, flags, selected = handlers.reset_thresholds(demo_cache, ALL_CLAUSES)
+    assert low[2][0][1] == high[2][0][1] == rows[0][1] == "No cap on liability found"
+    assert low[3][0]["rule"] == flags[0]["rule"] and selected is None
+
+
+def test_the_threshold_handlers_change_no_review_without_a_document(handlers):
+    assert all(is_skip(value) for value in handlers.release_low(0.1, 0.9, None, ALL_CLAUSES)[1:])
+
+
+def test_selecting_a_flag_with_quotes_highlights_it_and_shows_the_document(handlers, demo_cache):
+    flags = opened_flags(handlers)
+    _, segments, tabs, index = handlers.show_flag(
+        flags, demo_cache, flag_event("Automatic renewal with a notice window")
+    )
+    assert highlighted(segments)[0][1] == "Renewal Term"
+    assert tabs.selected == DOCUMENT_TAB and index == 1
+
+
+def test_selecting_a_flag_without_quotes_gives_an_info(handlers, demo_cache, infos):
+    result = handlers.show_flag(opened_flags(handlers), demo_cache, flag_event("No cap on liability found"))
+    assert infos == [app.NO_PASSAGE_ATTACHED] and result[3] == 0
+
+
+def test_explain_flag_streams_and_ends_with_the_note_line(make_services, demo_cache):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    yields = list(handlers.explain_flag(opened_flags(handlers), 1))
+    assert len(yields) > 1
+    assert "The contract states" in yields[-1]
+    assert yields[-1].endswith("</small>") and "not legal advice" in yields[-1]
+
+
+def test_explain_flag_without_quotes_returns_the_note(make_services):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    [text] = list(handlers.explain_flag(opened_flags(handlers), 0))
+    assert text.startswith("A missing cap means") and "No passage is attached" in text
+
+
+def test_explain_flag_without_a_selection_gives_an_info(handlers, infos):
+    assert is_skip(last(handlers.explain_flag(opened_flags(handlers), None)))
+    assert infos == [app.NO_FLAG_SELECTED]
+
+
+def test_explain_flag_without_a_model_warns(handlers, warnings):
+    assert is_skip(last(handlers.explain_flag(opened_flags(handlers), 1)))
+    assert warnings == [app.SUMMARIES_OFF]
+
+
+def test_the_review_tab_sits_between_the_summary_and_the_checklist(make_services):
+    demo = build_app(make_services())
+    ids = [tab.id for tab in demo.blocks.values() if isinstance(tab, gr.Tab)]
+    assert ids.index("tab-summary") + 1 == ids.index("tab-review")
+    assert ids.index("tab-review") + 2 == ids.index("tab-compare") + 1 == ids.index("tab-checklist")
+
+
+def compare_rows(handlers, cache=None, other=LONG_DOC_ID):
+    cache = cache or handlers.services.store.load(SHORT_DOC_ID, handlers.services.settings)
+    return last(handlers.compare(cache, other, TAU_LOW, TAU_HIGH))
+
+
+def test_compare_gives_the_term_and_clause_rows_with_marks(make_services):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    names, terms, clauses, status = compare_rows(handlers)
+    assert "Short supply agreement" in names and "Long outsourcing agreement" in names
+    assert len(terms) == 8 and len(clauses) == 49 and status == ""
+    assert any(row[3] == "≠" for row in terms) and any(row[3] == "≠" for row in clauses)
+
+
+def test_compare_extracts_a_missing_term_sheet_and_saves_it(make_services, settings):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    compare_rows(handlers)
+    assert len(list((settings.cache_dir / "term_sheets").glob("*.json"))) == 2
+
+
+def test_compare_says_which_contract_is_being_read_while_it_waits(make_services, demo_cache):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    first = next(iter(handlers.compare(demo_cache, LONG_DOC_ID, TAU_LOW, TAU_HIGH)))
+    assert first[3] == "Extracting the key terms of Short supply agreement"
+
+
+def test_compare_without_a_model_compares_only_the_clauses(make_services):
+    _, terms, clauses, status = compare_rows(Handlers(make_services()))
+    assert terms == [] and len(clauses) == 49 and "language model" in status
+
+
+def test_compare_with_the_same_document_warns(handlers, demo_cache, warnings):
+    assert is_skip(last(handlers.compare(demo_cache, SHORT_DOC_ID, TAU_LOW, TAU_HIGH)))
+    assert warnings == [app.CHOOSE_DIFFERENT]
+
+
+def test_compare_without_another_document_or_a_document_warns(handlers, demo_cache, warnings):
+    last(handlers.compare(demo_cache, None, TAU_LOW, TAU_HIGH))
+    last(handlers.compare(None, LONG_DOC_ID, TAU_LOW, TAU_HIGH))
+    assert warnings == [app.CHOOSE_OTHER, app.SELECT_CONTRACT]
+
+
+def test_compare_with_an_unknown_document_warns(handlers, demo_cache, warnings):
+    assert is_skip(last(handlers.compare(demo_cache, "sha256:missing", TAU_LOW, TAU_HIGH)))
+    assert warnings == [app.OTHER_UNAVAILABLE]
+
+
+def test_build_report_files_writes_both_files_from_the_saved_parts(make_services, demo_cache, settings):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    last(handlers.summarize(demo_cache, TAU_LOW, TAU_HIGH))
+    last(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
+    docx, markdown, status = handlers.build_report_files(demo_cache, TAU_LOW, TAU_HIGH)
+    assert docx.visible and markdown.visible and status == app.REPORT_BUILT
+    folder = settings.cache_dir / "reports"
+    assert sorted(path.suffix for path in folder.iterdir()) == [".docx", ".md"]
+    assert "No cap on liability found" in next(folder.glob("*.md")).read_text()
+
+
+def test_build_report_files_says_what_is_missing(make_services, demo_cache):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    docx, _, status = handlers.build_report_files(demo_cache, TAU_LOW, TAU_HIGH)
+    assert docx.visible and "the summary and the key terms" in status
+    assert "Summary tab" in status
+
+
+def test_build_report_files_without_a_document_warns(handlers, warnings):
+    assert is_skip(handlers.build_report_files(None, TAU_LOW, TAU_HIGH))
+    assert warnings == [app.SELECT_CONTRACT]
+
+
+def test_the_report_buttons_start_hidden(make_services):
+    demo = build_app(make_services())
+    assert find_component(demo, "report-docx").visible is False
+    assert find_component(demo, "report-md").visible is False

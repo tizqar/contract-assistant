@@ -19,8 +19,10 @@ from contract_assistant.answer import (
     blockquote,
     tier,
 )
+from contract_assistant.compare import DIFFERS, SAME, ChecklistRow, TermRow
 from contract_assistant.config import Settings
 from contract_assistant.explain import LANGUAGES, Explanation
+from contract_assistant.review import Flag
 from contract_assistant.store import DocumentCache
 from contract_assistant.summary import MS_PER_S, Summary
 from contract_assistant.term_sheet import FIELDS, LABELS, TermSheet, cell
@@ -175,6 +177,9 @@ STREAMING_LINE = (
 )
 WRITING_STATUS = "{what} · {elapsed} ▌"
 RETRY_STATUS = "The first reply was not shown because {reason}; asking again · {elapsed} ▌"
+
+SEVERITY_LABELS = {"high": "High", "medium": "Medium", "low": "Low"}
+FLAG_UNVALIDATED_TEXT = " (not validated on test data)"
 
 Segments = list[tuple[str, str | None]]
 
@@ -607,3 +612,42 @@ def term_rows(sheet: TermSheet) -> list[list[str]]:
             ]
         )
     return rows
+
+
+def flag_title(flag: Flag) -> str:
+    """Return the title of a flag as the review table shows it."""
+    return flag.title + FLAG_UNVALIDATED_TEXT if flag.unvalidated else flag.title
+
+
+def review_rows(flags: list[Flag]) -> list[list[str]]:
+    """Return one row per flag: severity badge, title, the clauses it rests on and its note."""
+    return [
+        [
+            f'<span class="tier tier-{flag.severity}">{SEVERITY_LABELS[flag.severity]}</span>',
+            flag_title(flag),
+            ", ".join(
+                f"{display_name(item.clause_type)} ({STATUS_LABELS[item.status].lower()})"
+                for item in flag.items
+            ),
+            flag.note,
+        ]
+        for flag in flags
+    ]
+
+
+def compare_term_rows(rows: list[TermRow]) -> list[list[str]]:
+    """Return one row per key term: label, the value in each contract and a mark if they differ."""
+    return [[row.label, row.left, row.right, DIFFERS if row.differs else SAME] for row in rows]
+
+
+def compare_clause_rows(rows: list[ChecklistRow]) -> list[list[str]]:
+    """Return one row per clause type: its status in each contract and a mark if they differ."""
+    return [
+        [
+            display_name(row.clause_type),
+            STATUS_LABELS[row.left],
+            STATUS_LABELS[row.right],
+            DIFFERS if row.differs else SAME,
+        ]
+        for row in rows
+    ]

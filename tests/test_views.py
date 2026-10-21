@@ -14,8 +14,10 @@ from contract_assistant.answer import (
     Passage,
     answer,
 )
+from contract_assistant.compare import ChecklistRow, TermRow
 from contract_assistant.config import ROOT, Settings
 from contract_assistant.explain import Explanation
+from contract_assistant.review import Flag
 from contract_assistant.router.base import RouteResult
 from contract_assistant.store import read_cache
 from contract_assistant.summary import Summary
@@ -42,6 +44,8 @@ from contract_assistant.ui.views import (
     chat_reply,
     checklist_intro,
     clause_rows,
+    compare_clause_rows,
+    compare_term_rows,
     definition_block,
     definition_citation,
     definition_rows,
@@ -54,6 +58,7 @@ from contract_assistant.ui.views import (
     highlighted_quote,
     passage_choices,
     passage_citation,
+    review_rows,
     sources_json,
     streaming_markdown,
     summary_markdown,
@@ -848,3 +853,61 @@ def test_chat_reply_for_a_definition_answer_is_the_definition_block():
         definition=definition,
     )
     assert chat_reply(result) == definition_block(definition)
+
+
+def make_flag(**changes) -> Flag:
+    item = AnswerItem(
+        clause_type="Cap On Liability",
+        status="check",
+        best_conf=0.5,
+        citation=Citation(quote="Liability is capped.", page=1, conf=0.5, start=0, end=20),
+    )
+    fields = {
+        "rule": "r",
+        "kind": "present",
+        "severity": "high",
+        "title": "Title",
+        "note": "A note.",
+        "status": "check",
+        "items": [item],
+        "unvalidated": False,
+    }
+    return Flag(**{**fields, **changes})
+
+
+def test_review_rows_show_severity_title_clauses_and_note():
+    [row] = review_rows([make_flag()])
+    assert row == [
+        '<span class="tier tier-high">High</span>',
+        "Title",
+        "Cap on Liability (verify)",
+        "A note.",
+    ]
+
+
+def test_review_rows_mark_a_flag_on_an_unvalidated_clause_type():
+    [row] = review_rows([make_flag(unvalidated=True, severity="low")])
+    assert row[1] == "Title (not validated on test data)" and "tier-low" in row[0]
+
+
+def test_review_rows_of_no_flags_are_empty():
+    assert review_rows([]) == []
+
+
+def test_compare_term_rows_mark_a_difference():
+    rows = [
+        TermRow(field="parties", label="Parties", left="A", right="B", differs=True),
+        TermRow(field="governing_law", label="Governing law", left="X", right="X", differs=False),
+    ]
+    assert compare_term_rows(rows) == [["Parties", "A", "B", "≠"], ["Governing law", "X", "X", ""]]
+
+
+def test_compare_clause_rows_show_status_words_and_a_mark():
+    rows = [
+        ChecklistRow(clause_type="Insurance", left="found", right="not_found", differs=True),
+        ChecklistRow(clause_type="Audit Rights", left="check", right="check", differs=False),
+    ]
+    assert compare_clause_rows(rows) == [
+        ["Insurance", "Found", "Not found", "≠"],
+        ["Audit Rights", "Verify", "Verify", ""],
+    ]

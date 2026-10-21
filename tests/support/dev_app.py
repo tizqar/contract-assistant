@@ -7,6 +7,7 @@ from pathlib import Path
 from contract_assistant.clause_types import app_clause_types, load_extra_clause_types
 from contract_assistant.config import load_settings
 from contract_assistant.extract.extractor import Extractor
+from contract_assistant.review import load_rules
 from contract_assistant.search import PassageSearch
 from contract_assistant.store import Store
 from contract_assistant.ui.app import Services, build_app, launch_app
@@ -25,8 +26,17 @@ def dev_services() -> Services:
     unvalidated = frozenset(clause_type.name for clause_type in extra)
     search = PassageSearch(FakeEncoder())
     gen = EchoTextClient()
+    rules = load_rules(known_types=[c.name for c in clause_types])
     return Services(
-        store, FakeRouter(), extractor, clause_types, settings, search, unvalidated, gen=gen
+        store,
+        FakeRouter(),
+        extractor,
+        clause_types,
+        settings,
+        search,
+        unvalidated,
+        gen=gen,
+        rules=rules,
     )
 
 

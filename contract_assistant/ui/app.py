@@ -5,7 +5,7 @@ import inspect
 import logging
 import time
 from collections import OrderedDict
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,6 +21,7 @@ from contract_assistant.answer import (
 )
 from contract_assistant.background import precompute, run_in_background, warm
 from contract_assistant.clause_types import ClauseType
+from contract_assistant.compare import compare_checklists, compare_terms
 from contract_assistant.config import Settings
 from contract_assistant.definitions import find_definitions, lookup
 from contract_assistant.explain import (
@@ -35,10 +36,13 @@ from contract_assistant.intents import Intent, detect_intent
 from contract_assistant.passage_answer import APP_ATTEMPTS as PASSAGE_ATTEMPTS
 from contract_assistant.passage_answer import generated_answer_from, passage_request
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
+from contract_assistant.report import build_report, write_report
+from contract_assistant.review import Flag, Rule, flag_request, load_rules, review
 from contract_assistant.router.base import Router, RouteResult, Turn
 from contract_assistant.router.clients import LLMClient, LLMError
 from contract_assistant.search import PassageSearch
 from contract_assistant.store import (
+    DOC_ID_PREFIX,
     CacheIntegrityError,
     CacheMismatchError,
     DocumentCache,
@@ -73,6 +77,8 @@ from contract_assistant.ui.views import (
     chat_reply,
     checklist_intro,
     clause_rows,
+    compare_clause_rows,
+    compare_term_rows,
     definition_citation,
     definition_rows,
     display_name,
@@ -80,9 +86,11 @@ from contract_assistant.ui.views import (
     document_title,
     document_view,
     explanation_markdown,
+    flag_title,
     highlighted_quote,
     passage_choices,
     passage_citation,
+    review_rows,
     sources_json,
     streaming_markdown,
     summary_markdown,
@@ -104,6 +112,9 @@ KEEP_WARM_S = 1500  # Ollama unloads an idle model after 30 minutes; load it aga
 WRITING_SUMMARY = "Writing the summary"
 WRITING_EXPLANATION = "Writing the explanation"
 WRITING_ANSWER = "Writing the answer from the passages"
+WRITING_FLAG = "Writing the note"
+EXTRACTING_TERMS = "Extracting the key terms of {name}"
+REPORTS_DIR = "reports"
 TERM_SHEET_STATUS = "Extracting the key terms. This can take up to half a minute."
 ASK_OTHER_OUTPUTS = 7
 MAX_REMEMBERED_TURNS = 8
@@ -119,6 +130,8 @@ UPLOAD_ERRORS = (UnsupportedFileError, EmptyDocumentError, CacheIntegrityError)
 DOCUMENT_TAB = "tab-document"
 SUMMARY_TAB = "tab-summary"
 CHECKLIST_TAB = "tab-checklist"
+REVIEW_TAB = "tab-review"
+COMPARE_TAB = "tab-compare"
 SETTINGS_TAB = "tab-settings"
 TECHNICAL_TAB = "tab-technical"
 ALL_CLAUSES = "all"
@@ -161,6 +174,44 @@ TERM_HEADERS = ["Term", "Value", "From clause", "Page"]
 TERM_DOWNLOAD_LABEL = "Download the term sheet (JSON)"
 GENERATION_FAILED = "The language model did not answer; see the server log."
 NOTHING_TO_EXPLAIN = "Ask about a clause first, then say 'explain that'."
+NO_FLAG_SELECTED = "Select a flag in the table first."
+NO_PASSAGE_ATTACHED = "No passage is attached to this flag."
+FLAG_NO_PASSAGE_NOTE = "{note}\n\n<small>No passage is attached to this flag.</small>"
+FLAG_WITHHELD = "The language model's note is not shown because {reason}."
+FLAG_META = (
+    "Written by the language model {model} from the quotes of the clauses. "
+    "It is not legal advice; read the passages."
+)
+REVIEW_INTRO = (
+    "These flags come from a rule file checked against the clauses found in this contract. "
+    "No language model is used. Each flag names the clauses it rests on. "
+    "\u201cNot validated on test data\u201d marks a flag that rests on one of the extra clause "
+    "types. Select a flag to see its passage, and check the passages yourself."
+)
+REVIEW_HEADERS = ["Severity", "Flag", "Clauses", "Note"]
+COMPARE_INTRO = (
+    "Put this contract next to another one: the key terms and the status of every clause. "
+    "A mark in the last column shows a difference. Key terms are written by the language model "
+    "and checked against the clauses; the clause statuses use no model."
+)
+COMPARE_TERM_HEADERS = ["Term", "This contract", "Other contract", "Differs"]
+COMPARE_CLAUSE_HEADERS = ["Clause", "This contract", "Other contract", "Differs"]
+COMPARE_NAMES = "**{left}** compared with **{right}**"
+CHOOSE_OTHER = "Choose a contract to compare with."
+CHOOSE_DIFFERENT = "Choose a different contract: this one is already open."
+OTHER_UNAVAILABLE = "The other contract has not been analysed, or its analysis is damaged."
+TERMS_SKIPPED = "The key terms are not compared: {reason}."
+TERMS_NEED_MODEL = "they need the language model, which is off"
+TERMS_NEED_CLAUSES = "no clause they are read from was found in {name}"
+TERMS_FAILED = "the language model did not answer"
+REPORT_INTRO = (
+    "The report holds the saved summary and key terms, the review flags, the clauses found and "
+    "the defined terms. Nothing is generated when it is built."
+)
+REPORT_BUILT = "Report built from the saved summary and key terms."
+REPORT_MISSING = (
+    "Report built without {missing}. Make {them} in the Summary tab, then build the report again."
+)
 NOTHING_TO_SUMMARIZE = "No clause was found in this contract, so there is nothing to summarize."
 NOTHING_HIGHLIGHTED = (
     "Nothing is highlighted. Ask a question or select a clause in the checklist first."
@@ -204,13 +255,20 @@ CSS = """
 .tier-related { background: #e5e7eb; color: #374151; }
 .tier-generated { background: #dbeafe; color: #1e3a8a; }
 .tier-definition { background: #ede9fe; color: #4c1d95; }
+.tier-high { background: #b91c1c; color: #ffffff; }
+.tier-medium { background: transparent; border-color: #b45309; color: #92400e; }
+.tier-low { background: transparent; border-color: #9ca3af; color: #6b7280; }
+.dark .tier-high { background: #f87171; color: #2a0505; }
+.dark .tier-medium { border-color: #fbbf24; color: #fbbf24; }
+.dark .tier-low { border-color: #6b7280; color: #9ca3af; }
 .dark .tier-found { background: #34a56f; color: #06210f; }
 .dark .tier-check { border-color: #fbbf24; color: #fbbf24; }
 .dark .tier-not_found { border-color: #6b7280; color: #9ca3af; }
 .dark .tier-related { background: #374151; color: #e5e7eb; }
 .dark .tier-generated { background: #1e3a8a; color: #dbeafe; }
 .dark .tier-definition { background: #4c1d95; color: #ede9fe; }
-#chat .message, #clause-table td, #clause-table td * {
+#chat .message, #clause-table td, #clause-table td *,
+#review-table td, #review-table td *, #compare-terms td, #compare-clauses td {
   overflow-wrap: anywhere;
   white-space: normal;
 }
@@ -260,6 +318,7 @@ class Services:
     gen: LLMClient | None = None
     summaries: SummaryStore | None = None
     term_sheets: TermSheetStore | None = None
+    rules: Sequence[Rule] = ()
 
 
 def guarded(handler: Callable) -> Callable:
@@ -342,6 +401,9 @@ class Handlers:
         self.term_sheets = services.term_sheets or TermSheetStore(
             services.settings.cache_dir / TERM_SHEET_DIR
         )
+        self.rules = services.rules or load_rules(
+            known_types=[clause_type.name for clause_type in services.clause_types]
+        )
         self.definitions: OrderedDict[str, list[Definition]] = OrderedDict()
 
     @guarded
@@ -363,6 +425,7 @@ class Handlers:
             return gr.skip()
         label, segments = document_view(cache, None, None)
         path = services.store.find(doc_id)
+        flags = self._flags(cache, tau_low, tau_high)
         rows = clause_rows(
             cache, tau_low, tau_high, status_of_filter(status_filter), services.unvalidated
         )
@@ -380,6 +443,9 @@ class Handlers:
             gr.DownloadButton(value=str(path)),
             [],
             definition_rows(self._definitions(cache)),
+            review_rows(flags),
+            _dump(flags),
+            None,
         )
 
     @guarded
@@ -471,9 +537,7 @@ class Handlers:
     ):
         """Keep the Verify threshold at or below the Found threshold and re-tier the checklist."""
         tau_low = min(tau_low, tau_high)
-        return tau_low, _table(
-            cache, tau_low, tau_high, status_filter, self.services.unvalidated
-        )
+        return tau_low, *self._retier(cache, tau_low, tau_high, status_filter)
 
     @guarded
     def release_high(
@@ -481,20 +545,14 @@ class Handlers:
     ):
         """Keep the Found threshold at or above the Verify threshold and re-tier the checklist."""
         tau_high = max(tau_high, tau_low)
-        return tau_high, _table(
-            cache, tau_low, tau_high, status_filter, self.services.unvalidated
-        )
+        return tau_high, *self._retier(cache, tau_low, tau_high, status_filter)
 
     @guarded
     def reset_thresholds(self, cache: DocumentCache | None, status_filter: str):
         """Restore the default thresholds and re-tier the checklist."""
         services = self.services
         tau_low, tau_high = services.settings.tau_low, services.settings.tau_high
-        return (
-            tau_low,
-            tau_high,
-            _table(cache, tau_low, tau_high, status_filter, services.unvalidated),
-        )
+        return tau_low, tau_high, *self._retier(cache, tau_low, tau_high, status_filter)
 
     @guarded
     def show_row(self, cache: DocumentCache | None, evt: gr.SelectData):
@@ -508,6 +566,152 @@ class Handlers:
             gr.Info(f"No passage found for {name}.")
             return gr.skip()
         return *document_view(cache, clause_type, citation), show_tab(DOCUMENT_TAB)
+
+    @guarded
+    def show_flag(
+        self, flags: list[dict] | None, cache: DocumentCache | None, evt: gr.SelectData
+    ):
+        """Show the first quote of the selected flag in the Document tab and remember the flag."""
+        if cache is None:
+            return gr.skip()
+        shown = [Flag.model_validate(flag) for flag in flags or []]
+        title = evt.row_value[1]
+        index = next((i for i, flag in enumerate(shown) if flag_title(flag) == title), None)
+        if index is None:
+            return gr.skip()
+        item = next((item for item in shown[index].items if item.citation), None)
+        if item is None:
+            gr.Info(NO_PASSAGE_ATTACHED)
+            return gr.skip(), gr.skip(), gr.skip(), index
+        label, segments = document_view(cache, item.clause_type, item.citation)
+        return label, segments, show_tab(DOCUMENT_TAB), index
+
+    @guarded
+    def explain_flag(self, flags: list[dict] | None, index: int | None):
+        """Write a short note on the selected flag from its quotes, checked against them."""
+        gen = self.services.gen
+        if index is None or index >= len(flags or []):
+            gr.Info(NO_FLAG_SELECTED)
+            yield gr.skip()
+            return
+        flag = Flag.model_validate(flags[index])
+        if not any(item.citation for item in flag.items):
+            yield FLAG_NO_PASSAGE_NOTE.format(note=flag.note)
+            return
+        if gen is None:
+            gr.Warning(SUMMARIES_OFF)
+            yield gr.skip()
+            return
+        try:
+            for step in _stream_checked(gen, WRITING_FLAG, flag_request(flag), 1):
+                if isinstance(step, Generation):
+                    outcome = step
+                else:
+                    yield step
+        except LLMError:
+            logger.exception("note on flag %s failed", flag.rule)
+            gr.Warning(GENERATION_FAILED)
+            yield gr.skip()
+            return
+        if outcome.text is None:
+            yield FLAG_WITHHELD.format(reason=outcome.reason)
+            return
+        meta = FLAG_META.format(model=gen.model)
+        yield f"**{flag.title}**\n\n{outcome.text}\n\n<small>{meta}</small>"
+
+    @guarded
+    def compare(
+        self, cache: DocumentCache | None, other_doc_id: str | None, tau_low: float, tau_high: float
+    ):
+        """Compare the key terms and the clause statuses of the open contract with another one."""
+        services = self.services
+        if cache is None:
+            gr.Warning(SELECT_CONTRACT)
+            yield gr.skip()
+            return
+        if not other_doc_id:
+            gr.Warning(CHOOSE_OTHER)
+            yield gr.skip()
+            return
+        if other_doc_id == cache.doc_id:
+            gr.Warning(CHOOSE_DIFFERENT)
+            yield gr.skip()
+            return
+        try:
+            other = services.store.load(other_doc_id, services.settings)
+        except (CacheIntegrityError, CacheMismatchError) as error:
+            logger.warning("cannot load %s: %s", other_doc_id, error)
+            other = None
+        if other is None:
+            gr.Warning(OTHER_UNAVAILABLE)
+            yield gr.skip()
+            return
+        names = COMPARE_NAMES.format(
+            left=document_name(cache.source.filename), right=document_name(other.source.filename)
+        )
+        try:
+            clauses = compare_checklists(
+                cache,
+                other,
+                [clause_type.name for clause_type in services.clause_types],
+                tau_low,
+                tau_high,
+                services.unvalidated,
+            )
+            sheets = yield from self._both_sheets(cache, other, tau_low, tau_high)
+        except ValueError as error:
+            gr.Warning(str(error))
+            yield gr.skip()
+            return
+        terms = [] if isinstance(sheets, str) else compare_term_rows(compare_terms(*sheets))
+        note = TERMS_SKIPPED.format(reason=sheets) if isinstance(sheets, str) else ""
+        yield names, terms, compare_clause_rows(clauses), note
+
+    @guarded
+    def build_report_files(self, cache: DocumentCache | None, tau_low: float, tau_high: float):
+        """Write the report of the open contract from what is saved; generate nothing."""
+        services = self.services
+        gen = services.gen
+        if cache is None:
+            gr.Warning(SELECT_CONTRACT)
+            return gr.skip()
+        summary = sheet = None
+        if gen is not None:
+            summary = self.summaries.load(cache.doc_id, gen.model, tau_low, tau_high)
+            sheet = self.term_sheets.load(cache.doc_id, gen.model, tau_low, tau_high)
+        missing = []
+        if summary is None or summary.text is None:
+            missing.append("the summary")
+        if sheet is None:
+            missing.append("the key terms")
+        report = build_report(
+            cache,
+            document_name(cache.source.filename),
+            services.settings,
+            [clause_type.name for clause_type in services.clause_types],
+            services.unvalidated,
+            summary,
+            sheet,
+            self._flags(cache, tau_low, tau_high),
+            self._definitions(cache),
+            tau_low=tau_low,
+            tau_high=tau_high,
+            model=gen.model if gen else None,
+        )
+        stem = f"{cache.doc_id.removeprefix(DOC_ID_PREFIX)}-{tau_high}-{tau_low}"
+        markdown_path, docx_path = write_report(
+            report, services.settings.cache_dir / REPORTS_DIR, stem
+        )
+        status = REPORT_BUILT
+        if missing:
+            status = REPORT_MISSING.format(
+                missing=" and ".join(missing), them="it" if len(missing) == 1 else "them"
+            )
+        return (
+            gr.DownloadButton(value=str(docx_path), visible=True),
+            gr.DownloadButton(value=str(markdown_path), visible=True),
+            status,
+        )
 
     @guarded
     def show_definition(self, cache: DocumentCache | None, evt: gr.SelectData):
@@ -699,6 +903,45 @@ class Handlers:
                 self.summaries.save(summary)
         yield summary
 
+    def _flags(self, cache: DocumentCache, tau_low: float, tau_high: float) -> list[Flag]:
+        return review(cache, self.rules, tau_low, tau_high, self.services.unvalidated)
+
+    def _retier(
+        self, cache: DocumentCache | None, tau_low: float, tau_high: float, status_filter: str
+    ) -> tuple:
+        if cache is None:
+            return gr.skip(), gr.skip(), gr.skip(), gr.skip()
+        flags = self._flags(cache, tau_low, tau_high)
+        table = _table(cache, tau_low, tau_high, status_filter, self.services.unvalidated)
+        return table, review_rows(flags), _dump(flags), None
+
+    def _both_sheets(
+        self, cache: DocumentCache, other: DocumentCache, tau_low: float, tau_high: float
+    ) -> Iterator[tuple]:
+        gen = self.services.gen
+        if gen is None:
+            return TERMS_NEED_MODEL
+        sheets = []
+        for one in (cache, other):
+            items = term_sheet_items(one, tau_low, tau_high, self.services.unvalidated)
+            if not items:
+                return TERMS_NEED_CLAUSES.format(name=document_name(one.source.filename))
+            sheet = self.term_sheets.load(one.doc_id, gen.model, tau_low, tau_high)
+            if sheet is None:
+                name = document_name(one.source.filename)
+                yield gr.skip(), gr.skip(), gr.skip(), EXTRACTING_TERMS.format(name=name)
+                try:
+                    sheet = request_term_sheet(
+                        one.doc_id, items, gen, tau_low, tau_high, attempts=TERM_SHEET_ATTEMPTS
+                    )
+                except LLMError:
+                    logger.exception("term sheet of %s failed", one.doc_id)
+                    return TERMS_FAILED
+                if sheet.reason is None:
+                    self.term_sheets.save(sheet)
+            sheets.append(sheet)
+        return tuple(sheets)
+
     def _definitions(self, cache: DocumentCache) -> list[Definition]:
         found = self.definitions.get(cache.doc_id)
         if found is None:
@@ -874,6 +1117,10 @@ def _last_shown(last: Answer | None) -> tuple[str, str] | None:
     return None
 
 
+def _dump(flags: list[Flag]) -> list[dict]:
+    return [flag.model_dump() for flag in flags]
+
+
 def _table(
     cache: DocumentCache | None,
     tau_low: float,
@@ -933,6 +1180,8 @@ def build_app(services: Services) -> gr.Blocks:
         answer_state = gr.State(None)
         turns_state = gr.State([])
         refresh_state = gr.State(None)
+        review_state = gr.State([])
+        flag_state = gr.State(None)
         with gr.Column(elem_id="top"):
             gr.Markdown(f"# Contract Assistant\n\n{INTRO}", elem_id="header")
             gr.Markdown(DISCLAIMER, elem_id="disclaimer")
@@ -1044,6 +1293,55 @@ def build_app(services: Services) -> gr.Blocks:
                     term_download = gr.DownloadButton(
                         TERM_DOWNLOAD_LABEL, elem_id="term-download", visible=False
                     )
+                    gr.Markdown(REPORT_INTRO, elem_id="report-intro")
+                    report_button = gr.Button("Build the report", elem_id="report")
+                    report_status = gr.Markdown(elem_id="report-status")
+                    with gr.Row():
+                        report_docx = gr.DownloadButton(
+                            "Download the report (DOCX)", elem_id="report-docx", visible=False
+                        )
+                        report_md = gr.DownloadButton(
+                            "Download the report (Markdown)", elem_id="report-md", visible=False
+                        )
+                with gr.Tab("Review", id=REVIEW_TAB):
+                    gr.Markdown(REVIEW_INTRO, elem_id="review-intro")
+                    review_table = gr.Dataframe(
+                        headers=REVIEW_HEADERS,
+                        datatype=["html", "str", "str", "str"],
+                        interactive=False,
+                        wrap=True,
+                        elem_id="review-table",
+                    )
+                    explain_flag = gr.Button(
+                        "Explain the selected flag",
+                        elem_id="explain-flag",
+                        interactive=services.gen is not None,
+                    )
+                    flag_explanation = gr.Markdown(elem_id="flag-explanation")
+                with gr.Tab("Compare", id=COMPARE_TAB):
+                    gr.Markdown(COMPARE_INTRO, elem_id="compare-intro")
+                    compare_with = gr.Dropdown(
+                        choices=document_choices(services.store),
+                        label="Compare with",
+                        elem_id="compare-with",
+                    )
+                    compare_button = gr.Button("Compare", elem_id="compare")
+                    compare_status = gr.Markdown(elem_id="compare-status")
+                    compare_names = gr.Markdown(elem_id="compare-names")
+                    compare_terms_table = gr.Dataframe(
+                        headers=COMPARE_TERM_HEADERS,
+                        datatype=["str", "str", "str", "str"],
+                        interactive=False,
+                        wrap=True,
+                        elem_id="compare-terms",
+                    )
+                    compare_clauses_table = gr.Dataframe(
+                        headers=COMPARE_CLAUSE_HEADERS,
+                        datatype=["str", "str", "str", "str"],
+                        interactive=False,
+                        wrap=True,
+                        elem_id="compare-clauses",
+                    )
                 with gr.Tab("Clause checklist", id=CHECKLIST_TAB):
                     checklist_text = gr.Markdown(elem_id="checklist-intro")
                     status_filter = gr.Radio(
@@ -1109,6 +1407,9 @@ def build_app(services: Services) -> gr.Blocks:
             download,
             turns_state,
             definitions_table,
+            review_table,
+            review_state,
+            flag_state,
         ]
         gr.on(
             triggers=[demo.load, document.change],
@@ -1164,23 +1465,29 @@ def build_app(services: Services) -> gr.Blocks:
         tau_low.release(
             handlers.release_low,
             [tau_low, tau_high, cache_state, status_filter],
-            [tau_low, table],
+            [tau_low, table, review_table, review_state, flag_state],
             api_name="release_tau_low",
         )
         tau_high.release(
             handlers.release_high,
             [tau_low, tau_high, cache_state, status_filter],
-            [tau_high, table],
+            [tau_high, table, review_table, review_state, flag_state],
             api_name="release_tau_high",
         )
         reset.click(
             handlers.reset_thresholds,
             [cache_state, status_filter],
-            [tau_low, tau_high, table],
+            [tau_low, tau_high, table, review_table, review_state, flag_state],
             api_name="reset_thresholds",
         )
         table.select(
             handlers.show_row, [cache_state], [view_label, view, tabs], api_name="show_row"
+        ).then(None, None, None, js=SCROLL_TO_HIGHLIGHT)
+        review_table.select(
+            handlers.show_flag,
+            [review_state, cache_state],
+            [view_label, view, tabs, flag_state],
+            api_name="show_flag",
         ).then(None, None, None, js=SCROLL_TO_HIGHLIGHT)
         definitions_table.select(
             handlers.show_definition,
@@ -1211,6 +1518,28 @@ def build_app(services: Services) -> gr.Blocks:
                 [explanation],
                 api_name="explain",
             )
+        )
+        running.append(
+            explain_flag.click(
+                handlers.explain_flag,
+                [review_state, flag_state],
+                [flag_explanation],
+                api_name="explain_flag",
+            )
+        )
+        running.append(
+            compare_button.click(
+                handlers.compare,
+                [cache_state, compare_with, tau_low, tau_high],
+                [compare_names, compare_terms_table, compare_clauses_table, compare_status],
+                api_name="compare",
+            )
+        )
+        report_button.click(
+            handlers.build_report_files,
+            [cache_state, tau_low, tau_high],
+            [report_docx, report_md, report_status],
+            api_name="build_report",
         )
         stop.click(None, None, None, cancels=running, api_visibility="private")
         keep_warm = gr.Timer(KEEP_WARM_S)
