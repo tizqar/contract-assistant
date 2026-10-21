@@ -1,0 +1,35 @@
+{% import "components.html" as c %}
+{% import "chat/macros.html" as m %}
+{# The reply to a question: the generated answer, a card per passage, or the clause list. #}
+{% if generated and generated.text is not none %}
+<div class="card chat-card">
+  <div class="bubble-head">{{ c.tag("generated", "Generated") }}<strong>Answer from the passages</strong></div>
+  <p class="generated-text">{{ generated.text }}</p>
+  {{ c.generated_note(generated_note) }}
+</div>
+{% elif generated %}
+{{ c.generated_note(generated_note) }}
+{% endif %}
+{% if intro %}<p>{{ intro }}</p>{% endif %}
+{% for card in cards %}
+{{ m.card(card, cache.doc_id, ws.gen_model) }}
+{% endfor %}
+{% if topics %}
+<p>{{ empty_text }}</p>
+<p>I can answer questions about:</p>
+<ul class="chat-topics">
+  {% for topic, names in topics %}
+  <li><strong>{{ topic }}:</strong> {{ names }}</li>
+  {% endfor %}
+</ul>
+<div class="row gap wrap">
+  <span class="muted small">For example:</span>
+  {% for question in examples %}
+  <button type="button" class="chip" data-fill="{{ question }}">{{ question }}</button>
+  {% endfor %}
+</div>
+{% endif %}
+<div class="bubble-actions">
+  {% if note %}<span class="muted">{{ note }}</span>{% endif %}
+  {% include "chat/feedback.html" %}
+</div>

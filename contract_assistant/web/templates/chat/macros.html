@@ -1,0 +1,49 @@
+{% import "components.html" as c %}
+{# The parts of an answer: a card per passage and the actions under it. #}
+
+{% macro card(card, doc_id, explain) -%}
+<div class="card chat-card">
+  <div class="bubble-head">{{ c.tag(card.kind, card.tag) }}<strong>{{ card.title }}</strong></div>
+  {%- if card.quote %}
+  <blockquote class="quote{% if card.plain %} quote-plain{% endif %}">{{ card.quote }}</blockquote>
+  {%- endif %}
+  {%- if card.text %}
+  <p>{{ card.text }}</p>
+  {%- endif %}
+  {%- if card.meta %}
+  <p class="meta">{{ card.meta }}</p>
+  {%- endif %}
+  {%- if card.shown %}
+  {{ actions(card.shown, doc_id, explain) }}
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{% macro actions(shown, doc_id, explain) -%}
+<div class="bubble-actions">
+  {{ c.view_link(shown.view(doc_id), "Show in document") }}
+  {%- if explain %}
+  {{ explain_form(shown, doc_id, "en", "Explain") }}
+  {{ explain_form(shown, doc_id, "sr", "Explain in Serbian") }}
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{% macro explain_form(shown, doc_id, language, text) -%}
+<form class="chat-explain" data-stream data-target="#insight-body" data-activate="chat" action="/documents/{{ doc_id }}/explain" method="post">
+  <input type="hidden" name="label" value="{{ shown.label }}">
+  <input type="hidden" name="quote" value="{{ shown.quote }}">
+  <input type="hidden" name="language" value="{{ language }}">
+  {%- if shown.citation %}
+  <input type="hidden" name="start" value="{{ shown.citation.start }}">
+  <input type="hidden" name="end" value="{{ shown.citation.end }}">
+  <input type="hidden" name="conf" value="{{ '%g' % shown.citation.conf }}">
+  {%- endif %}
+  {%- if shown.status %}
+  <input type="hidden" name="status" value="{{ shown.status }}">
+  {%- endif %}
+  <input type="hidden" name="inline" value="1">
+  <button type="submit" class="chat-action">{{ text }}</button>
+  <button type="button" class="btn btn-stop btn-sm" data-stop hidden>Stop</button>
+</form>
+{%- endmacro %}

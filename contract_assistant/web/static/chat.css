@@ -1,0 +1,22 @@
+/* Chat: the reply being written, the cards inside an answer and their small actions. */
+
+/* The pending place holds the question and the reply being written as items of the list. */
+.chat-pending { display: contents; }
+.chat-card { gap: 6px; }
+.bubble-assistant .chat-card .quote:not(.quote-plain) { background: var(--quote-bg); }
+.chat-tools { display: flex; justify-content: flex-end; }
+.chat-topics { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.chat-explain { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+.chat-action {
+  border: 0; background: none; padding: 0; min-height: 24px;
+  font: inherit; font-weight: 600; color: var(--primary); cursor: pointer;
+}
+.chat-action:hover { color: var(--primary-2); text-decoration: underline; }
+.chat-action:disabled { color: var(--muted); cursor: default; text-decoration: none; }
+.chat-action:focus-visible, .feedback button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.feedback button { display: inline-flex; align-items: center; min-height: 28px; }
+.feedback-done { color: var(--muted); font-size: 12px; }
+.chat-based-on { line-height: 1.9; }
+.chat-source { white-space: nowrap; }
+.chat-source .badge { font-size: 11px; padding: 0 6px; }
+.chat-stopped { color: var(--muted); font-size: 13px; }

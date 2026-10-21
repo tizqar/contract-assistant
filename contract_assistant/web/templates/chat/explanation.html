@@ -1,0 +1,13 @@
+{% import "components.html" as c %}
+{# A plain-language restatement of a passage, or why it is not shown. #}
+{% if withheld %}
+<p>{{ withheld }}</p>
+{% else %}
+<div class="bubble-head">{{ c.tag("generated", "Generated") }}<span><strong>{{ title }}</strong> · in plain {{ language }}</span></div>
+<p class="generated-text">{{ text }}</p>
+{{ c.generated_note(meta) }}
+{% endif %}
+{% set view = shown.view(cache.doc_id) %}
+{% if view %}
+<div class="bubble-actions">{{ c.view_link(view, "Show in document") }}</div>
+{% endif %}

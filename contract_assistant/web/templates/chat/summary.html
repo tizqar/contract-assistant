@@ -1,0 +1,15 @@
+{% import "components.html" as c %}
+{# The summary of the contract asked for in the chat, or why it is not shown. #}
+{% if withheld %}
+<p>{{ withheld }}</p>
+{% if mismatch %}<p class="meta">{{ mismatch }}</p>{% endif %}
+{% else %}
+<div class="bubble-head">{{ c.tag("generated", "Generated") }}<strong>Summary</strong></div>
+<p class="generated-text">{{ text }}</p>
+{{ c.generated_note(meta) }}
+<p class="meta chat-based-on">{{ based_on_text }}
+  {%- for name, status, unvalidated in based_on %}
+  <span class="chat-source">{{ name }} {{ c.badge(status) }}{% if unvalidated %}{{ mark }}{% endif %}</span>{% if not loop.last %},{% endif %}
+  {%- endfor %}
+  {%- if unvalidated_note %} · {{ mark }} {{ unvalidated_note }}{% endif %}</p>
+{% endif %}

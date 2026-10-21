@@ -1,0 +1,7 @@
+{% import "components.html" as c %}
+{# The question and the reply being written: a status line, then the text so far. #}
+<div class="bubble bubble-user">{{ user|safe }}</div>
+<div class="bubble bubble-assistant bubble-pending" aria-busy="true">
+  {{ c.status_line(status) }}
+  {% if text %}<p class="generated-text">{{ text }}</p>{% endif %}
+</div>
