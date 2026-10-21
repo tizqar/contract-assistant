@@ -28,7 +28,35 @@ PHRASE_SCHEMA = {
 QUOTED_SPAN = re.compile(r'"([^"]*)"|“([^”]*)”')
 # A number written in words with its digits, "six (6)", counts as one number: contracts write
 # numbers that way and a model mixes the pairs up ("six (10)") more often than it invents digits.
-NUMBER = re.compile(r"[A-Za-z-]+ \(\d+(?:[.,]\d+)*\)|\d+(?:[.,]\d+)*")
+NUMBER = re.compile(
+    r"[^\W\d_][\w-]*(?: (?:and|i) [^\W\d_][\w-]*)? \(\d+(?:[.,]\d+)*\)|\d+(?:[.,]\d+)*"
+)
+PAIR = re.compile(r"^([^\W\d_][\w-]*(?: (?:and|i) [^\W\d_][\w-]*)?) \((\d+(?:[.,]\d+)*)\)$")
+UNITS = {
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
+    "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
+    "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18,
+    "nineteen": 19,
+}  # fmt: skip
+TENS = {
+    "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70,
+    "eighty": 80, "ninety": 90,
+}  # fmt: skip
+HUNDRED = "hundred"
+# Serbian number words in Latin script, with the inflections a summary uses.
+SERBIAN_UNITS = {
+    "nula": 0, "jedan": 1, "jedna": 1, "jedno": 1, "jednog": 1, "jedne": 1, "dva": 2, "dve": 2,
+    "dvije": 2, "tri": 3, "četiri": 4, "cetiri": 4, "pet": 5, "šest": 6, "sest": 6, "sedam": 7,
+    "osam": 8, "devet": 9, "deset": 10, "jedanaest": 11, "dvanaest": 12, "trinaest": 13,
+    "četrnaest": 14, "cetrnaest": 14, "petnaest": 15, "šesnaest": 16, "sesnaest": 16,
+    "sedamnaest": 17, "osamnaest": 18, "devetnaest": 19,
+}  # fmt: skip
+SERBIAN_TENS = {
+    "dvadeset": 20, "trideset": 30, "četrdeset": 40, "cetrdeset": 40, "pedeset": 50,
+    "šezdeset": 60, "sezdeset": 60, "sedamdeset": 70, "osamdeset": 80, "devedeset": 90,
+}  # fmt: skip
+SERBIAN_HUNDRED = "sto"
+CONJUNCTIONS = frozenset({"and", "i"})
 
 
 class PhraseReply(BaseModel):
@@ -57,13 +85,55 @@ def unfaithful_spans(paragraph: str, quotes: Sequence[str]) -> list[str]:
 
 
 def unsupported_numbers(text: str, quotes: Sequence[str]) -> list[str]:
-    """Return the numbers written in text that none of the quotes contains, in order."""
+    """Return the numbers written in text that the quotes do not support, in order.
+
+    A pair of a word and digits is supported when the digits are in a quote and the word,
+    if it is an English number, says the same number; "six (10)" is never supported.
+    """
     lowered = [_collapse(quote).lower() for quote in quotes]
-    return [
-        number
-        for number in NUMBER.findall(text)
-        if not any(number.lower() in quote for quote in lowered)
-    ]
+    return [number for number in NUMBER.findall(text) if not _supported(number, lowered)]
+
+
+def _supported(number: str, quotes: Sequence[str]) -> bool:
+    if any(number.lower() in quote for quote in quotes):
+        return True
+    pair = PAIR.match(number)
+    if pair is None:
+        return False
+    word, digits = pair.group(1), pair.group(2)
+    spelled = spelled_number(word)
+    if spelled is not None and spelled != _as_number(digits):
+        return False
+    return any(digits in quote for quote in quotes)
+
+
+def spelled_number(words: str) -> int | None:
+    """Return the number an English or Serbian number phrase names, or None if it is not one."""
+    total = 0
+    for word in re.split(r"[\s-]+", words.lower().strip()):
+        if word in CONJUNCTIONS:
+            continue
+        if word in UNITS or word in SERBIAN_UNITS:
+            total += UNITS.get(word, SERBIAN_UNITS.get(word, 0))
+        elif word in TENS or word in SERBIAN_TENS:
+            total += TENS.get(word, SERBIAN_TENS.get(word, 0))
+        elif word in (HUNDRED, SERBIAN_HUNDRED):
+            total = (total or 1) * 100
+        else:
+            return None
+    return total
+
+
+def english_number(words: str) -> int | None:
+    """Return the number an English number phrase names; kept for callers of the old name."""
+    return spelled_number(words)
+
+
+def _as_number(digits: str) -> float | None:
+    try:
+        return float(digits.replace(",", ""))
+    except ValueError:
+        return None
 
 
 def _is_part_of(span: str, collapsed_quotes: Sequence[str]) -> bool:

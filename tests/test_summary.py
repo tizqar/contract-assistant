@@ -4,6 +4,7 @@ import pytest
 
 from contract_assistant.answer import STATUS_WORDS
 from contract_assistant.config import Settings
+from contract_assistant.explain import UnknownLanguageError
 from contract_assistant.phrase import unsupported_numbers
 from contract_assistant.router.clients import LLMError
 from contract_assistant.summary import (
@@ -21,6 +22,8 @@ from contract_assistant.summary import (
     render_markdown,
     request_summary,
     summary_items,
+    summary_request,
+    system_prompt,
 )
 from tests.support.caches import make_cache
 from tests.support.fakes import FakeLLMClient
@@ -66,7 +69,9 @@ def items(mixed_cache):
 
 
 def summarize(items, reply: str = FAITHFUL) -> Summary:
-    return request_summary(DOC_ID, items, FakeLLMClient([reply], model=MODEL), TAU_LOW, TAU_HIGH)
+    return request_summary(
+        DOC_ID, items, FakeLLMClient([reply], model=MODEL), TAU_LOW, TAU_HIGH
+    )
 
 
 def make_summary(items, **changes) -> Summary:
@@ -145,9 +150,7 @@ def test_summary_request_lists_every_item_in_order_with_its_status_word(items):
     request_summary(DOC_ID, items, client, TAU_LOW, TAU_HIGH)
     user = client.text_calls[0][1]
     found, check = STATUS_WORDS["found"], STATUS_WORDS["check"]
-    assert user == (
-        f'Items:\n- Governing Law ({found}): "{LAW}"\n- Term ({check}): "{TERM}"'
-    )
+    assert user == (f'Items:\n- Governing Law ({found}): "{LAW}"\n- Term ({check}): "{TERM}"')
 
 
 def test_summary_request_collapses_whitespace_inside_a_quote(settings):
@@ -211,7 +214,9 @@ def test_whitespace_only_reply_is_withheld_as_empty(items):
 
 
 def test_reply_naming_a_number_no_quote_contains_is_withheld_with_it(settings):
-    cache = make_cache("The term is ten (10) years.", settings, {"Term": [("ten (10) years", 0.9)]})
+    cache = make_cache(
+        "The term is ten (10) years.", settings, {"Term": [("ten (10) years", 0.9)]}
+    )
     items = summary_items(cache, ["Term"], TAU_LOW, TAU_HIGH)
     summary = summarize(items, "The term is 12 years.")
     assert summary.text is None
@@ -219,7 +224,9 @@ def test_reply_naming_a_number_no_quote_contains_is_withheld_with_it(settings):
 
 
 def test_reply_repeating_a_number_of_a_quote_is_kept(settings):
-    cache = make_cache("The term is ten (10) years.", settings, {"Term": [("ten (10) years", 0.9)]})
+    cache = make_cache(
+        "The term is ten (10) years.", settings, {"Term": [("ten (10) years", 0.9)]}
+    )
     items = summary_items(cache, ["Term"], TAU_LOW, TAU_HIGH)
     assert summarize(items, "It lasts ten (10) years.").text == "It lasts ten (10) years."
 
@@ -382,9 +389,9 @@ def test_request_summary_rejects_zero_attempts(items):
 
 def test_number_in_words_with_other_digits_is_unsupported():
     quotes = ["A six (6) months notice", "a term of ten (10) years"]
-    assert unsupported_numbers("Notice is six (10) years; the term is ten (10) years.", quotes) == [
-        "six (10)"
-    ]
+    assert unsupported_numbers(
+        "Notice is six (10) years; the term is ten (10) years.", quotes
+    ) == ["six (10)"]
 
 
 def test_number_in_words_is_matched_without_regard_to_case():
@@ -398,3 +405,53 @@ def test_summary_mixing_a_word_and_digit_pair_is_withheld(settings):
     summary = summarize(items, "Termination needs a six (10) year notice (Term).")
     assert summary.text is None
     assert summary.reason == NUMBERS_REASON.format(numbers="six (10)")
+
+
+def test_english_system_prompt_is_the_plain_one():
+    assert system_prompt("en") == SYSTEM_PROMPT
+
+
+def test_serbian_system_prompt_ends_with_the_language_instruction():
+    prompt = system_prompt("sr")
+    assert prompt.startswith(SYSTEM_PROMPT)
+    assert "Serbian" in prompt.removeprefix(SYSTEM_PROMPT)
+
+
+def test_unknown_language_raises(items):
+    with pytest.raises(UnknownLanguageError):
+        system_prompt("xx")
+    with pytest.raises(UnknownLanguageError):
+        summary_request(DOC_ID, items, "xx")
+
+
+def test_summary_request_carries_the_language_prompt(items):
+    assert summary_request(DOC_ID, items, "sr").system == system_prompt("sr")
+
+
+def test_summary_request_is_english_by_default(items):
+    assert summary_request(DOC_ID, items).system == SYSTEM_PROMPT
+
+
+def test_summary_records_its_language(items):
+    client = FakeLLMClient([FAITHFUL], model=MODEL)
+    summary = request_summary(DOC_ID, items, client, TAU_LOW, TAU_HIGH, language="sr")
+    assert summary.language == "sr"
+
+
+def test_summary_language_is_english_by_default(items):
+    assert summarize(items).language == "en"
+
+
+def test_stores_of_two_languages_save_the_same_key_to_different_files(tmp_path, items):
+    english, serbian = SummaryStore(tmp_path), SummaryStore(tmp_path, "sr")
+    summary = make_summary(items)
+    assert english.save(summary) != serbian.save(summary)
+
+
+def test_each_language_store_loads_only_its_own(tmp_path, items):
+    english, serbian = SummaryStore(tmp_path), SummaryStore(tmp_path, "sr")
+    english.save(make_summary(items))
+    assert serbian.load(DOC_ID, MODEL, TAU_LOW, TAU_HIGH) is None
+    serbian.save(make_summary(items, language="sr"))
+    assert serbian.load(DOC_ID, MODEL, TAU_LOW, TAU_HIGH).language == "sr"
+    assert english.load(DOC_ID, MODEL, TAU_LOW, TAU_HIGH).language == "en"

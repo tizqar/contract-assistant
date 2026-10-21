@@ -10,6 +10,7 @@ from pydantic import Field
 
 from contract_assistant import generation
 from contract_assistant.answer import STATUS_WORDS, AnswerItem, compose, verify_quotes
+from contract_assistant.explain import DEFAULT_LANGUAGE, LANGUAGES, UnknownLanguageError
 from contract_assistant.generation import (
     MS_PER_S,
     GeneratedRecord,
@@ -39,6 +40,10 @@ MAX_QUOTE_CHARS = 600
 CUT_MARK = "(cut)"
 SUMMARY_DIR = "summaries"
 KIND = "summary"
+# A summary in another language has a store kind of its own and this sentence in its prompt.
+LANGUAGE_INSTRUCTION = (
+    " Write the summary in {language}; keep every quote in the language of the contract."
+)
 SOURCE = "contract"
 MISQUOTE_REASON = generation.MISQUOTE_REASON.format(source=SOURCE)
 NUMBERS_REASON = generation.NUMBERS_REASON.format(source=SOURCE, numbers="{numbers}")
@@ -62,6 +67,7 @@ class Summary(GeneratedRecord):
     """The summary of one document by one model under one pair of thresholds."""
 
     prompt_version: int = PROMPT_VERSION
+    language: str = DEFAULT_LANGUAGE
     items: list[AnswerItem]
     text: str | None
     reason: str | None = None
@@ -87,11 +93,24 @@ def quotes_of(items: Sequence[AnswerItem]) -> list[str]:
     return [item.citation.quote for item in items if item.citation is not None]
 
 
-def summary_request(doc_id: str, items: Sequence[AnswerItem]) -> Request:
+def system_prompt(language: str = DEFAULT_LANGUAGE) -> str:
+    """Return the system prompt, asking for another language than English when given one."""
+    if language not in LANGUAGES:
+        raise UnknownLanguageError(
+            f"unknown language {language!r}; use one of {', '.join(LANGUAGES)}"
+        )
+    if language == DEFAULT_LANGUAGE:
+        return SYSTEM_PROMPT
+    return SYSTEM_PROMPT + LANGUAGE_INSTRUCTION.format(language=LANGUAGES[language])
+
+
+def summary_request(
+    doc_id: str, items: Sequence[AnswerItem], language: str = DEFAULT_LANGUAGE
+) -> Request:
     """Return the request that writes the summary of the items, with its faithfulness check."""
     items = cited(items)
     return Request(
-        SYSTEM_PROMPT,
+        system_prompt(language),
         _user_message(items),
         MAX_TOKENS,
         faithful_check(quotes_of(items), SOURCE),
@@ -107,6 +126,7 @@ def summary_from(
     client: LLMClient,
     tau_low: float,
     tau_high: float,
+    language: str = DEFAULT_LANGUAGE,
 ) -> Summary:
     """Return the Summary that a generation outcome gives for the items."""
     items = cited(items)
@@ -115,6 +135,7 @@ def summary_from(
         model=client.model,
         tau_low=tau_low,
         tau_high=tau_high,
+        language=language,
         items=items,
         text=result.text,
         reason=result.reason,
@@ -139,10 +160,11 @@ def request_summary(
     tau_low: float,
     tau_high: float,
     attempts: int = 1,
+    language: str = DEFAULT_LANGUAGE,
 ) -> Summary:
     """Ask the model to summarize the items, up to attempts times while the reply is withheld."""
-    result = run(client, summary_request(doc_id, items), attempts)
-    return summary_from(result, doc_id, items, client, tau_low, tau_high)
+    result = run(client, summary_request(doc_id, items, language), attempts)
+    return summary_from(result, doc_id, items, client, tau_low, tau_high, language)
 
 
 def _user_message(items: Sequence[AnswerItem]) -> str:
@@ -172,7 +194,9 @@ def render_markdown(summary: Summary) -> str:
 
 
 class SummaryStore(GeneratedStore[Summary]):
-    """Summaries saved as JSON files, one per document, model, thresholds and prompt version."""
+    """Summaries saved as JSON files, one per document, model, thresholds, language and version."""
 
-    def __init__(self, directory: Path):
-        super().__init__(directory, KIND, PROMPT_VERSION, Summary)
+    def __init__(self, directory: Path, language: str = DEFAULT_LANGUAGE):
+        kind = KIND if language == DEFAULT_LANGUAGE else f"{KIND}-{language}"
+        super().__init__(directory, kind, PROMPT_VERSION, Summary)
+        self.language = language
