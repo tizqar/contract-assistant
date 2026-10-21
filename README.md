@@ -209,6 +209,10 @@ The demo contracts are text files and show the excerpt only.
 | The key terms, each a verbatim value from a clause found. | A question outside the clause types, answered from the related passages. |
 | ![The review flags of a contract](docs/screenshots/review.png) | ![Two contracts compared](docs/screenshots/compare.png) |
 | Review flags from the rule file, each resting on a clause found. | Two contracts side by side, differing rows marked. |
+| ![Obligations by party](docs/screenshots/obligations.png) | ![The full-text overview](docs/screenshots/fulltext.png) |
+| Who must, may or must not do what, each entry a verbatim slice of a clause. | The full-text overview, written section by section and checked. |
+| ![The page of a PDF with the passage boxed](docs/screenshots/page.png) | |
+| For a PDF, the Document tab shows the page with the cited passage boxed. | |
 
 ### Defined terms and chat commands
 
