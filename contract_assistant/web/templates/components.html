@@ -1,0 +1,29 @@
+{# Macros every template uses, so that badges, quotes and notices look the same everywhere. #}
+
+{% macro badge(status) -%}
+<span class="badge badge-{{ status }}">{{ status|status_label }}</span>
+{%- endmacro %}
+
+{% macro tag(kind, text) -%}
+<span class="badge badge-{{ kind }}">{{ text }}</span>
+{%- endmacro %}
+
+{% macro quote(text) -%}
+<blockquote class="quote">{{ text }}</blockquote>
+{%- endmacro %}
+
+{% macro notice(text) -%}
+<p class="notice">{{ text }}</p>
+{%- endmacro %}
+
+{% macro status_line(text, elapsed=None) -%}
+<div class="status-line"><span class="spinner" aria-hidden="true"></span><span>{{ text }}{% if elapsed %} · {{ elapsed }}{% endif %}</span></div>
+{%- endmacro %}
+
+{% macro view_link(url, text, cls="link") -%}
+<a class="{{ cls }}" href="#document-pane" hx-get="{{ url }}" hx-target="#document-pane" hx-swap="innerHTML">{{ text }}</a>
+{%- endmacro %}
+
+{% macro generated_note(text) -%}
+<p class="meta">{{ text }}</p>
+{%- endmacro %}

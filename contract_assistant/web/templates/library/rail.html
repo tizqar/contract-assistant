@@ -1,0 +1,30 @@
+{# The contracts rail: the list of contracts, the upload and how answers are made. #}
+<div class="rail-head">
+  <span class="eyebrow">Contracts</span>
+  <a class="link small" href="/portfolio">Portfolio</a>
+</div>
+<nav class="doc-list" aria-label="Contracts">
+  {% for d in documents %}
+  <a class="doc-item {% if d.doc_id == cache.doc_id %}doc-item-active{% endif %}" href="/documents/{{ d.doc_id }}"
+     {% if d.doc_id == cache.doc_id %}aria-current="page"{% endif %}>
+    <span class="doc-name">{{ d.name }}</span>
+    <span class="doc-meta">{{ 'PDF' if d.kind == 'pdf' else 'Text' }} · {{ d.size }} · {{ d.found }} found, {{ d.check }} to verify</span>
+  </a>
+  {% endfor %}
+</nav>
+<details class="add-contract">
+  <summary class="btn btn-dashed">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+    Add a contract
+  </summary>
+  <div class="add-body">
+    {% include "library/upload.html" %}
+  </div>
+</details>
+<div id="report-result" class="report-result"></div>
+<div class="grow"></div>
+<div class="rail-note">
+  <strong>How answers are made</strong>
+  A fine-tuned encoder found the clauses once. Every quote is checked word for word. Text marked generated was written by the local model from those quotes and checked against them.
+  <span class="block">Found from {{ '%g' % tau.high }} · Verify from {{ '%g' % tau.low }}</span>
+</div>

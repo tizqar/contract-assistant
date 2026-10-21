@@ -124,6 +124,7 @@ from contract_assistant.router.factory import (
     load_encoder,
 )
 from contract_assistant.search import PassageSearch
+from contract_assistant.services import Services
 from contract_assistant.store import (
     DOC_ID_PREFIX,
     CacheIntegrityError,
@@ -162,6 +163,7 @@ from contract_assistant.term_sheet import (
 from contract_assistant.term_sheet import (
     render_markdown as render_term_sheet,
 )
+from contract_assistant.web.app import DEFAULT_HOST, DEFAULT_PORT, create_app, run_server
 
 DEMO_DOCUMENTS = ROOT / "demo" / "demo_documents.json"
 CHECK_DOCUMENT = ROOT / "demo" / "short_supply_agreement.txt"
@@ -173,6 +175,13 @@ DEFINITION_HEADING = "**Definition: {term}** · p. {page}"
 DEFINITIONS_HEADER = ("| Term | Defined as | Page |", "| --- | --- | --- |")
 ELLIPSIS = "…"
 PRECOMPUTE_NOTICE = "precomputing summaries and key terms in the background"
+WEB_UI = "web"
+GRADIO_UI = "gradio"
+UI_CHOICES = (WEB_UI, GRADIO_UI)
+SHARE_NOTICE = (
+    "--share applies to the Gradio app only; "
+    "use --host 0.0.0.0 to serve the web app on the network"
+)
 PAGES_DIR = "pages"
 TEXT_FILE_ERROR = "error: {name} is a text file; it has no pages to show"
 NO_COPY_ERROR = "error: no PDF copy of this document; run extract on the PDF again"
@@ -1363,9 +1372,6 @@ def _cmd_check(args: argparse.Namespace) -> int:
 
 
 def _cmd_serve(args: argparse.Namespace) -> int:
-    # Imported here so the other commands do not pay for loading Gradio.
-    from contract_assistant.ui.app import Services, build_app, launch_app
-
     logging.basicConfig(level=logging.INFO)
     settings = load_settings()
     app_types = app_clause_types(settings)
@@ -1414,7 +1420,19 @@ def _cmd_serve(args: argparse.Namespace) -> int:
             extras,
             obligation_store,
         )
-    launch_app(build_app(services), services, share=args.share, port=args.port)
+    if args.ui == GRADIO_UI:
+        # Imported here so the other commands do not pay for loading Gradio.
+        from contract_assistant.ui.app import build_app, launch_app
+
+        launch_app(build_app(services), services, share=args.share, port=args.port)
+        return 0
+    if args.share:
+        print(SHARE_NOTICE, file=sys.stderr)
+    run_server(
+        create_app(services, keep_warm=gen is not None),
+        host=args.host,
+        port=args.port or DEFAULT_PORT,
+    )
     return 0
 
 
@@ -1597,6 +1615,10 @@ def _parser() -> argparse.ArgumentParser:
     check = commands.add_parser("check", help="load the model and answer one question")
     check.set_defaults(func=_cmd_check)
     serve = commands.add_parser("serve", help="start the web app")
+    serve.add_argument(
+        "--ui", choices=UI_CHOICES, default=WEB_UI, help="the web app, or the older Gradio app"
+    )
+    serve.add_argument("--host", default=DEFAULT_HOST, help="address to listen on")
     serve.add_argument("--share", action="store_true", help="create a public Gradio link")
     serve.add_argument("--port", type=int, help="port to listen on")
     serve.add_argument(

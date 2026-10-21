@@ -28,7 +28,26 @@ def served(monkeypatch, tmp_path):
         "launch_app",
         lambda demo, services, share, port: state["launched"].update(services=services),
     )
+    monkeypatch.setattr(
+        cli,
+        "run_server",
+        lambda web_app, host, port: state["launched"].update(
+            services=web_app.state.workspace.services, host=host, port=port
+        ),
+    )
     return state
+
+
+def test_serve_runs_the_web_app_by_default(served):
+    assert cli.main(["serve", "--port", "8123"]) == 0
+    assert served["launched"]["host"] == cli.DEFAULT_HOST
+    assert served["launched"]["port"] == 8123
+
+
+def test_serve_can_start_the_gradio_app(served):
+    assert cli.main(["serve", "--ui", "gradio"]) == 0
+    assert "host" not in served["launched"]
+    assert served["launched"]["services"].rules
 
 
 def test_serve_starts_the_precompute_in_the_background(served, capsys):

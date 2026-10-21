@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ entry.name if entry else cache.source.filename|document_name }} · Contract Assistant{% endblock %}
+{% block switcher %}
+<label class="sr-only" for="switch">Contract</label>
+<select id="switch" class="switcher" data-navigate aria-label="Open another contract">
+  {% for d in documents %}
+  <option value="/documents/{{ d.doc_id }}" {% if d.doc_id == cache.doc_id %}selected{% endif %}>{{ d.name }} · {{ d.size }}</option>
+  {% endfor %}
+</select>
+{% endblock %}
+{% block actions %}
+<button type="button" class="btn btn-primary" hx-post="/documents/{{ cache.doc_id }}/report" hx-target="#report-result" hx-swap="innerHTML">Build report</button>
+{% endblock %}
+{% block main %}
+<div class="workspace">
+  <aside class="rail">
+    {% include "library/rail.html" %}
+  </aside>
+  <main class="pane pane-document" id="document-pane" aria-label="Document"
+        hx-get="/documents/{{ cache.doc_id }}/view" hx-trigger="load" hx-swap="innerHTML">
+  </main>
+  <section class="pane pane-insights" id="insights" aria-label="Insights">
+    {% include "insights/panel.html" %}
+  </section>
+</div>
+{% endblock %}

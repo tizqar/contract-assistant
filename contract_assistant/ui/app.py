@@ -5,8 +5,7 @@ import inspect
 import logging
 import time
 from collections import OrderedDict
-from collections.abc import Callable, Iterator, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Iterator
 from io import BytesIO
 from pathlib import Path
 
@@ -28,9 +27,7 @@ from contract_assistant.background import (
     run_in_background,
     warm,
 )
-from contract_assistant.clause_types import ClauseType
 from contract_assistant.compare import compare_checklists, compare_terms
-from contract_assistant.config import Settings
 from contract_assistant.dates import key_dates
 from contract_assistant.definitions import find_definitions, lookup
 from contract_assistant.explain import (
@@ -39,7 +36,6 @@ from contract_assistant.explain import (
     explanation_from,
     explanation_request,
 )
-from contract_assistant.extract.extractor import Extractor
 from contract_assistant.feedback import FEEDBACK_FILE, Feedback, now, record_feedback
 from contract_assistant.fulltext import APP_ATTEMPTS as FULLTEXT_ATTEMPTS
 from contract_assistant.fulltext import (
@@ -74,10 +70,10 @@ from contract_assistant.portfolio import headers as portfolio_headers
 from contract_assistant.portfolio import portfolio_rows, to_csv
 from contract_assistant.portfolio import table as portfolio_table
 from contract_assistant.report import build_report, write_report
-from contract_assistant.review import Flag, Rule, flag_request, load_rules, review
-from contract_assistant.router.base import Router, RouteResult, Turn
+from contract_assistant.review import Flag, flag_request, load_rules, review
+from contract_assistant.router.base import RouteResult, Turn
 from contract_assistant.router.clients import LLMClient, LLMError
-from contract_assistant.search import PassageSearch
+from contract_assistant.services import Services
 from contract_assistant.store import (
     DOC_ID_PREFIX,
     CacheIntegrityError,
@@ -393,25 +389,6 @@ CSS = """
 #view .line-break { display: block; }
 #view .text, #view .token { word-break: normal; overflow-wrap: break-word; }
 """
-
-
-@dataclass(frozen=True)
-class Services:
-    """Everything the app needs from outside: caches, models and settings."""
-
-    store: Store
-    router: Router
-    extractor: Extractor | None
-    clause_types: list[ClauseType]
-    settings: Settings
-    search: PassageSearch
-    unvalidated: frozenset[str]
-    gen: LLMClient | None = None
-    summaries: SummaryStore | None = None
-    term_sheets: TermSheetStore | None = None
-    rules: Sequence[Rule] = ()
-    obligations: ObligationStore | None = None
-    fulltexts: FullTextStore | None = None
 
 
 def guarded(handler: Callable) -> Callable:

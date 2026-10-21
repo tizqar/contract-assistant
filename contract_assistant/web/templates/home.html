@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Contract Assistant{% endblock %}
+{% block main %}
+<div class="empty-state">
+  <div class="card card-wide">
+    <h1 class="h1">Add your first contract</h1>
+    <p class="muted">Upload a PDF or a text file. The clauses are located once by a fine-tuned encoder on this computer; every answer afterwards quotes the contract word for word.</p>
+    {% include "library/upload.html" %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Contract Assistant{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/chat.css">
+<link rel="stylesheet" href="/static/insights.css">
+<link rel="stylesheet" href="/static/library.css">
+<script src="/static/htmx.min.js" defer></script>
+<script src="/static/app.js" defer></script>
+<script src="/static/chat.js" defer></script>
+<script src="/static/insights.js" defer></script>
+<script src="/static/library.js" defer></script>
+</head>
+<body>
+<div id="thresholds" hidden>
+  <input type="hidden" id="tau-low" name="low" value="{{ '%g' % tau.low }}" data-default="{{ '%g' % ws.settings.tau_low }}">
+  <input type="hidden" id="tau-high" name="high" value="{{ '%g' % tau.high }}" data-default="{{ '%g' % ws.settings.tau_high }}">
+</div>
+<header class="topbar">
+  <a class="brand" href="/">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="2" y="2" width="24" height="24" rx="6" fill="currentColor"></rect><path d="M9 9h10M9 14h10M9 19h6" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path></svg>
+    <span>Contract Assistant</span>
+  </a>
+  {% block switcher %}{% endblock %}
+  <div class="grow"></div>
+  <nav class="topnav" aria-label="Main">
+    {% if ws.gen_model %}
+    <span class="pill pill-ok"><span class="dot"></span>Local model · {{ ws.gen_model }}</span>
+    {% else %}
+    <span class="pill pill-off"><span class="dot"></span>Language model off</span>
+    {% endif %}
+    <a class="btn" href="/compare{% if cache is defined and cache %}?left={{ cache.doc_id }}{% endif %}">Compare</a>
+    <a class="btn" href="/portfolio">Portfolio</a>
+    {% block actions %}{% endblock %}
+    <details class="menu" id="settings-menu">
+      <summary class="btn btn-icon" aria-label="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg>
+      </summary>
+      <div class="menu-body">
+        <h3 class="menu-title">Thresholds</h3>
+        <p class="muted small">A passage at or above the Found value is marked Found; between the two values it is marked Verify; below the Verify value the clause is reported as not found. The defaults were chosen on validation data.</p>
+        <label class="range-row">
+          <span>Found from <output id="tau-high-out">{{ '%g' % tau.high }}</output></span>
+          <input type="range" min="0" max="1" step="0.01" value="{{ '%g' % tau.high }}" data-threshold="high" aria-label="Found threshold">
+        </label>
+        <label class="range-row">
+          <span>Verify from <output id="tau-low-out">{{ '%g' % tau.low }}</output></span>
+          <input type="range" min="0" max="1" step="0.01" value="{{ '%g' % tau.low }}" data-threshold="low" aria-label="Verify threshold">
+        </label>
+        <div class="row gap">
+          <button type="button" class="btn btn-sm" data-threshold-reset>Reset to defaults</button>
+          <button type="button" class="btn btn-sm" hx-get="/technical" hx-target="#technical" hx-swap="innerHTML">Technical details</button>
+        </div>
+        <div id="technical" class="technical"></div>
+      </div>
+    </details>
+  </nav>
+</header>
+{% block main %}{% endblock %}
+<div id="toasts" class="toasts" aria-live="polite"></div>
+</body>
+</html>

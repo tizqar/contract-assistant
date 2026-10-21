@@ -1,0 +1,15 @@
+{% import "components.html" as c %}
+{# A first version of the Definitions tab. #}
+<div class="tab-head">
+  <h2 class="h2">Defined terms</h2>
+  <span class="muted small">Found by pattern in the text. No model.</span>
+</div>
+{% if not definitions %}
+{{ c.notice("No defined terms were found.") }}
+{% endif %}
+{% for d in definitions %}
+<div class="card">
+  <strong>{{ d.term }}</strong>
+  <span class="serif">{{ d.quote }}</span>
+</div>
+{% endfor %}

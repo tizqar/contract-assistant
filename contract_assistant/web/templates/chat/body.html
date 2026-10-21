@@ -1,0 +1,12 @@
+{# A first version of the chat body: the messages, oldest first. #}
+<div class="chat-list" id="chat-messages">
+  {% if not conversation.messages %}
+  <div class="chat-empty">
+    <strong>Ask a question about this contract</strong>
+    <p class="muted">Ask, for example, who the parties are, which law governs or whether either side may terminate. Each answer is marked Found, Verify or Not found.</p>
+  </div>
+  {% endif %}
+  {% for m in conversation.messages %}
+  <div class="bubble bubble-{{ m.role }}">{{ m.html|safe }}</div>
+  {% endfor %}
+</div>

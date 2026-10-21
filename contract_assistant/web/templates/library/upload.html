@@ -1,0 +1,10 @@
+{# The upload form. The route streams the progress of the analysis, then redirects. #}
+<form class="upload" data-stream data-target="#upload-status" action="/upload" method="post" enctype="multipart/form-data">
+  <label class="sr-only" for="upload-file">PDF or text file</label>
+  <input id="upload-file" class="file" type="file" name="file" accept=".pdf,.txt" required>
+  <div class="row gap">
+    <button class="btn btn-primary btn-sm" type="submit">Analyse</button>
+    <button class="btn btn-stop btn-sm" type="button" data-stop hidden>Stop</button>
+  </div>
+</form>
+<div id="upload-status" class="upload-status"></div>

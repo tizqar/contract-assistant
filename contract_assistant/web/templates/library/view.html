@@ -1,0 +1,20 @@
+{% import "components.html" as c %}
+{# A first version of the document pane: the text around the span, the span highlighted. #}
+<div class="doc-toolbar">
+  <span class="doc-heading">{{ heading }}</span>
+</div>
+<article class="doc-text">
+  {%- for text, mark in segments -%}
+    {%- if mark %}<mark class="highlight" data-label="{{ mark }}">{{ text }}</mark>{% else %}{{ text }}{% endif -%}
+  {%- endfor -%}
+</article>
+{% if citation %}
+<div class="card passage-card">
+  <div class="row gap wrap">
+    {% if status %}{{ c.badge(status) }}{% endif %}
+    <strong>{{ label }}</strong>
+    <span class="muted small">{% if citation.page %}Page {{ citation.page }} · {% endif %}{{ citation.conf|percent }} confidence</span>
+  </div>
+  {{ c.quote(citation.quote) }}
+</div>
+{% endif %}
