@@ -138,7 +138,7 @@ The test split has 30 questions. qwen3.5:4b is the default router on these numbe
 embedding router at its tuned threshold (0.58) stays the fallback.
 
 The other commands are `contract-assistant import-demo | extract | show | definitions | summarize | term-sheet |
-review | compare | report | explain | check | serve`.
+review | compare | dates | portfolio | feedback | report | explain | check | serve`.
 `extract` adds the extra clause types to an existing cache without re-extracting the 41.
 
 ## How answers read
@@ -222,7 +222,11 @@ is withheld with the reason. The app and the command line then ask the model onc
 before giving up. The clause types it used are listed under it. A shown
 summary is saved under `cache/summaries/` per contract, model and thresholds, so a change of
 the sliders writes a new one; a withheld one is not saved, so the next request asks the
-model again. On an Apple M4 with 16 GB, qwen3.5:4b takes about 15 to 25 s for a demo
+model again.
+
+The summary can be written in Serbian: the web app has a "Summary in" dropdown, the command
+line has `summarize --language sr`, and the chat understands "summarize in Serbian". The
+quotes stay in English. The Serbian summary is saved apart from the English one. On an Apple M4 with 16 GB, qwen3.5:4b takes about 15 to 25 s for a demo
 contract, at about 27 tokens per second.
 
 The term sheet fills in eight key terms: parties, agreement date, effective date,
@@ -253,6 +257,7 @@ misstate what the clause means, so the reader checks it against the highlighted 
 
 ```bash
 contract-assistant summarize demo/short_supply_agreement.txt
+contract-assistant summarize demo/short_supply_agreement.txt --language sr
 contract-assistant explain demo/short_supply_agreement.txt --type "Governing Law" --language sr
 contract-assistant term-sheet demo/short_supply_agreement.txt demo/long_outsourcing_agreement.txt
 contract-assistant term-sheet demo/short_supply_agreement.txt --json
@@ -300,6 +305,30 @@ contract-assistant report demo/short_supply_agreement.txt
 
 `review` and `compare` take `--json`; `compare` takes `--fresh` to ask the model again.
 `report` writes to `cache/reports/` unless `--out` names a folder.
+
+## Key dates, portfolio and feedback
+
+Key dates are read from the key terms. A stated date is parsed. The end of the initial
+term, the end of the first renewal and the last day to give notice are computed from the
+durations in the key terms, and each one shows its formula. The dates are only as good as
+the key terms they come from, so the reader checks them against the contract. `dates` reads
+the saved key terms; when there are none, it writes them with the generation model first.
+
+The Portfolio tab and `portfolio` list every analysed contract with its size, the number of
+clauses found, to verify and not found, the key terms, and the number of high, medium and low
+flags. The key terms come from the saved term sheets; no model runs. `--csv` writes the
+table to a file.
+
+The thumbs up and down under a chat answer are stored in `cache/feedback.jsonl`, one line
+each, and `feedback` lists them. They never leave the computer.
+
+```bash
+contract-assistant dates demo/short_supply_agreement.txt
+contract-assistant portfolio --csv portfolio.csv
+contract-assistant feedback
+```
+
+`dates`, `portfolio` and `feedback` take `--json`.
 
 ## Demo documents
 

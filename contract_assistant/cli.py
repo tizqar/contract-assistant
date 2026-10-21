@@ -37,6 +37,8 @@ from contract_assistant.clause_types import (
 from contract_assistant.compare import compare_checklists, compare_terms
 from contract_assistant.compare import render_markdown as render_comparison
 from contract_assistant.config import ROOT, Settings, load_settings
+from contract_assistant.dates import key_dates
+from contract_assistant.dates import render_markdown as render_dates
 from contract_assistant.definitions import find_definitions, lookup
 from contract_assistant.evaluation.e2e import (
     ORACLE,
@@ -75,9 +77,13 @@ from contract_assistant.explain import (
 )
 from contract_assistant.extract.extractor import Extractor, ModelNotFoundError
 from contract_assistant.extract.windowing import assert_sliding_windows
+from contract_assistant.feedback import FEEDBACK_FILE, dump_json, read_feedback
+from contract_assistant.feedback import summary as feedback_counts
 from contract_assistant.passage_answer import APP_ATTEMPTS as PASSAGE_ATTEMPTS
 from contract_assistant.passage_answer import request_passage_answer
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
+from contract_assistant.portfolio import portfolio_rows, to_csv
+from contract_assistant.portfolio import render_markdown as render_portfolio
 from contract_assistant.report import build_report, write_report
 from contract_assistant.review import RuleFileError, load_rules, review
 from contract_assistant.review import render_markdown as render_flags
@@ -166,6 +172,13 @@ NOT_IN_CACHE = "error: {name} is not in the analysis of this contract"
 EXPLANATION_WITHHELD = "Explanation withheld: {reason}."
 NO_KEY_TERMS = "error: no key-term clause was found in {name}"
 NO_TERM_COMPARISON = "key terms need a generation model ({settings})"
+NO_DATES_SHEET = (
+    "error: dates needs the key terms; run term-sheet first or set a generation model"
+)
+NO_FEEDBACK = "no feedback yet"
+FEEDBACK_COUNTS = "liked {liked} · disliked {disliked}"
+FEEDBACK_LINE = "{at} {verdict} {doc_id} {question}"
+DOC_ID_WIDTH = 16
 NO_SAVED_SUMMARY = "no saved summary; run summarize first"
 NO_SAVED_TERMS = "no saved key terms; run term-sheet first"
 REPORTS_DIR = "reports"
@@ -557,8 +570,9 @@ def _summary(
     client: LLMClient,
     fresh: bool,
     settings: Settings,
+    language: str = DEFAULT_LANGUAGE,
 ) -> Summary:
-    store = SummaryStore(settings.cache_dir / SUMMARY_DIR)
+    store = SummaryStore(settings.cache_dir / SUMMARY_DIR, language)
     key = (cache.doc_id, client.model, settings.tau_low, settings.tau_high)
     saved = None if fresh else store.load(*key)
     if saved is not None:
@@ -570,6 +584,7 @@ def _summary(
         settings.tau_low,
         settings.tau_high,
         attempts=SUMMARY_ATTEMPTS,
+        language=language,
     )
     # A withheld summary is not saved, so the next run asks the model again.
     if summary.text is not None:
@@ -593,7 +608,7 @@ def _cmd_summarize(args: argparse.Namespace) -> int:
         print(NOTHING_TO_SUMMARIZE, file=sys.stderr)
         return EXIT_ERROR
     try:
-        summary = _summary(cache, items, client, args.fresh, settings)
+        summary = _summary(cache, items, client, args.fresh, settings, args.language)
     except LLMError as error:
         print(LLM_FAILED.format(error=error), file=sys.stderr)
         return EXIT_ERROR
@@ -663,6 +678,93 @@ def _cmd_term_sheet(args: argparse.Namespace) -> int:
         print(json.dumps(data, indent=JSON_INDENT))
     else:
         print(render_term_sheet(sheets))
+    return 0
+
+
+def _dates_sheet(cache: DocumentCache, settings: Settings) -> TermSheet | None:
+    key = (cache.doc_id, settings.gen_model, settings.tau_low, settings.tau_high)
+    saved = TermSheetStore(settings.cache_dir / TERM_SHEET_DIR).load(*key)
+    if saved is not None:
+        return saved
+    client = build_gen_client(settings)
+    if client is None:
+        print(NO_DATES_SHEET, file=sys.stderr)
+        return None
+    items = term_sheet_items(cache, settings.tau_low, settings.tau_high, _extra_names(settings))
+    if not items:
+        print(NO_KEY_TERMS.format(name=Path(cache.source.filename).stem), file=sys.stderr)
+        return None
+    return _term_sheet(cache, items, client, False, settings)
+
+
+def _cmd_dates(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    cache = _load_cache(args.target, settings)
+    if cache is None:
+        return EXIT_ERROR
+    try:
+        sheet = _dates_sheet(cache, settings)
+    except LLMError as error:
+        print(LLM_FAILED.format(error=error), file=sys.stderr)
+        return EXIT_ERROR
+    if sheet is None:
+        return EXIT_ERROR
+    dates = key_dates(sheet)
+    if args.json:
+        print(json.dumps([item.model_dump(mode="json") for item in dates], indent=JSON_INDENT))
+    else:
+        print(render_dates(dates))
+    return 0
+
+
+def _cmd_portfolio(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    names = _names(app_clause_types(settings))
+    try:
+        rules = load_rules(known_types=names)
+    except RuleFileError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    model = settings.gen_model if settings.llm_backend != NO_BACKEND else None
+    rows = portfolio_rows(
+        Store(settings.cache_dir, settings.demo_cache_dir),
+        settings,
+        names,
+        rules,
+        TermSheetStore(settings.cache_dir / TERM_SHEET_DIR),
+        model,
+        _extra_names(settings),
+    )
+    if args.csv is not None:
+        args.csv.write_text(to_csv(rows), encoding="utf-8")
+        print(args.csv)
+    elif args.json:
+        print(json.dumps([row.model_dump(mode="json") for row in rows], indent=JSON_INDENT))
+    else:
+        print(render_portfolio(rows))
+    return 0
+
+
+def _cmd_feedback(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    verdicts = read_feedback(settings.cache_dir / FEEDBACK_FILE)
+    if not verdicts:
+        print(NO_FEEDBACK)
+        return 0
+    if args.json:
+        print(dump_json(verdicts))
+        return 0
+    print(FEEDBACK_COUNTS.format(**feedback_counts(verdicts)))
+    for verdict in verdicts:
+        word = "liked" if verdict.liked else "disliked"
+        print(
+            FEEDBACK_LINE.format(
+                at=verdict.at,
+                verdict=word,
+                doc_id=verdict.doc_id[:DOC_ID_WIDTH],
+                question=verdict.question,
+            )
+        )
     return 0
 
 
@@ -1234,6 +1336,7 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="ask the model again instead of using the saved summary",
     )
+    summarize.add_argument("--language", choices=list(LANGUAGES), default=DEFAULT_LANGUAGE)
     summarize.set_defaults(func=_cmd_summarize)
     term_sheet = commands.add_parser(
         "term-sheet", help="fill in the key terms of one or more documents, side by side"
@@ -1262,6 +1365,17 @@ def _parser() -> argparse.ArgumentParser:
         "--fresh", action="store_true", help="ask the model again instead of using saved sheets"
     )
     compare.set_defaults(func=_cmd_compare)
+    dates = commands.add_parser("dates", help="list the dates of a contract from its key terms")
+    dates.add_argument("target", help="document, cache file or sha256: document id")
+    dates.add_argument("--json", action="store_true", help="print the dates as JSON")
+    dates.set_defaults(func=_cmd_dates)
+    portfolio = commands.add_parser("portfolio", help="list every analysed contract")
+    portfolio.add_argument("--csv", type=Path, help="write the portfolio as CSV to this file")
+    portfolio.add_argument("--json", action="store_true", help="print the portfolio as JSON")
+    portfolio.set_defaults(func=_cmd_portfolio)
+    feedback = commands.add_parser("feedback", help="list the thumbs up and down of the chat")
+    feedback.add_argument("--json", action="store_true", help="print the verdicts as JSON")
+    feedback.set_defaults(func=_cmd_feedback)
     report = commands.add_parser(
         "report", help="write a Markdown and a DOCX report from the saved analysis"
     )
