@@ -9,14 +9,19 @@ from contract_assistant.answer import Definition
 from contract_assistant.clause_types import load_extra_clause_types
 from contract_assistant.config import Settings
 from contract_assistant.definitions import find_definitions
+from contract_assistant.fulltext import FullTextSummary
+from contract_assistant.obligations import Obligation, ObligationSheet
 from contract_assistant.report import (
     DISCLAIMER,
     ELLIPSIS,
     MAX_QUOTE_CHARS,
     NO_DEFINITIONS,
     NO_FLAGS,
+    NO_FULLTEXT,
+    NO_OBLIGATIONS,
     NO_SUMMARY,
     NO_TERMS,
+    ObligationLine,
     Report,
     build_report,
     to_docx,
@@ -42,11 +47,16 @@ MODEL = "gen-test"
 SUMMARY_TEXT = "A short supply deal."
 TYPES = ["Governing Law", "Term", "Insurance", "Exclusivity"]
 DEMO_CACHE = ROOT / "demo" / "cache" / "short_supply_agreement.json"
+OBLIGATIONS_HEADING = "Obligations by party (generated, verified)"
+FULLTEXT_HEADING = "Full-text overview (generated)"
+OVERVIEW = "A supply deal with payment and audit duties."
 HEADINGS = [
     "Summary (generated)",
     "Key terms",
     "Review flags",
     "Clauses found",
+    OBLIGATIONS_HEADING,
+    FULLTEXT_HEADING,
     "Defined terms",
 ]
 
@@ -221,7 +231,7 @@ def test_markdown_starts_with_the_title_line(cache, settings):
     assert to_markdown(build(cache, settings)).startswith(f"# Contract report: {NAME}\n")
 
 
-def test_markdown_has_the_five_section_headings_in_order(cache, settings):
+def test_markdown_has_the_seven_section_headings_in_order(cache, settings):
     lines = to_markdown(build(cache, settings)).splitlines()
     headings = [line[3:] for line in lines if line.startswith("## ")]
     assert headings == HEADINGS
@@ -260,7 +270,14 @@ def test_markdown_shows_the_summary_and_flags(cache, settings):
 def test_markdown_uses_the_empty_messages(settings):
     cache = make_cache(TEXT, settings, {})
     text = to_markdown(build_report(cache, NAME, settings, [], today=TODAY))
-    for message in (NO_SUMMARY, NO_TERMS, NO_FLAGS, NO_DEFINITIONS):
+    for message in (
+        NO_SUMMARY,
+        NO_TERMS,
+        NO_FLAGS,
+        NO_DEFINITIONS,
+        NO_OBLIGATIONS,
+        NO_FULLTEXT,
+    ):
         assert message in text
 
 
@@ -298,7 +315,7 @@ def open_docx(report) -> Document:
     return Document(BytesIO(data))
 
 
-def test_docx_opens_and_has_the_title_and_headings_in_order(cache, settings):
+def test_docx_opens_and_has_the_title_and_seven_headings_in_order(cache, settings):
     document = open_docx(build(cache, settings))
     headings = [
         p.text for p in document.paragraphs if p.style.name.startswith(("Heading", "Title"))
@@ -316,6 +333,8 @@ def test_docx_has_a_clauses_table_and_the_empty_message_for_missing_parts(cache,
     assert NO_FLAGS in texts
     assert NO_DEFINITIONS in texts
     assert NO_SUMMARY in texts
+    assert NO_OBLIGATIONS in texts
+    assert NO_FULLTEXT in texts
     assert "Not found: Insurance" in texts
     assert texts[-1] == DISCLAIMER
 
@@ -367,3 +386,98 @@ def test_a_full_report_of_the_short_demo_contract_renders_both_ways(settings):
     assert "No cap on liability found" in markdown
     assert any("No cap on liability found" in p.text for p in document.paragraphs)
     assert json.loads(report.model_dump_json())["title"] == "Short supply"
+
+
+def obligation(party, modality, action, clause_type) -> Obligation:
+    return Obligation(
+        party=party,
+        modality=modality,
+        action=action,
+        clause_type=clause_type,
+        page=None,
+        start=0,
+        end=len(action),
+    )
+
+
+def obligation_sheet() -> ObligationSheet:
+    return ObligationSheet(
+        doc_id="sha256:abc",
+        model=MODEL,
+        tau_low=TAU_LOW,
+        tau_high=TAU_HIGH,
+        latency_ms=0.0,
+        items=[],
+        obligations=[
+            obligation("Supplier", "must", "deliver", "Delivery"),
+            obligation("Customer", "must", "pay", "Payment Terms"),
+            obligation("Supplier", "must not", "assign", "Anti-Assignment"),
+        ],
+    )
+
+
+def fulltext_summary() -> FullTextSummary:
+    return FullTextSummary(
+        doc_id="sha256:abc",
+        model=MODEL,
+        tau_low=TAU_LOW,
+        tau_high=TAU_HIGH,
+        latency_ms=0.0,
+        text=OVERVIEW,
+    )
+
+
+def test_report_obligations_are_grouped_by_party_in_order_of_first_appearance(cache, settings):
+    report = build(cache, settings, obligations=obligation_sheet())
+    assert report.obligations == [
+        ObligationLine(
+            party="Supplier", modality="must", action="deliver", clause_type="Delivery"
+        ),
+        ObligationLine(
+            party="Supplier",
+            modality="must not",
+            action="assign",
+            clause_type="Anti-Assignment",
+        ),
+        ObligationLine(
+            party="Customer", modality="must", action="pay", clause_type="Payment Terms"
+        ),
+    ]
+
+
+def test_report_obligations_and_fulltext_are_empty_without_them(cache, settings):
+    report = build(cache, settings)
+    assert report.obligations == []
+    assert report.fulltext is None
+
+
+def test_report_takes_the_fulltext_overview_text(cache, settings):
+    assert build(cache, settings, fulltext=fulltext_summary()).fulltext == OVERVIEW
+
+
+def test_markdown_has_the_obligations_table_and_the_overview(cache, settings):
+    report = build(cache, settings, obligations=obligation_sheet(), fulltext=fulltext_summary())
+    text = to_markdown(report)
+    assert "| Supplier | must | deliver | Delivery |" in text
+    assert "| Customer | must | pay | Payment Terms |" in text
+    assert OVERVIEW in text
+    assert NO_OBLIGATIONS not in text
+    assert NO_FULLTEXT not in text
+
+
+def test_markdown_has_the_two_new_headings_after_the_clauses(cache, settings):
+    lines = to_markdown(build(cache, settings)).splitlines()
+    assert f"## {OBLIGATIONS_HEADING}" in lines
+    assert f"## {FULLTEXT_HEADING}" in lines
+    assert lines.index(f"## {OBLIGATIONS_HEADING}") < lines.index(f"## {FULLTEXT_HEADING}")
+
+
+def test_docx_has_the_two_new_headings_and_the_obligations_table(cache, settings):
+    document = open_docx(
+        build(cache, settings, obligations=obligation_sheet(), fulltext=fulltext_summary())
+    )
+    headings = [p.text for p in document.paragraphs if p.style.name.startswith("Heading")]
+    assert OBLIGATIONS_HEADING in headings
+    assert FULLTEXT_HEADING in headings
+    assert ["Supplier", "must", "deliver", "Delivery"] in table_rows(document, 1)
+    assert OVERVIEW in [p.text for p in document.paragraphs]

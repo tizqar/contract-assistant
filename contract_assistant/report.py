@@ -8,10 +8,12 @@ from io import BytesIO
 from pathlib import Path
 
 from docx import Document
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from contract_assistant.answer import STATUS_WORDS, Definition, Status, compose, verify_quotes
 from contract_assistant.config import Settings
+from contract_assistant.fulltext import FullTextSummary
+from contract_assistant.obligations import ObligationSheet, by_party
 from contract_assistant.review import Flag
 from contract_assistant.store import DocumentCache
 from contract_assistant.summary import Summary
@@ -24,6 +26,8 @@ NO_SUMMARY = "No summary was written for this contract."
 NO_TERMS = "No key terms were extracted."
 NO_FLAGS = "No review flags."
 NO_DEFINITIONS = "No defined terms were found."
+NO_OBLIGATIONS = "No obligations were read from the clauses."
+NO_FULLTEXT = "No full-text overview was written for this contract."
 DISCLAIMER = (
     "Passages were located by a model and quotes were verified word for word against the "
     "contract. Text marked as generated was written by a language model from those quotes and "
@@ -50,6 +54,15 @@ class TermLine(BaseModel):
     clause_types: list[str]
 
 
+class ObligationLine(BaseModel):
+    """One obligation of the report."""
+
+    party: str
+    modality: str
+    action: str
+    clause_type: str
+
+
 class Report(BaseModel):
     """Everything the report prints, assembled once so Markdown and DOCX agree."""
 
@@ -68,6 +81,8 @@ class Report(BaseModel):
     clauses: list[ClauseLine]
     not_found: list[str]
     definitions: list[Definition]
+    obligations: list[ObligationLine] = Field(default_factory=list)
+    fulltext: str | None = None
 
 
 def build_report(
@@ -84,6 +99,8 @@ def build_report(
     tau_high: float | None = None,
     model: str | None = None,
     today: date | None = None,
+    obligations: ObligationSheet | None = None,
+    fulltext: FullTextSummary | None = None,
 ) -> Report:
     """Assemble the report of a document from its analysis and the generated parts."""
     low = settings.tau_low if tau_low is None else tau_low
@@ -118,7 +135,21 @@ def build_report(
         clauses=clauses,
         not_found=not_found,
         definitions=list(definitions),
+        obligations=_obligations(obligations),
+        fulltext=fulltext.text if fulltext else None,
     )
+
+
+def _obligations(sheet: ObligationSheet | None) -> list[ObligationLine]:
+    if sheet is None:
+        return []
+    return [
+        ObligationLine(
+            party=party, modality=o.modality, action=_short(o.action), clause_type=o.clause_type
+        )
+        for party, obligations in by_party(sheet).items()
+        for o in obligations
+    ]
 
 
 def _terms(sheet: TermSheet | None) -> list[TermLine]:
@@ -191,6 +222,16 @@ def to_markdown(report: Report) -> str:
     ]
     if report.not_found:
         lines += ["", f"Not found: {', '.join(report.not_found)}"]
+    lines += ["", "## Obligations by party (generated, verified)", ""]
+    if report.obligations:
+        lines += ["| Party | | What | Clause |", "| --- | --- | --- | --- |"]
+        lines += [
+            f"| {o.party} | {o.modality} | {o.action.replace('|', '/')} | {o.clause_type} |"
+            for o in report.obligations
+        ]
+    else:
+        lines.append(NO_OBLIGATIONS)
+    lines += ["", "## Full-text overview (generated)", "", report.fulltext or NO_FULLTEXT]
     lines += ["", "## Defined terms", ""]
     if report.definitions:
         lines += ["| Term | Defined as | Page |", "| --- | --- | --- |"]
@@ -244,6 +285,17 @@ def to_docx(report: Report) -> bytes:
     )
     if report.not_found:
         document.add_paragraph(f"Not found: {', '.join(report.not_found)}")
+    document.add_heading("Obligations by party (generated, verified)", level=1)
+    if report.obligations:
+        _table(
+            document,
+            ["Party", "", "What", "Clause"],
+            [[o.party, o.modality, o.action, o.clause_type] for o in report.obligations],
+        )
+    else:
+        document.add_paragraph(NO_OBLIGATIONS)
+    document.add_heading("Full-text overview (generated)", level=1)
+    document.add_paragraph(report.fulltext or NO_FULLTEXT)
     document.add_heading("Defined terms", level=1)
     if report.definitions:
         _table(

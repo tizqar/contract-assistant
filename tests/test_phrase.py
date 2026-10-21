@@ -10,7 +10,9 @@ from contract_assistant.phrase import (
     cited_quotes,
     quoted_spans,
     request_paragraph,
+    spelled_number,
     unfaithful_spans,
+    unsupported_numbers,
 )
 from contract_assistant.router.base import RouteResult
 from contract_assistant.router.clients import LLMError, OllamaClient
@@ -294,3 +296,47 @@ def test_local_model_returns_a_paragraph_for_the_governing_law_clause(settings):
     assert paragraph
     spans = unfaithful_spans(paragraph, cited_quotes(result))
     assert all(span in paragraph for span in spans)
+
+
+@pytest.mark.parametrize(
+    ("words", "number"),
+    [
+        ("twenty-one", 21),
+        ("one hundred", 100),
+        ("osamdeset i jednog", 81),
+        ("dvadeset jedan", 21),
+        ("sto", 100),
+        ("šest", 6),
+        ("deset", 10),
+    ],
+)
+def test_spelled_number_reads_english_and_serbian_number_words(words, number):
+    assert spelled_number(words) == number
+
+
+def test_spelled_number_gives_none_for_an_unknown_word():
+    assert spelled_number("šestomesečnog") is None
+    assert spelled_number("banana") is None
+
+
+def test_a_pair_whose_word_says_another_number_is_unsupported():
+    quotes = ["for six (6) months", "and ten (10) years"]
+    assert unsupported_numbers("a term of six (10) months", quotes) == ["six (10)"]
+
+
+def test_a_serbian_word_with_the_same_number_is_supported():
+    assert unsupported_numbers("deset (10) godina", ["for ten (10) years"]) == []
+
+
+def test_a_serbian_pair_with_the_wrong_word_is_unsupported_although_the_digits_are_quoted():
+    assert unsupported_numbers("osamdeset i jednog (21)", ["after 21 days"]) == [
+        "osamdeset i jednog (21)"
+    ]
+
+
+def test_a_pair_is_supported_when_its_digits_are_quoted_with_a_percent_sign():
+    assert unsupported_numbers("fifty (50) of the fee", ["a fee of 50% of sales"]) == []
+
+
+def test_a_pair_with_a_word_that_is_not_a_number_is_supported_by_its_digits():
+    assert unsupported_numbers("šestomesečnog (6) roka", ["a period of 6 months"]) == []

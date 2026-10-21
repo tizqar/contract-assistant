@@ -1,10 +1,18 @@
+import json
 import logging
 import threading
 
 import pytest
 
-from contract_assistant.background import precompute, precompute_all, run_in_background, warm
+from contract_assistant.background import (
+    precompute,
+    precompute_all,
+    precompute_obligations,
+    run_in_background,
+    warm,
+)
 from contract_assistant.config import Settings
+from contract_assistant.obligations import ObligationStore
 from contract_assistant.router.clients import LLMError
 from contract_assistant.store import Store
 from contract_assistant.summary import SummaryStore
@@ -25,6 +33,16 @@ TAU_HIGH = 0.91
 MISQUOTE = 'The contract says "words that are nowhere in it".'
 SHEET_REPLY = '{"governing_law": "laws of Delaware"}'
 ECHO_CALLS_PER_DOCUMENT = 2
+OBLIGATION_REPLY = json.dumps(
+    [
+        {
+            "clause_type": "Governing Law",
+            "party": "This Agreement",
+            "modality": "shall",
+            "action": "governed by the laws of Delaware",
+        }
+    ]
+)
 
 
 @pytest.fixture
@@ -45,6 +63,11 @@ def summaries(tmp_path) -> SummaryStore:
 @pytest.fixture
 def term_sheets(tmp_path) -> TermSheetStore:
     return TermSheetStore(tmp_path / "t")
+
+
+@pytest.fixture
+def obligations(tmp_path) -> ObligationStore:
+    return ObligationStore(tmp_path / "o")
 
 
 @pytest.fixture
@@ -251,3 +274,57 @@ def test_run_in_background_runs_the_target_with_its_arguments_in_a_daemon_thread
     thread.join(timeout=5)
     assert thread.daemon is True
     assert calls == [((1, "two"), thread)]
+
+
+def run_obligations(cache, client, obligations):
+    precompute_obligations(cache, TYPES, client, obligations, TAU_LOW, TAU_HIGH)
+
+
+def test_precompute_obligations_saves_a_sheet_when_it_is_missing(cache, obligations):
+    client = FakeLLMClient([OBLIGATION_REPLY])
+    run_obligations(cache, client, obligations)
+    sheet = obligations.load(*keys(client, cache))
+    assert sheet is not None
+    assert [o.action for o in sheet.obligations] == ["governed by the laws of Delaware"]
+
+
+def test_precompute_obligations_makes_no_call_when_a_sheet_is_saved(cache, obligations):
+    run_obligations(cache, FakeLLMClient([OBLIGATION_REPLY]), obligations)
+    again = FakeLLMClient([])
+    run_obligations(cache, again, obligations)
+    assert again.text_calls == []
+
+
+def test_precompute_obligations_saves_nothing_for_an_invalid_reply(cache, obligations):
+    client = FakeLLMClient(["no list", "no list"])
+    run_obligations(cache, client, obligations)
+    assert not list(obligations.directory.glob("*.json"))
+
+
+def test_precompute_obligations_asks_nothing_without_items(settings, obligations):
+    client = FakeLLMClient([])
+    run_obligations(make_cache(TEXT, settings), client, obligations)
+    assert client.text_calls == []
+
+
+def test_precompute_all_also_fills_the_obligations_store(
+    store, settings, summaries, term_sheets, obligations
+):
+    cache = make_cache(TEXT, settings, CLAUSES)
+    store.save(cache)
+    client = FakeLLMClient([MISQUOTE, MISQUOTE, SHEET_REPLY, OBLIGATION_REPLY])
+    done = precompute_all(
+        store, settings, TYPES, client, summaries, term_sheets, obligations=obligations
+    )
+    assert done == 1
+    assert obligations.load(*keys(client, cache)) is not None
+
+
+def test_precompute_all_leaves_the_obligations_alone_without_the_argument(
+    store, settings, summaries, term_sheets, obligations
+):
+    store.save(make_cache(TEXT, settings, CLAUSES))
+    client = EchoTextClient()
+    precompute_all(store, settings, TYPES, client, summaries, term_sheets)
+    assert len(client.text_calls) == ECHO_CALLS_PER_DOCUMENT
+    assert not list(obligations.directory.glob("*.json"))
