@@ -14,9 +14,11 @@ from contract_assistant.generation import (
     MS_PER_S,
     GeneratedRecord,
     GeneratedStore,
+    Generation,
+    Request,
     complete_sentences,
-    faithfulness_reason,
-    generate,
+    faithful_check,
+    run,
 )
 from contract_assistant.phrase import unfaithful_spans
 from contract_assistant.router.clients import LLMClient
@@ -85,6 +87,51 @@ def quotes_of(items: Sequence[AnswerItem]) -> list[str]:
     return [item.citation.quote for item in items if item.citation is not None]
 
 
+def summary_request(doc_id: str, items: Sequence[AnswerItem]) -> Request:
+    """Return the request that writes the summary of the items, with its faithfulness check."""
+    items = cited(items)
+    return Request(
+        SYSTEM_PROMPT,
+        _user_message(items),
+        MAX_TOKENS,
+        faithful_check(quotes_of(items), SOURCE),
+        SOURCE,
+        f"summary of {doc_id}",
+    )
+
+
+def summary_from(
+    result: Generation,
+    doc_id: str,
+    items: Sequence[AnswerItem],
+    client: LLMClient,
+    tau_low: float,
+    tau_high: float,
+) -> Summary:
+    """Return the Summary that a generation outcome gives for the items."""
+    items = cited(items)
+    return Summary(
+        doc_id=doc_id,
+        model=client.model,
+        tau_low=tau_low,
+        tau_high=tau_high,
+        items=items,
+        text=result.text,
+        reason=result.reason,
+        unfaithful_spans=unfaithful_spans(result.reply, quotes_of(items)),
+        attempts=result.attempts,
+        latency_ms=result.latency_ms,
+    )
+
+
+def cited(items: Sequence[AnswerItem]) -> list[AnswerItem]:
+    """Return the items that kept a citation; raise when none did."""
+    kept = [item for item in items if item.citation is not None]
+    if not kept:
+        raise ValueError("no items to summarize")
+    return kept
+
+
 def request_summary(
     doc_id: str,
     items: Sequence[AnswerItem],
@@ -94,32 +141,8 @@ def request_summary(
     attempts: int = 1,
 ) -> Summary:
     """Ask the model to summarize the items, up to attempts times while the reply is withheld."""
-    items = [item for item in items if item.citation is not None]
-    if not items:
-        raise ValueError("no items to summarize")
-    quotes = quotes_of(items)
-    result = generate(
-        client,
-        SYSTEM_PROMPT,
-        _user_message(items),
-        MAX_TOKENS,
-        lambda text: faithfulness_reason(text, quotes, SOURCE),
-        source=SOURCE,
-        attempts=attempts,
-        label=f"summary of {doc_id}",
-    )
-    return Summary(
-        doc_id=doc_id,
-        model=client.model,
-        tau_low=tau_low,
-        tau_high=tau_high,
-        items=items,
-        text=result.text,
-        reason=result.reason,
-        unfaithful_spans=unfaithful_spans(result.reply, quotes),
-        attempts=result.attempts,
-        latency_ms=result.latency_ms,
-    )
+    result = run(client, summary_request(doc_id, items), attempts)
+    return summary_from(result, doc_id, items, client, tau_low, tau_high)
 
 
 def _user_message(items: Sequence[AnswerItem]) -> str:

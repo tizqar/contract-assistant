@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Protocol
 
 import httpx
@@ -48,6 +49,8 @@ class LLMClient(Protocol):
     def complete_json(self, system: str, user: str, schema: dict) -> str: ...
 
     def complete_text(self, system: str, user: str, max_tokens: int) -> str: ...
+
+    def stream_text(self, system: str, user: str, max_tokens: int) -> Iterator[str]: ...
 
 
 def _messages(system: str, user: str) -> list[dict[str, str]]:
@@ -137,6 +140,24 @@ class OllamaClient:
         """Return the model's reply as free text of at most max_tokens tokens."""
         return self._chat(system, user, options=self._options(num_predict=max_tokens))
 
+    def stream_text(self, system: str, user: str, max_tokens: int) -> Iterator[str]:
+        """Yield the model's free-text reply piece by piece as it is written."""
+        try:
+            chunks = self.client.chat(
+                model=self.model,
+                messages=_messages(system, user),
+                think=False,
+                keep_alive=KEEP_ALIVE,
+                stream=True,
+                options=self._options(num_predict=max_tokens),
+            )
+            for chunk in chunks:
+                piece = chunk.message.content
+                if piece:
+                    yield piece
+        except OLLAMA_ERRORS as error:
+            raise LLMError(f"ollama stream from {self.model} failed: {error!r}") from error
+
     def _options(self, **extra: int) -> dict[str, int | float]:
         options: dict[str, int | float] = {"temperature": TEMPERATURE, **extra}
         if self.num_ctx is not None:
@@ -209,6 +230,25 @@ class OpenAICompatClient:
     def complete_text(self, system: str, user: str, max_tokens: int) -> str:
         """Return the model's reply as free text of at most max_tokens tokens."""
         return self._create(system, user, max_tokens=max_tokens)
+
+    def stream_text(self, system: str, user: str, max_tokens: int) -> Iterator[str]:
+        """Yield the model's free-text reply piece by piece as it is written."""
+        import openai
+
+        try:
+            chunks = self.client.chat.completions.create(
+                model=self.model,
+                messages=_messages(system, user),
+                temperature=TEMPERATURE,
+                max_tokens=max_tokens,
+                stream=True,
+            )
+            for chunk in chunks:
+                piece = chunk.choices[0].delta.content if chunk.choices else None
+                if piece:
+                    yield piece
+        except openai.APIError as error:
+            raise LLMError(f"openai stream from {self.model} failed: {error!r}") from error
 
     def _create(self, system: str, user: str, **arguments) -> str:
         import openai

@@ -9,9 +9,12 @@ from contract_assistant.generation import (
     REJECTION,
     GeneratedRecord,
     GeneratedStore,
+    Generation,
+    Partial,
     complete_sentences,
     faithfulness_reason,
     generate,
+    generate_stream,
 )
 from contract_assistant.router.clients import LLMError
 from tests.support.fakes import FakeLLMClient
@@ -260,3 +263,88 @@ def test_store_save_creates_the_directory(tmp_path):
     assert not store.directory.exists()
     store.save(make_note())
     assert store.directory.is_dir()
+
+
+def stream(client, check=accept, **kwargs):
+    return generate_stream(client, SYSTEM, USER, MAX_TOKENS, check, source=SOURCE, **kwargs)
+
+
+def test_stream_yields_growing_partials_of_the_first_attempt_then_the_generation():
+    items = list(stream(FakeLLMClient(["One two three."])))
+    *partials, final = items
+    assert [p.text for p in partials] == ["One ", "One two ", "One two three."]
+    assert all(isinstance(p, Partial) and p.attempt == 1 for p in partials)
+    assert all(p.previous_reason is None for p in partials)
+    assert isinstance(final, Generation)
+
+
+def test_stream_names_the_first_reason_in_the_partials_of_the_second_attempt():
+    client = FakeLLMClient(["bad one.", "good."])
+    items = list(stream(client, reject_unless_good, attempts=2))
+    *partials, final = items
+    second = [p for p in partials if p.attempt == 2]
+    assert second
+    assert all(p.previous_reason == REASON for p in second)
+    assert final.attempts == 2
+    assert final.text == "good."
+
+
+def test_stream_checks_the_stripped_and_trimmed_full_reply():
+    seen: list[str] = []
+
+    def record(text: str) -> str | None:
+        seen.append(text)
+        return None
+
+    list(stream(FakeLLMClient(["  First done. Second cut"]), record))
+    assert seen == ["First done."]
+
+
+def test_stream_without_trim_keeps_an_unfinished_sentence():
+    *_, final = stream(FakeLLMClient(["First done. Second cut"]), trim=False)
+    assert final.text == "First done. Second cut"
+
+
+def test_stream_with_fewer_than_one_attempt_raises_before_any_call():
+    client = FakeLLMClient(["unused"])
+    with pytest.raises(ValueError, match="attempts"):
+        next(stream(client, attempts=0))
+    assert client.text_calls == []
+
+
+def test_stream_of_a_rejected_only_run_ends_with_no_text_and_the_last_reply():
+    *_, final = stream(FakeLLMClient(["one.", "two."]), reject, attempts=2)
+    assert final.text is None
+    assert final.reply == "two."
+    assert final.reason == REASON
+    assert final.attempts == 2
+
+
+def test_stream_propagates_an_llm_error_raised_mid_stream():
+    class Breaking:
+        model = MODEL
+
+        def stream_text(self, system, user, max_tokens):
+            yield "first "
+            raise LLMError("broke")
+
+    consumer = stream(Breaking())
+    assert isinstance(next(consumer), Partial)
+    with pytest.raises(LLMError, match="broke"):
+        next(consumer)
+
+
+def test_generate_returns_the_generation_the_stream_ends_with():
+    replies = ["bad one.", "good."]
+    expected = list(stream(FakeLLMClient(replies), reject_unless_good, attempts=2))[-1]
+    outcome = run(FakeLLMClient(replies), reject_unless_good, attempts=2)
+    assert outcome.model_dump(exclude={"latency_ms"}) == expected.model_dump(
+        exclude={"latency_ms"}
+    )
+
+
+def test_generate_makes_as_many_requests_as_the_stream():
+    streamed, generated = FakeLLMClient(["a.", "b.", "c."]), FakeLLMClient(["a.", "b.", "c."])
+    list(stream(streamed, reject, attempts=3))
+    run(generated, reject, attempts=3)
+    assert len(generated.text_calls) == len(streamed.text_calls) == 3

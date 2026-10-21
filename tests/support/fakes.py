@@ -136,11 +136,22 @@ class FakeLLMClient:
         self.text_calls.append((system, user, max_tokens))
         return self._reply()
 
+    def stream_text(self, system: str, user: str, max_tokens: int):
+        yield from stream_pieces(self.complete_text(system, user, max_tokens))
+
     def _reply(self) -> str:
         reply = self.replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
         return reply
+
+
+PIECE = re.compile(r"\S+\s*")
+
+
+def stream_pieces(text: str):
+    """Yield a text word by word, as a streaming model would."""
+    yield from (match.group() for match in PIECE.finditer(text))
 
 
 QUOTED = re.compile(r'"([^"]+)"')
@@ -166,6 +177,9 @@ class EchoTextClient:
 
     def complete_json(self, system: str, user: str, schema: dict) -> str:
         return "{}"
+
+    def stream_text(self, system: str, user: str, max_tokens: int):
+        yield from stream_pieces(self.complete_text(system, user, max_tokens))
 
     def complete_text(self, system: str, user: str, max_tokens: int) -> str:
         self.text_calls.append((system, user, max_tokens))

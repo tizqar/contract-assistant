@@ -1,4 +1,5 @@
 import json
+import logging
 from types import SimpleNamespace
 
 import httpx
@@ -9,9 +10,13 @@ from contract_assistant.config import Settings
 from contract_assistant.router.clients import (
     KEEP_ALIVE,
     LOAD_TIMEOUT_S,
+    NO_GRAMMAR_STATUS,
+    NO_GRAMMAR_TEXT,
+    SCHEMA_INSTRUCTION,
     LLMError,
     OllamaClient,
     OpenAICompatClient,
+    json_object,
 )
 
 MODEL = "test-model"
@@ -438,6 +443,220 @@ def test_openai_from_settings_applies_the_settings(openai_from_settings):
     assert openai_from_settings.model == "other"
     assert str(openai_from_settings.client.base_url) == "http://test/v1/"
     assert openai_from_settings.client.timeout == 3.0
+
+
+PIECES = ["The agreement ", "is governed ", "by Delaware law."]
+JSON_OBJECT = {"clause_types": ["Governing Law"]}
+NESTED = '{"a": {"b": [1, {"c": 2}]}}'
+NO_GRAMMAR_ERROR = {"error": NO_GRAMMAR_TEXT}
+
+
+def stream_body(pieces: list[str]) -> bytes:
+    lines = []
+    for piece in pieces:
+        message = {"role": "assistant", "content": piece}
+        lines.append(json.dumps({"model": MODEL, "message": message, "done": False}))
+    final = {"role": "assistant", "content": ""}
+    lines.append(json.dumps({"model": MODEL, "message": final, "done": True}))
+    return ("\n".join(lines) + "\n").encode()
+
+
+def stream_reply(pieces: list[str]) -> httpx.Response:
+    headers = {"Content-Type": "application/x-ndjson"}
+    return httpx.Response(200, content=stream_body(pieces), headers=headers)
+
+
+def ollama_stream_request_body(num_ctx: int | None = None) -> dict:
+    bodies = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        return stream_reply(PIECES)
+
+    client = ollama_client(handler)
+    client.num_ctx = num_ctx
+    list(client.stream_text(SYSTEM, USER, MAX_TOKENS))
+    return bodies[0]
+
+
+def test_ollama_stream_yields_the_pieces_in_order():
+    client = ollama_client(lambda request: stream_reply(PIECES))
+    assert list(client.stream_text(SYSTEM, USER, MAX_TOKENS)) == PIECES
+
+
+def test_ollama_stream_skips_empty_pieces():
+    client = ollama_client(lambda request: stream_reply(["a", "", "b"]))
+    assert list(client.stream_text(SYSTEM, USER, MAX_TOKENS)) == ["a", "b"]
+
+
+def test_ollama_stream_request_asks_for_a_stream_without_format():
+    body = ollama_stream_request_body()
+    assert body["stream"] is True
+    assert "format" not in body
+
+
+def test_ollama_stream_request_turns_thinking_off():
+    assert ollama_stream_request_body()["think"] is False
+
+
+def test_ollama_stream_request_uses_temperature_zero_and_the_token_limit():
+    options = ollama_stream_request_body()["options"]
+    assert options["temperature"] == 0
+    assert options["num_predict"] == MAX_TOKENS
+
+
+def test_ollama_stream_request_sets_the_context_size_of_the_client():
+    assert ollama_stream_request_body(num_ctx=NUM_CTX)["options"]["num_ctx"] == NUM_CTX
+
+
+def test_ollama_stream_request_has_no_context_size_unless_the_client_has_one():
+    assert "num_ctx" not in ollama_stream_request_body()["options"]
+
+
+@pytest.mark.parametrize("handler", FAILURES)
+def test_ollama_stream_failure_becomes_llm_error_naming_the_model(handler):
+    stream = ollama_client(handler).stream_text(SYSTEM, USER, MAX_TOKENS)
+    with pytest.raises(LLMError, match=MODEL):
+        list(stream)
+
+
+def no_grammar_handler(bodies: list[dict], content: str, status: int = NO_GRAMMAR_STATUS):
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        bodies.append(body)
+        if "format" in body:
+            return httpx.Response(status, json=NO_GRAMMAR_ERROR)
+        return chat_reply(content)
+
+    return handler
+
+
+OBJECT_TEXT = json.dumps(JSON_OBJECT)
+WRAPPED_REPLIES = [
+    pytest.param(OBJECT_TEXT, id="plain"),
+    pytest.param(f"```json\n{OBJECT_TEXT}\n```", id="fenced"),
+    pytest.param(f"Here you go: {OBJECT_TEXT} Hope it helps.", id="prose"),
+]
+
+
+@pytest.mark.parametrize("content", WRAPPED_REPLIES)
+def test_ollama_json_without_a_grammar_returns_the_json_object_only(content):
+    client = ollama_client(no_grammar_handler([], content))
+    assert client.complete_json(SYSTEM, USER, SCHEMA) == OBJECT_TEXT
+
+
+def test_ollama_json_without_a_grammar_remembers_it():
+    client = ollama_client(no_grammar_handler([], OBJECT_TEXT))
+    client.complete_json(SYSTEM, USER, SCHEMA)
+    assert client.grammar is False
+
+
+def test_ollama_json_after_the_fallback_sends_one_request_without_format():
+    bodies: list[dict] = []
+    client = ollama_client(no_grammar_handler(bodies, OBJECT_TEXT))
+    client.complete_json(SYSTEM, USER, SCHEMA)
+    bodies.clear()
+    assert client.complete_json(SYSTEM, USER, SCHEMA) == OBJECT_TEXT
+    assert len(bodies) == 1
+    assert "format" not in bodies[0]
+
+
+def test_ollama_json_success_with_a_schema_sets_grammar():
+    client = ollama_client(lambda request: chat_reply(REPLY))
+    client.complete_json(SYSTEM, USER, SCHEMA)
+    assert client.grammar is True
+
+
+def test_ollama_json_fallback_puts_the_schema_at_the_end_of_the_system_message():
+    bodies: list[dict] = []
+    client = ollama_client(no_grammar_handler(bodies, OBJECT_TEXT))
+    client.complete_json(SYSTEM, USER, SCHEMA)
+    system = bodies[-1]["messages"][0]["content"]
+    assert system == SYSTEM + SCHEMA_INSTRUCTION.format(schema=json.dumps(SCHEMA))
+
+
+def test_ollama_json_fallback_by_message_text_alone():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "format" in json.loads(request.content):
+            return httpx.Response(500, json=NO_GRAMMAR_ERROR)
+        return chat_reply(OBJECT_TEXT)
+
+    client = ollama_client(handler)
+    assert client.complete_json(SYSTEM, USER, SCHEMA) == OBJECT_TEXT
+    assert client.grammar is False
+
+
+def test_ollama_json_server_error_still_raises_and_leaves_grammar_unknown():
+    client = ollama_client(respond_500)
+    with pytest.raises(LLMError, match=MODEL):
+        client.complete_json(SYSTEM, USER, SCHEMA)
+    assert client.grammar is None
+
+
+def test_ollama_json_fallback_logs_one_warning_naming_the_model(caplog):
+    client = ollama_client(no_grammar_handler([], OBJECT_TEXT))
+    with caplog.at_level(logging.WARNING):
+        client.complete_json(SYSTEM, USER, SCHEMA)
+        client.complete_json(SYSTEM, USER, SCHEMA)
+    warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert MODEL in warnings[0].getMessage()
+
+
+def test_json_object_returns_a_plain_object():
+    assert json_object(OBJECT_TEXT) == OBJECT_TEXT
+
+
+def test_json_object_removes_code_fences():
+    assert json_object(f"```json\n{OBJECT_TEXT}\n```") == OBJECT_TEXT
+
+
+def test_json_object_cuts_the_prose_around_the_object():
+    assert json_object(f"Sure. {OBJECT_TEXT} Done.") == OBJECT_TEXT
+
+
+def test_json_object_returns_the_stripped_text_when_there_is_no_object():
+    assert json_object("  no object here \n") == "no object here"
+
+
+def test_json_object_keeps_nested_braces():
+    assert json_object(f"Result: {NESTED}!") == NESTED
+
+
+def chunk(content: str | None) -> SimpleNamespace:
+    delta = SimpleNamespace(content=content)
+    return SimpleNamespace(choices=[SimpleNamespace(delta=delta)])
+
+
+class StreamingCompletions:
+    def __init__(self, chunks: list):
+        self.chunks = chunks
+        self.calls: list[dict] = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return iter(self.chunks)
+
+
+def test_openai_stream_yields_the_pieces_in_order():
+    completions = StreamingCompletions([chunk(piece) for piece in PIECES])
+    stream = fake_openai(completions).stream_text(SYSTEM, USER, MAX_TOKENS)
+    assert list(stream) == PIECES
+
+
+def test_openai_stream_skips_empty_deltas_and_chunks_without_choices():
+    chunks = [chunk("a"), chunk(None), SimpleNamespace(choices=[]), chunk(""), chunk("b")]
+    stream = fake_openai(StreamingCompletions(chunks)).stream_text(SYSTEM, USER, MAX_TOKENS)
+    assert list(stream) == ["a", "b"]
+
+
+def test_openai_stream_request_asks_for_a_stream_with_the_token_limit():
+    completions = StreamingCompletions([chunk("a")])
+    list(fake_openai(completions).stream_text(SYSTEM, USER, MAX_TOKENS))
+    [call] = completions.calls
+    assert call["stream"] is True
+    assert call["max_tokens"] == MAX_TOKENS
+    assert call["temperature"] == 0
 
 
 @pytest.mark.slow

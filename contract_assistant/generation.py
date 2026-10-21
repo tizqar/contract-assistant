@@ -8,7 +8,8 @@ import logging
 import os
 import tempfile
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
@@ -37,6 +38,27 @@ REJECTION = (
 Check = Callable[[str], str | None]
 
 
+@dataclass(frozen=True)
+class Request:
+    """What one checked generation needs: the prompts, the token limit, the check and labels."""
+
+    system: str
+    user: str
+    max_tokens: int
+    check: Check
+    source: str
+    label: str = "reply"
+    trim: bool = True
+
+
+class Partial(BaseModel):
+    """The text of an attempt as it grows, and why the attempt before it was withheld."""
+
+    text: str
+    attempt: int
+    previous_reason: str | None = None
+
+
 class Generation(BaseModel):
     """The outcome of the loop: the accepted text, or the last reply and why it is withheld."""
 
@@ -59,6 +81,47 @@ class GeneratedRecord(BaseModel):
     latency_ms: float
 
 
+def generate_stream(
+    client: LLMClient,
+    system: str,
+    user: str,
+    max_tokens: int,
+    check: Check,
+    *,
+    source: str,
+    attempts: int = 1,
+    label: str = "reply",
+    trim: bool = True,
+) -> Iterator[Partial | Generation]:
+    """Yield each attempt's text as it grows, then the Generation; the reason names a retry."""
+    if attempts < 1:
+        raise ValueError(f"attempts must be at least 1, got {attempts}")
+    message = user
+    previous: str | None = None
+    start = time.perf_counter()
+    for attempt in range(1, attempts + 1):
+        pieces: list[str] = []
+        for piece in client.stream_text(system, message, max_tokens):
+            pieces.append(piece)
+            yield Partial(text="".join(pieces), attempt=attempt, previous_reason=previous)
+        reply = "".join(pieces).strip()
+        if trim:
+            reply = complete_sentences(reply)
+        reason = check(reply)
+        if reason is None:
+            break
+        logger.warning("%s by %s withheld (attempt %d): %s", label, client.model, attempt, reason)
+        previous = reason
+        message = user + REJECTION.format(reason=reason, text=reply, source=source)
+    yield Generation(
+        text=None if reason else reply,
+        reply=reply,
+        reason=reason,
+        attempts=attempt,
+        latency_ms=(time.perf_counter() - start) * MS_PER_S,
+    )
+
+
 def generate(
     client: LLMClient,
     system: str,
@@ -72,26 +135,58 @@ def generate(
     trim: bool = True,
 ) -> Generation:
     """Ask the model up to attempts times, naming the reason while check rejects the reply."""
-    if attempts < 1:
-        raise ValueError(f"attempts must be at least 1, got {attempts}")
-    message = user
-    start = time.perf_counter()
-    for attempt in range(1, attempts + 1):
-        reply = client.complete_text(system, message, max_tokens).strip()
-        if trim:
-            reply = complete_sentences(reply)
-        reason = check(reply)
-        if reason is None:
-            break
-        logger.warning("%s by %s withheld (attempt %d): %s", label, client.model, attempt, reason)
-        message = user + REJECTION.format(reason=reason, text=reply, source=source)
-    return Generation(
-        text=None if reason else reply,
-        reply=reply,
-        reason=reason,
-        attempts=attempt,
-        latency_ms=(time.perf_counter() - start) * MS_PER_S,
+    stream = generate_stream(
+        client,
+        system,
+        user,
+        max_tokens,
+        check,
+        source=source,
+        attempts=attempts,
+        label=label,
+        trim=trim,
     )
+    outcome: Partial | Generation | None = None
+    for item in stream:
+        outcome = item
+    if not isinstance(outcome, Generation):
+        raise TypeError("the generation stream ended without an outcome")
+    return outcome
+
+
+def stream(client: LLMClient, request: Request, attempts: int = 1) -> Iterator[Partial | Generation]:
+    """Stream a request: the growing text of each attempt, then the Generation."""
+    return generate_stream(
+        client,
+        request.system,
+        request.user,
+        request.max_tokens,
+        request.check,
+        source=request.source,
+        attempts=attempts,
+        label=request.label,
+        trim=request.trim,
+    )
+
+
+def run(client: LLMClient, request: Request, attempts: int = 1) -> Generation:
+    """Run a request to its outcome."""
+    return generate(
+        client,
+        request.system,
+        request.user,
+        request.max_tokens,
+        request.check,
+        source=request.source,
+        attempts=attempts,
+        label=request.label,
+        trim=request.trim,
+    )
+
+
+def faithful_check(quotes: Sequence[str], source: str) -> Check:
+    """Return the check that withholds text which misquotes or adds numbers to the quotes."""
+    return lambda text: faithfulness_reason(text, quotes, source)
 
 
 def faithfulness_reason(text: str, quotes: Sequence[str], source: str) -> str | None:
