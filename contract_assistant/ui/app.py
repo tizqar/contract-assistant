@@ -23,6 +23,7 @@ from contract_assistant.background import precompute, run_in_background, warm
 from contract_assistant.clause_types import ClauseType
 from contract_assistant.compare import compare_checklists, compare_terms
 from contract_assistant.config import Settings
+from contract_assistant.dates import key_dates
 from contract_assistant.definitions import find_definitions, lookup
 from contract_assistant.explain import (
     DEFAULT_LANGUAGE,
@@ -31,11 +32,15 @@ from contract_assistant.explain import (
     explanation_request,
 )
 from contract_assistant.extract.extractor import Extractor
+from contract_assistant.feedback import FEEDBACK_FILE, Feedback, now, record_feedback
 from contract_assistant.generation import Generation, Request, stream
 from contract_assistant.intents import Intent, detect_intent
 from contract_assistant.passage_answer import APP_ATTEMPTS as PASSAGE_ATTEMPTS
 from contract_assistant.passage_answer import generated_answer_from, passage_request
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
+from contract_assistant.portfolio import headers as portfolio_headers
+from contract_assistant.portfolio import portfolio_rows, to_csv
+from contract_assistant.portfolio import table as portfolio_table
 from contract_assistant.report import build_report, write_report
 from contract_assistant.review import Flag, Rule, flag_request, load_rules, review
 from contract_assistant.router.base import Router, RouteResult, Turn
@@ -79,6 +84,7 @@ from contract_assistant.ui.views import (
     clause_rows,
     compare_clause_rows,
     compare_term_rows,
+    date_rows,
     definition_citation,
     definition_rows,
     display_name,
@@ -115,6 +121,9 @@ WRITING_ANSWER = "Writing the answer from the passages"
 WRITING_FLAG = "Writing the note"
 EXTRACTING_TERMS = "Extracting the key terms of {name}"
 REPORTS_DIR = "reports"
+PORTFOLIO_CSV = "portfolio.csv"
+FEEDBACK_THANKS = "Noted, thank you."
+SERBIAN = "sr"
 TERM_SHEET_STATUS = "Extracting the key terms. This can take up to half a minute."
 ASK_OTHER_OUTPUTS = 7
 MAX_REMEMBERED_TURNS = 8
@@ -132,6 +141,7 @@ SUMMARY_TAB = "tab-summary"
 CHECKLIST_TAB = "tab-checklist"
 REVIEW_TAB = "tab-review"
 COMPARE_TAB = "tab-compare"
+PORTFOLIO_TAB = "tab-portfolio"
 SETTINGS_TAB = "tab-settings"
 TECHNICAL_TAB = "tab-technical"
 ALL_CLAUSES = "all"
@@ -171,6 +181,16 @@ TERMS_INTRO = (
 NO_TERM_CLAUSES = "None of the clauses the key terms are read from was found in this contract."
 TERM_SHEET_WITHHELD = "The term sheet is not shown because {reason}."
 TERM_HEADERS = ["Term", "Value", "From clause", "Page"]
+DATE_HEADERS = ["Date", "When", "From", "How"]
+DATES_INTRO = (
+    "The dates are read from the key terms. A computed date shows its formula. "
+    "The dates are only as good as the key terms above."
+)
+PORTFOLIO_INTRO = (
+    "Every analysed contract in one table, with its clause counts, key terms and flags. "
+    "Key terms appear once they were extracted in the Summary tab."
+)
+PORTFOLIO_CSV_LABEL = "Download CSV"
 TERM_DOWNLOAD_LABEL = "Download the term sheet (JSON)"
 GENERATION_FAILED = "The language model did not answer; see the server log."
 NOTHING_TO_EXPLAIN = "Ask about a clause first, then say 'explain that'."
@@ -209,9 +229,7 @@ REPORT_INTRO = (
     "the defined terms. Nothing is generated when it is built."
 )
 REPORT_BUILT = "Report built from the saved summary and key terms."
-REPORT_MISSING = (
-    "Report built without {missing}. Make {them} in the Summary tab, then build the report again."
-)
+REPORT_MISSING = "Report built without {missing}. Make {them} in the Summary tab, then build the report again."
 NOTHING_TO_SUMMARIZE = "No clause was found in this contract, so there is nothing to summarize."
 NOTHING_HIGHLIGHTED = (
     "Nothing is highlighted. Ask a question or select a clause in the checklist first."
@@ -397,6 +415,9 @@ class Handlers:
         }
         self.summaries = services.summaries or SummaryStore(
             services.settings.cache_dir / SUMMARY_DIR
+        )
+        self.serbian_summaries = SummaryStore(
+            services.settings.cache_dir / SUMMARY_DIR, SERBIAN
         )
         self.term_sheets = services.term_sheets or TermSheetStore(
             services.settings.cache_dir / TERM_SHEET_DIR
@@ -621,7 +642,11 @@ class Handlers:
 
     @guarded
     def compare(
-        self, cache: DocumentCache | None, other_doc_id: str | None, tau_low: float, tau_high: float
+        self,
+        cache: DocumentCache | None,
+        other_doc_id: str | None,
+        tau_low: float,
+        tau_high: float,
     ):
         """Compare the key terms and the clause statuses of the open contract with another one."""
         services = self.services
@@ -647,7 +672,8 @@ class Handlers:
             yield gr.skip()
             return
         names = COMPARE_NAMES.format(
-            left=document_name(cache.source.filename), right=document_name(other.source.filename)
+            left=document_name(cache.source.filename),
+            right=document_name(other.source.filename),
         )
         try:
             clauses = compare_checklists(
@@ -727,7 +753,13 @@ class Handlers:
         return gr.skip()
 
     @guarded
-    def summarize(self, cache: DocumentCache | None, tau_low: float, tau_high: float):
+    def summarize(
+        self,
+        cache: DocumentCache | None,
+        tau_low: float,
+        tau_high: float,
+        language: str = DEFAULT_LANGUAGE,
+    ):
         """Summarize the clauses found in the open contract, reusing a saved summary."""
         services = self.services
         gen = services.gen
@@ -740,7 +772,7 @@ class Handlers:
             yield gr.skip()
             return
         try:
-            for step in self._summary_steps(cache, tau_low, tau_high):
+            for step in self._summary_steps(cache, tau_low, tau_high, language):
                 if isinstance(step, Summary):
                     yield summary_markdown(step, services.unvalidated)
                 else:
@@ -778,7 +810,7 @@ class Handlers:
             return
         sheet = self.term_sheets.load(cache.doc_id, gen.model, tau_low, tau_high)
         if sheet is None:
-            yield gr.skip(), gr.skip(), TERM_SHEET_STATUS
+            yield gr.skip(), gr.skip(), TERM_SHEET_STATUS, gr.skip()
             try:
                 sheet = request_term_sheet(
                     cache.doc_id, items, gen, tau_low, tau_high, attempts=TERM_SHEET_ATTEMPTS
@@ -786,17 +818,58 @@ class Handlers:
             except LLMError:
                 logger.exception("term sheet of %s failed", cache.doc_id)
                 gr.Warning(GENERATION_FAILED)
-                yield gr.skip(), gr.skip(), ""
+                yield gr.skip(), gr.skip(), "", gr.skip()
                 return
             # A withheld term sheet is not saved, so the next click asks the model again.
             if sheet.reason is None:
                 self.term_sheets.save(sheet)
         if sheet.reason is not None:
             gr.Warning(TERM_SHEET_WITHHELD.format(reason=sheet.reason))
-            yield term_rows(sheet), gr.DownloadButton(visible=False), ""
+            yield term_rows(sheet), gr.DownloadButton(visible=False), "", []
             return
         path = self.term_sheets.path_of(sheet)
-        yield term_rows(sheet), gr.DownloadButton(value=str(path), visible=True), ""
+        yield (
+            term_rows(sheet),
+            gr.DownloadButton(value=str(path), visible=True),
+            "",
+            date_rows(key_dates(sheet)),
+        )
+
+    @guarded
+    def feedback(self, cache: DocumentCache | None, last: Answer | None, evt: gr.LikeData):
+        """Store a thumbs up or down on the last answer in the local feedback file."""
+        if cache is None or last is None:
+            return
+        verdict = Feedback(
+            doc_id=cache.doc_id,
+            question=last.question,
+            route_kind=last.route.kind,
+            clause_types=[item.clause_type for item in last.items],
+            liked=bool(evt.liked),
+            comment=None,
+            at=now(),
+        )
+        record_feedback(self.services.settings.cache_dir / FEEDBACK_FILE, verdict)
+        gr.Info(FEEDBACK_THANKS)
+
+    @guarded
+    def portfolio(self):
+        """Tabulate every cached contract and write the table as a CSV file."""
+        services = self.services
+        gen = services.gen
+        rows = portfolio_rows(
+            services.store,
+            services.settings,
+            [clause_type.name for clause_type in services.clause_types],
+            self.rules,
+            self.term_sheets,
+            gen.model if gen else None,
+            services.unvalidated,
+        )
+        path = services.settings.cache_dir / PORTFOLIO_CSV
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(to_csv(rows), encoding="utf-8")
+        return portfolio_table(rows), gr.DownloadButton(value=str(path), visible=True)
 
     @guarded
     def explain(self, segments: list | None, language: str, cache: DocumentCache | None):
@@ -881,7 +954,11 @@ class Handlers:
         warm([services.gen, getattr(services.router, "client", None)])
 
     def _summary_steps(
-        self, cache: DocumentCache, tau_low: float, tau_high: float
+        self,
+        cache: DocumentCache,
+        tau_low: float,
+        tau_high: float,
+        language: str = DEFAULT_LANGUAGE,
     ) -> Iterator[str | Summary]:
         services = self.services
         gen = services.gen
@@ -890,17 +967,20 @@ class Handlers:
         if not items:
             yield NOTHING_TO_SUMMARIZE
             return
-        summary = self.summaries.load(cache.doc_id, gen.model, tau_low, tau_high)
+        store = self.serbian_summaries if language == SERBIAN else self.summaries
+        summary = store.load(cache.doc_id, gen.model, tau_low, tau_high)
         if summary is None:
-            request = summary_request(cache.doc_id, items)
+            request = summary_request(cache.doc_id, items, language)
             for step in _stream_checked(gen, WRITING_SUMMARY, request, APP_ATTEMPTS):
                 if isinstance(step, Generation):
-                    summary = summary_from(step, cache.doc_id, items, gen, tau_low, tau_high)
+                    summary = summary_from(
+                        step, cache.doc_id, items, gen, tau_low, tau_high, language=language
+                    )
                 else:
                     yield step
             # A withheld summary is not saved, so the next click asks the model again.
             if summary.text is not None:
-                self.summaries.save(summary)
+                store.save(summary)
         yield summary
 
     def _flags(self, cache: DocumentCache, tau_low: float, tau_high: float) -> list[Flag]:
@@ -996,7 +1076,7 @@ class Handlers:
         if intent.kind == "explain":
             yield from self._explain_last(intent, asked, last)
         else:
-            yield from self._summarize_in_chat(asked, cache, tau_low, tau_high)
+            yield from self._summarize_in_chat(asked, cache, tau_low, tau_high, intent.language)
 
     def _explain_last(
         self, intent: Intent, asked: list[dict], last: Answer | None
@@ -1026,13 +1106,18 @@ class Handlers:
         yield _chat_only(asked, explanation_markdown(explanation))
 
     def _summarize_in_chat(
-        self, asked: list[dict], cache: DocumentCache, tau_low: float, tau_high: float
+        self,
+        asked: list[dict],
+        cache: DocumentCache,
+        tau_low: float,
+        tau_high: float,
+        language: str,
     ) -> Iterator[tuple]:
         if self.services.gen is None:
             yield _chat_only(asked, SUMMARIES_OFF)
             return
         try:
-            for step in self._summary_steps(cache, tau_low, tau_high):
+            for step in self._summary_steps(cache, tau_low, tau_high, language):
                 if isinstance(step, Summary):
                     step = summary_markdown(step, self.services.unvalidated)
                 yield _chat_only(asked, step)
@@ -1269,12 +1354,21 @@ def build_app(services: Services) -> gr.Blocks:
                         SUMMARY_INTRO_ON if services.gen else SUMMARY_INTRO_OFF,
                         elem_id="summary-intro",
                     )
-                    summarize = gr.Button(
-                        "Summarize contract",
-                        variant="primary",
-                        elem_id="summarize",
-                        interactive=services.gen is not None,
-                    )
+                    with gr.Row():
+                        summary_language = gr.Dropdown(
+                            choices=LANGUAGE_CHOICES,
+                            value=DEFAULT_LANGUAGE,
+                            label="Summary in",
+                            elem_id="summary-language",
+                            scale=1,
+                        )
+                        summarize = gr.Button(
+                            "Summarize contract",
+                            variant="primary",
+                            elem_id="summarize",
+                            scale=2,
+                            interactive=services.gen is not None,
+                        )
                     summary_output = gr.Markdown(elem_id="summary")
                     gr.Markdown(TERMS_INTRO, elem_id="terms-intro")
                     term_sheet_button = gr.Button(
@@ -1292,6 +1386,14 @@ def build_app(services: Services) -> gr.Blocks:
                     )
                     term_download = gr.DownloadButton(
                         TERM_DOWNLOAD_LABEL, elem_id="term-download", visible=False
+                    )
+                    gr.Markdown(DATES_INTRO, elem_id="dates-intro")
+                    dates_table = gr.Dataframe(
+                        headers=DATE_HEADERS,
+                        datatype=["str", "str", "str", "str"],
+                        interactive=False,
+                        wrap=True,
+                        elem_id="dates-table",
                     )
                     gr.Markdown(REPORT_INTRO, elem_id="report-intro")
                     report_button = gr.Button("Build the report", elem_id="report")
@@ -1341,6 +1443,19 @@ def build_app(services: Services) -> gr.Blocks:
                         interactive=False,
                         wrap=True,
                         elem_id="compare-clauses",
+                    )
+                with gr.Tab("Portfolio", id=PORTFOLIO_TAB):
+                    gr.Markdown(PORTFOLIO_INTRO, elem_id="portfolio-intro")
+                    portfolio_table_view = gr.Dataframe(
+                        headers=portfolio_headers(),
+                        interactive=False,
+                        wrap=True,
+                        max_height=TABLE_MAX_HEIGHT,
+                        elem_id="portfolio-table",
+                    )
+                    portfolio_refresh = gr.Button("Refresh", elem_id="portfolio-refresh")
+                    portfolio_csv = gr.DownloadButton(
+                        PORTFOLIO_CSV_LABEL, elem_id="portfolio-csv", visible=False
                     )
                 with gr.Tab("Clause checklist", id=CHECKLIST_TAB):
                     checklist_text = gr.Markdown(elem_id="checklist-intro")
@@ -1417,6 +1532,24 @@ def build_app(services: Services) -> gr.Blocks:
             inputs=open_inputs,
             outputs=open_outputs,
             api_name="load_document",
+        )
+        demo.load(
+            handlers.portfolio,
+            None,
+            [portfolio_table_view, portfolio_csv],
+            api_visibility="private",
+        )
+        portfolio_refresh.click(
+            handlers.portfolio,
+            None,
+            [portfolio_table_view, portfolio_csv],
+            api_name="portfolio",
+        )
+        chat.like(
+            handlers.feedback,
+            inputs=[cache_state, answer_state],
+            outputs=None,
+            api_visibility="private",
         )
         ask_outputs = [
             question,
@@ -1498,7 +1631,7 @@ def build_app(services: Services) -> gr.Blocks:
         running.append(
             summarize.click(
                 handlers.summarize,
-                [cache_state, tau_low, tau_high],
+                [cache_state, tau_low, tau_high, summary_language],
                 [summary_output],
                 api_name="summarize",
             )
@@ -1507,7 +1640,7 @@ def build_app(services: Services) -> gr.Blocks:
             term_sheet_button.click(
                 handlers.term_sheet,
                 [cache_state, tau_low, tau_high],
-                [term_table, term_download, term_status],
+                [term_table, term_download, term_status, dates_table],
                 api_name="term_sheet",
             )
         )

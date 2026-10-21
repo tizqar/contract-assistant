@@ -21,7 +21,8 @@ from contract_assistant.answer import (
 )
 from contract_assistant.compare import DIFFERS, SAME, ChecklistRow, TermRow
 from contract_assistant.config import Settings
-from contract_assistant.explain import LANGUAGES, Explanation
+from contract_assistant.dates import KeyDate
+from contract_assistant.explain import DEFAULT_LANGUAGE, LANGUAGES, Explanation
 from contract_assistant.review import Flag
 from contract_assistant.store import DocumentCache
 from contract_assistant.summary import MS_PER_S, Summary
@@ -171,6 +172,13 @@ GENERATED_ANSWER_WITHHELD = "The language model's answer is not shown because {r
 MATCHING_BACKENDS = {"ollama": "Ollama"}
 OPENAI_BACKEND = "an OpenAI-compatible API"
 GENERATION_OFF = "off"
+FEEDBACK_LINE = (
+    "- **Feedback:** thumbs up and down on answers are stored in `cache/feedback.jsonl` "
+    "for the evaluation and never leave this computer"
+)
+DATE_UNREADABLE = "not readable"
+DATE_STATED = "stated"
+SUMMARY_LANGUAGE_TEXT = " It is written in {language}."
 STREAMING_LINE = (
     "- **Generated text:** shown as it is written, then checked against the contract "
     "when complete; text that fails the check is withheld"
@@ -491,6 +499,7 @@ def technical_markdown(
     if unvalidated:
         names = ", ".join(display_name(name) for name in sorted(unvalidated))
         lines.append(f"- **Not validated on test data:** {names}")
+    lines.append(FEEDBACK_LINE)
     return "\n".join(lines)
 
 
@@ -549,6 +558,9 @@ def summary_markdown(summary: Summary, unvalidated: Collection[str] = ()) -> str
         count=len(summary.items),
         seconds=round(summary.latency_ms / MS_PER_S),
     )
+    if summary.language != DEFAULT_LANGUAGE:
+        language = LANGUAGES.get(summary.language, summary.language).split(",")[0]
+        meta += SUMMARY_LANGUAGE_TEXT.format(language=language)
     names = ", ".join(
         _based_on(item, item.clause_type in unvalidated) for item in summary.items
     )
@@ -612,6 +624,21 @@ def term_rows(sheet: TermSheet) -> list[list[str]]:
             ]
         )
     return rows
+
+
+def date_rows(dates: list[KeyDate]) -> list[list[str]]:
+    """Return one row per key date: label, ISO date, where it comes from and how."""
+    return [
+        [
+            item.label,
+            item.date.isoformat() if item.date else DATE_UNREADABLE,
+            f"{item.source} ({display_name(item.clause_type)})"
+            if item.clause_type
+            else item.source,
+            item.formula or DATE_STATED,
+        ]
+        for item in dates
+    ]
 
 
 def flag_title(flag: Flag) -> str:

@@ -1,4 +1,5 @@
 import dataclasses
+import datetime
 import json
 import re
 import time
@@ -16,6 +17,7 @@ from contract_assistant.answer import (
 )
 from contract_assistant.compare import ChecklistRow, TermRow
 from contract_assistant.config import ROOT, Settings
+from contract_assistant.dates import KeyDate
 from contract_assistant.explain import Explanation
 from contract_assistant.review import Flag
 from contract_assistant.router.base import RouteResult
@@ -46,6 +48,7 @@ from contract_assistant.ui.views import (
     clause_rows,
     compare_clause_rows,
     compare_term_rows,
+    date_rows,
     definition_block,
     definition_citation,
     definition_rows,
@@ -897,9 +900,14 @@ def test_review_rows_of_no_flags_are_empty():
 def test_compare_term_rows_mark_a_difference():
     rows = [
         TermRow(field="parties", label="Parties", left="A", right="B", differs=True),
-        TermRow(field="governing_law", label="Governing law", left="X", right="X", differs=False),
+        TermRow(
+            field="governing_law", label="Governing law", left="X", right="X", differs=False
+        ),
     ]
-    assert compare_term_rows(rows) == [["Parties", "A", "B", "≠"], ["Governing law", "X", "X", ""]]
+    assert compare_term_rows(rows) == [
+        ["Parties", "A", "B", "≠"],
+        ["Governing law", "X", "X", ""],
+    ]
 
 
 def test_compare_clause_rows_show_status_words_and_a_mark():
@@ -911,3 +919,51 @@ def test_compare_clause_rows_show_status_words_and_a_mark():
         ["Insurance", "Found", "Not found", "≠"],
         ["Audit Rights", "Verify", "Verify", ""],
     ]
+
+
+def test_date_rows_show_the_iso_date_the_source_and_the_formula():
+    dates = [
+        KeyDate(
+            label="Agreement date",
+            date=datetime.date(2020, 1, 2),
+            source="January 2, 2020",
+            clause_type="Agreement Date",
+        ),
+        KeyDate(
+            label="Initial term ends",
+            date=datetime.date(2021, 1, 2),
+            source="one year",
+            clause_type="Expiration Date",
+            formula="agreement date + 1 year",
+        ),
+    ]
+    assert date_rows(dates) == [
+        ["Agreement date", "2020-01-02", "January 2, 2020 (Agreement Date)", "stated"],
+        [
+            "Initial term ends",
+            "2021-01-02",
+            "one year (Expiration Date)",
+            "agreement date + 1 year",
+        ],
+    ]
+
+
+def test_date_rows_say_when_a_date_is_not_readable():
+    unreadable = KeyDate(
+        label="Effective date", date=None, source="upon signing", clause_type=None
+    )
+    assert date_rows([unreadable]) == [
+        ["Effective date", "not readable", "upon signing", "stated"]
+    ]
+
+
+def test_date_rows_of_nothing_are_empty():
+    assert date_rows([]) == []
+
+
+def test_summary_markdown_says_when_it_is_written_in_serbian():
+    assert "written in Serbian" in summary_markdown(summary_of(language="sr"))
+
+
+def test_summary_markdown_in_english_does_not_name_a_language():
+    assert "written in" not in summary_markdown(summary_of())

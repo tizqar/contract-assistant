@@ -1,5 +1,6 @@
 import dataclasses
 import inspect
+import json
 import socket
 from types import SimpleNamespace
 from typing import get_type_hints
@@ -9,17 +10,25 @@ import pytest
 from gradio_client import Client
 
 from contract_assistant import cli
-from contract_assistant.answer import GeneratedAnswer, Passage
+from contract_assistant.answer import Answer, GeneratedAnswer, Passage
 from contract_assistant.clause_types import app_clause_types, load_extra_clause_types
 from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.extract.extractor import Extractor
+from contract_assistant.feedback import FEEDBACK_FILE
 from contract_assistant.router.base import RouteResult, Turn
 from contract_assistant.router.clients import LLMError
 from contract_assistant.search import PassageSearch
 from contract_assistant.store import Store
 from contract_assistant.term_sheet import FIELDS, INVALID_REASON, LABELS, TermSheet
 from contract_assistant.ui import app
-from contract_assistant.ui.app import ALL_CLAUSES, DOCUMENT_TAB, Handlers, Services, build_app
+from contract_assistant.ui.app import (
+    ALL_CLAUSES,
+    DOCUMENT_TAB,
+    Handlers,
+    Services,
+    build_app,
+    document_choices,
+)
 from contract_assistant.ui.views import SUGGESTED_QUESTIONS, display_name
 from tests.support.caches import make_cache
 from tests.support.fakes import (
@@ -739,7 +748,7 @@ def test_term_sheet_returns_rows_in_field_order_and_a_download(
     make_services, demo_cache, settings
 ):
     handlers = Handlers(make_services(gen=EchoTextClient()))
-    rows, button, _ = last(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
+    rows, button, *_ = last(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
     assert [row[0] for row in rows] == [LABELS[field] for field in FIELDS]
     assert len(rows) == 8
     assert button.visible is True
@@ -793,7 +802,7 @@ def test_term_sheet_withheld_shows_not_stated_hides_the_download_and_is_not_save
     make_services, demo_cache, warnings, settings
 ):
     handlers, _ = generating(make_services, ["no json", "still no json"])
-    rows, button, _ = last(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
+    rows, button, *_ = last(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
     assert {row[1] for row in rows} == {"not stated"}
     assert button.visible is False
     assert warnings == [app.TERM_SHEET_WITHHELD.format(reason=INVALID_REASON)]
@@ -1176,10 +1185,14 @@ def test_the_threshold_handlers_refresh_the_review_rows(handlers, demo_cache):
 
 
 def test_the_threshold_handlers_change_no_review_without_a_document(handlers):
-    assert all(is_skip(value) for value in handlers.release_low(0.1, 0.9, None, ALL_CLAUSES)[1:])
+    assert all(
+        is_skip(value) for value in handlers.release_low(0.1, 0.9, None, ALL_CLAUSES)[1:]
+    )
 
 
-def test_selecting_a_flag_with_quotes_highlights_it_and_shows_the_document(handlers, demo_cache):
+def test_selecting_a_flag_with_quotes_highlights_it_and_shows_the_document(
+    handlers, demo_cache
+):
     flags = opened_flags(handlers)
     _, segments, tabs, index = handlers.show_flag(
         flags, demo_cache, flag_event("Automatic renewal with a notice window")
@@ -1189,7 +1202,9 @@ def test_selecting_a_flag_with_quotes_highlights_it_and_shows_the_document(handl
 
 
 def test_selecting_a_flag_without_quotes_gives_an_info(handlers, demo_cache, infos):
-    result = handlers.show_flag(opened_flags(handlers), demo_cache, flag_event("No cap on liability found"))
+    result = handlers.show_flag(
+        opened_flags(handlers), demo_cache, flag_event("No cap on liability found")
+    )
     assert infos == [app.NO_PASSAGE_ATTACHED] and result[3] == 0
 
 
@@ -1221,7 +1236,9 @@ def test_the_review_tab_sits_between_the_summary_and_the_checklist(make_services
     demo = build_app(make_services())
     ids = [tab.id for tab in demo.blocks.values() if isinstance(tab, gr.Tab)]
     assert ids.index("tab-summary") + 1 == ids.index("tab-review")
-    assert ids.index("tab-review") + 2 == ids.index("tab-compare") + 1 == ids.index("tab-checklist")
+    assert ids.index("tab-review") + 1 == ids.index("tab-compare")
+    assert ids.index("tab-compare") + 1 == ids.index("tab-portfolio")
+    assert ids.index("tab-portfolio") + 1 == ids.index("tab-checklist")
 
 
 def compare_rows(handlers, cache=None, other=LONG_DOC_ID):
@@ -1270,7 +1287,9 @@ def test_compare_with_an_unknown_document_warns(handlers, demo_cache, warnings):
     assert warnings == [app.OTHER_UNAVAILABLE]
 
 
-def test_build_report_files_writes_both_files_from_the_saved_parts(make_services, demo_cache, settings):
+def test_build_report_files_writes_both_files_from_the_saved_parts(
+    make_services, demo_cache, settings
+):
     handlers = Handlers(make_services(gen=EchoTextClient()))
     last(handlers.summarize(demo_cache, TAU_LOW, TAU_HIGH))
     last(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))
@@ -1297,3 +1316,114 @@ def test_the_report_buttons_start_hidden(make_services):
     demo = build_app(make_services())
     assert find_component(demo, "report-docx").visible is False
     assert find_component(demo, "report-md").visible is False
+
+
+def test_term_sheet_returns_the_key_dates_in_a_fourth_output(make_services, demo_cache):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    dates = last(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))[3]
+    assert "Agreement date" in [row[0] for row in dates]
+    assert all(len(row) == 4 for row in dates)
+
+
+def test_term_sheet_withheld_returns_no_date_rows(make_services, demo_cache, warnings):
+    handlers, _ = generating(make_services, ["no json", "still no json"])
+    assert last(handlers.term_sheet(demo_cache, TAU_LOW, TAU_HIGH))[3] == []
+
+
+def test_the_summary_tab_has_the_dates_table_and_its_intro(make_services):
+    demo = build_app(make_services())
+    assert find_component(demo, "dates-table").headers == ["Date", "When", "From", "How"]
+    assert "formula" in find_component(demo, "dates-intro").value
+
+
+def answered(cache, question="who governs?") -> Answer:
+    route = RouteResult(clause_types=["Governing Law"], kind="explicit", latency_ms=1.0)
+    return Answer(
+        question=question,
+        route=route,
+        tau_low=TAU_LOW,
+        tau_high=TAU_HIGH,
+        items=[],
+        dropped_quotes=0,
+    )
+
+
+def like(liked: bool = True) -> SimpleNamespace:
+    return SimpleNamespace(liked=liked, index=[0, 1], value="x")
+
+
+def test_feedback_keeps_the_like_data_annotation_gradio_looks_for(handlers):
+    assert get_type_hints(handlers.feedback)["evt"] is gr.LikeData
+
+
+def test_feedback_writes_the_question_and_the_verdict(handlers, demo_cache, settings, infos):
+    handlers.feedback(demo_cache, answered(demo_cache), like(False))
+    [line] = (settings.cache_dir / FEEDBACK_FILE).read_text().splitlines()
+    saved = json.loads(line)
+    assert saved["question"] == "who governs?"
+    assert saved["liked"] is False
+    assert saved["doc_id"] == demo_cache.doc_id
+    assert infos == [app.FEEDBACK_THANKS]
+
+
+def test_feedback_without_an_answer_does_nothing(handlers, demo_cache, settings, infos):
+    handlers.feedback(demo_cache, None, like())
+    assert not (settings.cache_dir / FEEDBACK_FILE).exists()
+    assert infos == []
+
+
+def test_feedback_without_a_contract_does_nothing(handlers, demo_cache, settings):
+    handlers.feedback(None, answered(demo_cache), like())
+    assert not (settings.cache_dir / FEEDBACK_FILE).exists()
+
+
+def test_technical_tab_names_the_feedback_file(make_services):
+    texts = component_values(build_app(make_services()))
+    assert any("feedback.jsonl" in text for text in texts)
+
+
+def test_portfolio_gives_one_row_per_cached_document_and_a_csv(handlers, settings):
+    rows, button = handlers.portfolio()
+    documents = {doc_id for _, doc_id in document_choices(handlers.services.store)}
+    assert len(rows) == len(documents)
+    assert button.visible is True
+    assert (settings.cache_dir / app.PORTFOLIO_CSV).exists()
+    assert button.value["orig_name"] == app.PORTFOLIO_CSV
+
+
+def test_the_portfolio_tab_and_its_components_exist(make_services):
+    demo = build_app(make_services())
+    assert "tab-portfolio" in [b.id for b in demo.blocks.values() if isinstance(b, gr.Tab)]
+    assert find_component(demo, "portfolio-table").interactive is False
+    assert find_component(demo, "portfolio-refresh").value == "Refresh"
+    assert find_component(demo, "portfolio-csv").visible is False
+    assert find_component(demo, "portfolio-intro").value
+
+
+def test_summarize_in_serbian_asks_for_serbian_and_saves_under_its_own_store(
+    make_services, law_cache, settings
+):
+    client = EchoTextClient()
+    handlers = Handlers(make_services(gen=client))
+    result = last(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH, "sr"))
+    assert "Serbian" in client.text_calls[0][0]
+    assert "written in Serbian" in result
+    last(handlers.summarize(law_cache, TAU_LOW, TAU_HIGH))
+    assert len(client.text_calls) == 2
+    assert len(list((settings.cache_dir / "summaries").glob("*.json"))) == 2
+
+
+def test_summarize_in_serbian_in_the_chat_does_the_same(make_services, law_cache):
+    client = EchoTextClient()
+    handlers = Handlers(make_services(router=FixedRouter({}), gen=client))
+    yields = list(
+        handlers.ask("summarize in Serbian", [], law_cache, TAU_LOW, TAU_HIGH, [], None)
+    )
+    assert "Serbian" in client.text_calls[0][0]
+    assert "written in Serbian" in yields[-1][1][-1]["content"]
+
+
+def test_the_summary_tab_has_a_language_dropdown(make_services):
+    dropdown = find_component(build_app(make_services()), "summary-language")
+    assert dropdown.value == "en"
+    assert ("Serbian", "sr") in dropdown.choices
