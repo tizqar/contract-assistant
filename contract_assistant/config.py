@@ -46,7 +46,7 @@ class Settings:
     tau_source: str = field(default_factory=lambda: _env("TAU_SOURCE", "validation, seed 3407"))
 
     llm_backend: str = field(default_factory=lambda: _env("LLM_BACKEND", "ollama"))
-    llm_model: str = field(default_factory=lambda: _env("LLM_MODEL", "qwen3:1.7b"))
+    llm_model: str = field(default_factory=lambda: _env("LLM_MODEL", "qwen3.5:4b"))
     openai_base_url: str | None = field(default_factory=lambda: _env("OPENAI_BASE_URL"))
     openai_api_key: str | None = field(default_factory=lambda: _env("OPENAI_API_KEY"))
     llm_timeout_s: float = 10.0
@@ -60,7 +60,7 @@ class Settings:
         default_factory=lambda: _env("EMBEDDING_MODEL_ID", "BAAI/bge-base-en-v1.5")
     )
     embedding_threshold: float = field(
-        default_factory=lambda: float(_env("EMBEDDING_THRESHOLD", "0.55"))
+        default_factory=lambda: float(_env("EMBEDDING_THRESHOLD", "0.58"))
     )
 
     cache_dir: Path = field(default_factory=lambda: _path("CACHE_DIR", "cache"))

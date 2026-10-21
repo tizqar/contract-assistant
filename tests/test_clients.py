@@ -335,9 +335,10 @@ def test_ollama_text_reply_without_content_becomes_llm_error():
         client.complete_text(SYSTEM, USER, MAX_TOKENS)
 
 
-def test_ollama_from_settings_has_no_context_size(monkeypatch):
+def test_ollama_from_settings_shares_the_generation_context_size(monkeypatch):
     monkeypatch.setattr(ollama, "Client", lambda **kwargs: object())
-    assert OllamaClient.from_settings(Settings()).num_ctx is None
+    settings = Settings(gen_num_ctx=6144)
+    assert OllamaClient.from_settings(settings).num_ctx == 6144
 
 
 def test_ollama_for_generation_uses_the_generation_settings(monkeypatch):

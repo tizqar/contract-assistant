@@ -1,0 +1,654 @@
+{
+  "router": "embedding",
+  "model": "BAAI/bge-base-en-v1.5",
+  "split": "test",
+  "threshold": 0.58,
+  "report": {
+    "overall": {
+      "n": 30,
+      "precision": 0.6294444444444445,
+      "recall": 0.74,
+      "f1": 0.6261375661375662
+    },
+    "by_kind": {
+      "single": {
+        "n": 15,
+        "precision": 0.5622222222222223,
+        "recall": 0.8,
+        "f1": 0.611111111111111
+      },
+      "compound": {
+        "n": 10,
+        "precision": 0.845,
+        "recall": 0.82,
+        "f1": 0.7617460317460318
+      },
+      "out_of_scope": {
+        "n": 5,
+        "precision": 0.4,
+        "recall": 0.4,
+        "f1": 0.4
+      }
+    },
+    "exact_set_accuracy": 0.4,
+    "out_of_scope_accuracy": 0.4,
+    "fallback_rate": 0.0,
+    "latency_median_ms": 10.760375000245403,
+    "latency_p90_ms": 12.34028360049706,
+    "results": [
+      {
+        "id": "q02",
+        "question": "Who are the parties?",
+        "kind": "single",
+        "gold": [
+          "Parties"
+        ],
+        "route": {
+          "clause_types": [
+            "Parties"
+          ],
+          "kind": "embedding",
+          "latency_ms": 11.467542000900721,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      {
+        "id": "q03",
+        "question": "When was it signed, and when does it take effect?",
+        "kind": "compound",
+        "gold": [
+          "Agreement Date",
+          "Effective Date"
+        ],
+        "route": {
+          "clause_types": [
+            "Agreement Date",
+            "Effective Date",
+            "Document Name",
+            "Parties"
+          ],
+          "kind": "embedding",
+          "latency_ms": 11.059874999773456,
+          "raw": null
+        },
+        "precision": 0.5,
+        "recall": 1.0,
+        "f1": 0.6666666666666666
+      },
+      {
+        "id": "q04",
+        "question": "When does it expire, and does it renew on its own?",
+        "kind": "compound",
+        "gold": [
+          "Expiration Date",
+          "Renewal Term",
+          "Notice Period To Terminate Renewal"
+        ],
+        "route": {
+          "clause_types": [
+            "Renewal Term",
+            "Expiration Date",
+            "Notice Period To Terminate Renewal",
+            "Irrevocable Or Perpetual License"
+          ],
+          "kind": "embedding",
+          "latency_ms": 10.82308300101431,
+          "raw": null
+        },
+        "precision": 0.75,
+        "recall": 1.0,
+        "f1": 0.8571428571428571
+      },
+      {
+        "id": "q05",
+        "question": "Can either side walk away without cause?",
+        "kind": "single",
+        "gold": [
+          "Termination For Convenience"
+        ],
+        "route": {
+          "clause_types": [
+            "Termination For Convenience"
+          ],
+          "kind": "embedding",
+          "latency_ms": 10.400292001577327,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      {
+        "id": "q07",
+        "question": "Are there exclusivity obligations?",
+        "kind": "single",
+        "gold": [
+          "Exclusivity"
+        ],
+        "route": {
+          "clause_types": [
+            "Competitive Restriction Exception",
+            "Exclusivity",
+            "Post-Termination Services",
+            "Joint IP Ownership",
+            "Revenue/Profit Sharing"
+          ],
+          "kind": "embedding",
+          "latency_ms": 10.404291002487298,
+          "raw": null
+        },
+        "precision": 0.2,
+        "recall": 1.0,
+        "f1": 0.33333333333333337
+      },
+      {
+        "id": "q08",
+        "question": "Is liability capped anywhere? Is anything uncapped?",
+        "kind": "compound",
+        "gold": [
+          "Uncapped Liability",
+          "Cap On Liability"
+        ],
+        "route": {
+          "clause_types": [
+            "Uncapped Liability",
+            "Cap On Liability"
+          ],
+          "kind": "embedding",
+          "latency_ms": 10.532042000704678,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      {
+        "id": "q12",
+        "question": "What does it say about data privacy?",
+        "kind": "out_of_scope",
+        "gold": [],
+        "route": {
+          "clause_types": [],
+          "kind": "embedding",
+          "latency_ms": 10.739000001194654,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      {
+        "id": "q14",
+        "question": "Who covers shipping and delivery costs?",
+        "kind": "out_of_scope",
+        "gold": [],
+        "route": {
+          "clause_types": [],
+          "kind": "embedding",
+          "latency_ms": 10.321374997147359,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      {
+        "id": "q16",
+        "question": "Do we also get to use things owned by their parent company or sister companies?",
+        "kind": "single",
+        "gold": [
+          "Affiliate License-Licensor"
+        ],
+        "route": {
+          "clause_types": [
+            "IP Ownership Assignment",
+            "Change Of Control",
+            "Affiliate License-Licensee",
+            "License Grant",
+            "Joint IP Ownership"
+          ],
+          "kind": "embedding",
+          "latency_ms": 10.781749999296153,
+          "raw": null
+        },
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      {
+        "id": "q17",
+        "question": "Can you summarise this contract in a few sentences?",
+        "kind": "out_of_scope",
+        "gold": [],
+        "route": {
+          "clause_types": [
+            "Document Name",
+            "Agreement Date",
+            "Parties",
+            "Effective Date",
+            "Post-Termination Services"
+          ],
+          "kind": "embedding",
+          "latency_ms": 10.91183300013654,
+          "raw": null
+        },
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      {
+        "id": "q18",
+        "question": "How many days do we have to pay an invoice?",
+        "kind": "out_of_scope",
+        "gold": [],
+        "route": {
+          "clause_types": [
+            "Agreement Date",
+            "Expiration Date",
+            "Renewal Term"
+          ],
+          "kind": "embedding",
+          "latency_ms": 11.538374998053769,
+          "raw": null
+        },
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      {
+        "id": "q21",
+        "question": "If they decide to sell this product line, do we get to make an offer before anyone else?",
+        "kind": "single",
+        "gold": [
+          "Rofr/Rofo/Rofn"
+        ],
+        "route": {
+          "clause_types": [
+            "Rofr/Rofo/Rofn",
+            "Most Favored Nation"
+          ],
+          "kind": "embedding",
+          "latency_ms": 13.25712499965448,
+          "raw": null
+        },
+        "precision": 0.5,
+        "recall": 1.0,
+        "f1": 0.6666666666666666
+      },
+      {
+        "id": "q22",
+        "question": "Is there anything that lets us work with a rival despite the non-compete?",
+        "kind": "compound",
+        "gold": [
+          "Non-Compete",
+          "Competitive Restriction Exception"
+        ],
+        "route": {
+          "clause_types": [
+            "Non-Compete",
+            "Competitive Restriction Exception"
+          ],
+          "kind": "embedding",
+          "latency_ms": 10.48616700063576,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      {
+        "id": "q30",
+        "question": "Just the basics: who's it between, which law applies and how long does it run?",
+        "kind": "compound",
+        "gold": [
+          "Parties",
+          "Expiration Date",
+          "Governing Law"
+        ],
+        "route": {
+          "clause_types": [
+            "Governing Law"
+          ],
+          "kind": "embedding",
+          "latency_ms": 11.206750001292676,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 0.3333333333333333,
+        "f1": 0.5
+      },
+      {
+        "id": "q31",
+        "question": "If the developer shuts down, is the source code kept somewhere safe for us?",
+        "kind": "single",
+        "gold": [
+          "Source Code Escrow"
+        ],
+        "route": {
+          "clause_types": [
+            "Source Code Escrow"
+          ],
+          "kind": "embedding",
+          "latency_ms": 11.313666000205558,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      {
+        "id": "q32",
+        "question": "How long does their guarantee last after delivery?",
+        "kind": "single",
+        "gold": [
+          "Warranty Duration"
+        ],
+        "route": {
+          "clause_types": [
+            "Renewal Term",
+            "Warranty Duration",
+            "Expiration Date"
+          ],
+          "kind": "embedding",
+          "latency_ms": 11.519499999849359,
+          "raw": null
+        },
+        "precision": 0.3333333333333333,
+        "recall": 1.0,
+        "f1": 0.5
+      },
+      {
+        "id": "q33",
+        "question": "What's the exact title at the top of this document?",
+        "kind": "single",
+        "gold": [
+          "Document Name"
+        ],
+        "route": {
+          "clause_types": [
+            "Document Name"
+          ],
+          "kind": "embedding",
+          "latency_ms": 11.008540997863747,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      {
+        "id": "q37",
+        "question": "Do they get to use what we develop for their own products later?",
+        "kind": "compound",
+        "gold": [
+          "IP Ownership Assignment",
+          "Joint IP Ownership",
+          "License Grant"
+        ],
+        "route": {
+          "clause_types": [
+            "IP Ownership Assignment",
+            "Joint IP Ownership"
+          ],
+          "kind": "embedding",
+          "latency_ms": 12.829582999984268,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 0.6666666666666666,
+        "f1": 0.8
+      },
+      {
+        "id": "q41",
+        "question": "What can't they do after it ends?",
+        "kind": "compound",
+        "gold": [
+          "Non-Compete",
+          "Exclusivity",
+          "No-Solicit Of Customers",
+          "No-Solicit Of Employees",
+          "Post-Termination Services"
+        ],
+        "route": {
+          "clause_types": [
+            "Post-Termination Services"
+          ],
+          "kind": "embedding",
+          "latency_ms": 12.285917000554036,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 0.2,
+        "f1": 0.33333333333333337
+      },
+      {
+        "id": "q42",
+        "question": "Do I need their say-so to sign this contract over to another company?",
+        "kind": "single",
+        "gold": [
+          "Anti-Assignment"
+        ],
+        "route": {
+          "clause_types": [
+            "Anti-Assignment",
+            "Parties",
+            "License Grant",
+            "Post-Termination Services",
+            "Non-Transferable License"
+          ],
+          "kind": "embedding",
+          "latency_ms": 9.743209000589559,
+          "raw": null
+        },
+        "precision": 0.2,
+        "recall": 1.0,
+        "f1": 0.33333333333333337
+      },
+      {
+        "id": "q45",
+        "question": "Is it OK if we headhunt some of their people?",
+        "kind": "single",
+        "gold": [
+          "No-Solicit Of Employees"
+        ],
+        "route": {
+          "clause_types": [],
+          "kind": "embedding",
+          "latency_ms": 9.757457999512553,
+          "raw": null
+        },
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      {
+        "id": "q46",
+        "question": "Can they look through our records or visit our premises to check we're following the rules?",
+        "kind": "single",
+        "gold": [
+          "Audit Rights"
+        ],
+        "route": {
+          "clause_types": [
+            "Audit Rights"
+          ],
+          "kind": "embedding",
+          "latency_ms": 10.381792002590373,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      {
+        "id": "q48",
+        "question": "Can we install it on as many machines as we like?",
+        "kind": "single",
+        "gold": [
+          "Unlimited/All-You-Can-Eat-License"
+        ],
+        "route": {
+          "clause_types": [
+            "Unlimited/All-You-Can-Eat-License"
+          ],
+          "kind": "embedding",
+          "latency_ms": 9.570749996782979,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      {
+        "id": "q49",
+        "question": "Is the price fixed, or can it go up if we use more than we planned?",
+        "kind": "compound",
+        "gold": [
+          "Price Restrictions",
+          "Volume Restriction"
+        ],
+        "route": {
+          "clause_types": [
+            "Price Restrictions",
+            "Volume Restriction"
+          ],
+          "kind": "embedding",
+          "latency_ms": 9.870000001683366,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      {
+        "id": "q50",
+        "question": "Do they get a cut of what we earn from this?",
+        "kind": "single",
+        "gold": [
+          "Revenue/Profit Sharing"
+        ],
+        "route": {
+          "clause_types": [],
+          "kind": "embedding",
+          "latency_ms": 9.58316600008402,
+          "raw": null
+        },
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      {
+        "id": "q52",
+        "question": "What happens to our deal if the other company gets taken over?",
+        "kind": "compound",
+        "gold": [
+          "Change Of Control",
+          "Anti-Assignment"
+        ],
+        "route": {
+          "clause_types": [
+            "Change Of Control",
+            "Anti-Assignment",
+            "Parties",
+            "Post-Termination Services",
+            "IP Ownership Assignment"
+          ],
+          "kind": "embedding",
+          "latency_ms": 10.049042000900954,
+          "raw": null
+        },
+        "precision": 0.4,
+        "recall": 1.0,
+        "f1": 0.5714285714285715
+      },
+      {
+        "id": "q53",
+        "question": "Are there pre-agreed penalties if someone misses a deadline or breaks a promise?",
+        "kind": "single",
+        "gold": [
+          "Liquidated Damages"
+        ],
+        "route": {
+          "clause_types": [
+            "Liquidated Damages",
+            "Post-Termination Services",
+            "Termination For Convenience",
+            "Notice Period To Terminate Renewal",
+            "Cap On Liability"
+          ],
+          "kind": "embedding",
+          "latency_ms": 9.875583000393817,
+          "raw": null
+        },
+        "precision": 0.2,
+        "recall": 1.0,
+        "f1": 0.33333333333333337
+      },
+      {
+        "id": "q54",
+        "question": "where do formal notices to the other side have to be sent",
+        "kind": "out_of_scope",
+        "gold": [],
+        "route": {
+          "clause_types": [
+            "Governing Law"
+          ],
+          "kind": "embedding",
+          "latency_ms": 9.801416999835055,
+          "raw": null
+        },
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      {
+        "id": "q58",
+        "question": "Walk me through the licence: what we're allowed to do, whether our subsidiaries can use it, whether we can pass it on and whether it lasts forever.",
+        "kind": "compound",
+        "gold": [
+          "License Grant",
+          "Non-Transferable License",
+          "Affiliate License-Licensee",
+          "Irrevocable Or Perpetual License"
+        ],
+        "route": {
+          "clause_types": [
+            "Irrevocable Or Perpetual License",
+            "License Grant",
+            "Affiliate License-Licensee",
+            "Non-Transferable License",
+            "Affiliate License-Licensor"
+          ],
+          "kind": "embedding",
+          "latency_ms": 75.80837500063353,
+          "raw": null
+        },
+        "precision": 0.8,
+        "recall": 1.0,
+        "f1": 0.888888888888889
+      },
+      {
+        "id": "q60",
+        "question": "What's the smallest order we're allowed to place?",
+        "kind": "single",
+        "gold": [
+          "Minimum Commitment"
+        ],
+        "route": {
+          "clause_types": [
+            "Minimum Commitment"
+          ],
+          "kind": "embedding",
+          "latency_ms": 11.349500000505941,
+          "raw": null
+        },
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      }
+    ]
+  }
+}

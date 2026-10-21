@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from typing import TYPE_CHECKING, Protocol
 
 import httpx
@@ -25,6 +27,13 @@ KEEP_ALIVE = "30m"
 LOAD_TIMEOUT_S = 120
 # ollama raises the builtin ConnectionError when the server cannot be reached.
 OLLAMA_ERRORS = (ollama.ResponseError, httpx.HTTPError, ConnectionError)
+# Ollama's MLX runner answers a schema-constrained request with 501 and this text.
+NO_GRAMMAR_STATUS = 501
+NO_GRAMMAR_TEXT = "structured output is unavailable"
+SCHEMA_INSTRUCTION = (
+    "\n\nReply with one JSON object that follows this JSON schema, and nothing else:\n{schema}"
+)
+FENCE = re.compile(r"^```[a-z]*\s*|\s*```$")
 
 
 class LLMError(RuntimeError):
@@ -45,6 +54,18 @@ def _messages(system: str, user: str) -> list[dict[str, str]]:
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
+def json_object(text: str) -> str:
+    """Return the first JSON object in a reply, without code fences; the reply if none."""
+    stripped = FENCE.sub("", text.strip())
+    start, end = stripped.find("{"), stripped.rfind("}")
+    return stripped[start : end + 1] if 0 <= start < end else stripped
+
+
+def _no_grammar(error: Exception) -> bool:
+    status = getattr(error, "status_code", None)
+    return status == NO_GRAMMAR_STATUS or NO_GRAMMAR_TEXT in str(error)
+
+
 class OllamaClient:
     """A model served by an Ollama server."""
 
@@ -59,14 +80,17 @@ class OllamaClient:
         self.model = model
         self.load_client = load_client or client
         self.num_ctx = num_ctx
+        # None until the first schema-constrained call shows whether the runner has a grammar.
+        self.grammar: bool | None = None
 
     @classmethod
     def from_settings(cls, settings: Settings) -> OllamaClient:
-        """Build the router's client from the settings; OLLAMA_HOST selects the server."""
+        """Build the router's client; it shares the context size so one model can serve both."""
         return cls(
             ollama.Client(timeout=settings.llm_timeout_s),
             settings.llm_model,
             ollama.Client(timeout=LOAD_TIMEOUT_S),
+            num_ctx=settings.gen_num_ctx,
         )
 
     @classmethod
@@ -90,15 +114,34 @@ class OllamaClient:
             raise LLMError(f"ollama load of {self.model} failed: {error!r}") from error
 
     def complete_json(self, system: str, user: str, schema: dict) -> str:
-        """Return the model's reply as JSON text that follows the schema."""
-        return self._chat(system, user, format=schema, options={"temperature": TEMPERATURE})
+        """Return the model's reply as JSON text that follows the schema.
+
+        A runner without a grammar gets the schema in the prompt instead, and the first
+        JSON object of its reply is returned; the caller validates it either way.
+        """
+        if self.grammar is not False:
+            try:
+                reply = self._chat(system, user, format=schema, options=self._options())
+            except LLMError as error:
+                if not _no_grammar(error.__cause__ or error):
+                    raise
+                logger.warning("%s has no grammar; the schema goes into the prompt", self.model)
+                self.grammar = False
+            else:
+                self.grammar = True
+                return reply
+        prompted = system + SCHEMA_INSTRUCTION.format(schema=json.dumps(schema))
+        return json_object(self._chat(prompted, user, options=self._options()))
 
     def complete_text(self, system: str, user: str, max_tokens: int) -> str:
         """Return the model's reply as free text of at most max_tokens tokens."""
-        options = {"temperature": TEMPERATURE, "num_predict": max_tokens}
+        return self._chat(system, user, options=self._options(num_predict=max_tokens))
+
+    def _options(self, **extra: int) -> dict[str, int | float]:
+        options: dict[str, int | float] = {"temperature": TEMPERATURE, **extra}
         if self.num_ctx is not None:
             options["num_ctx"] = self.num_ctx
-        return self._chat(system, user, options=options)
+        return options
 
     def _chat(self, system: str, user: str, **arguments) -> str:
         try:
