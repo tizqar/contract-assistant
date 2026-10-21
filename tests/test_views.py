@@ -9,6 +9,7 @@ from contract_assistant.answer import (
     Answer,
     AnswerItem,
     Citation,
+    Definition,
     GeneratedAnswer,
     Passage,
     answer,
@@ -41,6 +42,9 @@ from contract_assistant.ui.views import (
     chat_reply,
     checklist_intro,
     clause_rows,
+    definition_block,
+    definition_citation,
+    definition_rows,
     display_name,
     document_name,
     document_title,
@@ -793,3 +797,54 @@ def test_technical_details_say_generated_text_is_streamed_and_checked(settings):
 
 def test_technical_details_without_a_model_do_not_mention_streaming(settings):
     assert "shown as it is written" not in technical_markdown(settings, "embedding")
+
+
+def make_definition(
+    page: int | None = 3, quote: str = "RMA means a return number."
+) -> Definition:
+    return Definition(term="RMA", quote=quote, page=page, start=10, end=10 + len(quote))
+
+
+def test_definition_block_shows_badge_term_quote_and_page():
+    block = definition_block(make_definition())
+    assert 'class="tier tier-definition">Definition</span> **RMA**' in block
+    assert "> RMA means a return number." in block
+    assert "The sentence of the contract that defines the term" in block
+    assert "Page 3" in block
+
+
+def test_definition_block_without_a_page_names_no_page():
+    assert "Page" not in definition_block(make_definition(page=None))
+
+
+def test_definition_citation_is_the_sentence_with_full_confidence():
+    citation = definition_citation(make_definition())
+    assert (citation.quote, citation.page, citation.conf) == (
+        "RMA means a return number.",
+        3,
+        1.0,
+    )
+    assert (citation.start, citation.end) == (10, 36)
+
+
+def test_definition_rows_shorten_the_quote_and_mark_a_missing_page():
+    long = "RMA means " + "x" * 200
+    rows = definition_rows([make_definition(), make_definition(page=None, quote=long)])
+    assert rows[0] == ["RMA", "RMA means a return number.", "3"]
+    assert len(rows[1][1]) == TABLE_PASSAGE_CHARS and rows[1][1].endswith("…")
+    assert rows[1][2] == NO_PAGE
+
+
+def test_chat_reply_for_a_definition_answer_is_the_definition_block():
+    definition = make_definition()
+    route = RouteResult(clause_types=[], kind="definition", latency_ms=0.0)
+    result = Answer(
+        question="What is an RMA?",
+        route=route,
+        tau_low=TAU_LOW,
+        tau_high=TAU_HIGH,
+        items=[],
+        dropped_quotes=0,
+        definition=definition,
+    )
+    assert chat_reply(result) == definition_block(definition)

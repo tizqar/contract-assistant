@@ -4,6 +4,7 @@ import functools
 import inspect
 import logging
 import time
+from collections import OrderedDict
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +13,7 @@ import gradio as gr
 
 from contract_assistant.answer import (
     Answer,
+    Definition,
     Passage,
     Status,
     answer,
@@ -20,6 +22,7 @@ from contract_assistant.answer import (
 from contract_assistant.background import precompute, run_in_background, warm
 from contract_assistant.clause_types import ClauseType
 from contract_assistant.config import Settings
+from contract_assistant.definitions import find_definitions, lookup
 from contract_assistant.explain import (
     DEFAULT_LANGUAGE,
     LANGUAGES,
@@ -28,10 +31,11 @@ from contract_assistant.explain import (
 )
 from contract_assistant.extract.extractor import Extractor
 from contract_assistant.generation import Generation, Request, stream
+from contract_assistant.intents import Intent, detect_intent
 from contract_assistant.passage_answer import APP_ATTEMPTS as PASSAGE_ATTEMPTS
 from contract_assistant.passage_answer import generated_answer_from, passage_request
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
-from contract_assistant.router.base import Router
+from contract_assistant.router.base import Router, RouteResult, Turn
 from contract_assistant.router.clients import LLMClient, LLMError
 from contract_assistant.search import PassageSearch
 from contract_assistant.store import (
@@ -44,6 +48,7 @@ from contract_assistant.store import (
 from contract_assistant.summary import (
     APP_ATTEMPTS,
     SUMMARY_DIR,
+    Summary,
     SummaryStore,
     summary_from,
     summary_items,
@@ -58,6 +63,9 @@ from contract_assistant.term_sheet import (
 )
 from contract_assistant.ui.views import (
     CLAUSE_HEADERS,
+    DEFINITION_HEADERS,
+    DEFINITION_LABEL,
+    DEFINITION_VALUE,
     PASSAGE_PREFIX,
     RELATED_LABEL,
     STATUS_LABELS,
@@ -65,6 +73,8 @@ from contract_assistant.ui.views import (
     chat_reply,
     checklist_intro,
     clause_rows,
+    definition_citation,
+    definition_rows,
     display_name,
     document_name,
     document_title,
@@ -86,6 +96,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_DOCUMENT = "short_supply_agreement.txt"
 HIGHLIGHT_COLOR = "#fcd34d"
 TABLE_MAX_HEIGHT = 460
+DEFINITIONS_MAX_HEIGHT = 260
 CHAT_HEIGHT = 400
 UPLOAD_HEIGHT = 120
 SLIDER_STEP = 0.01
@@ -94,7 +105,9 @@ WRITING_SUMMARY = "Writing the summary"
 WRITING_EXPLANATION = "Writing the explanation"
 WRITING_ANSWER = "Writing the answer from the passages"
 TERM_SHEET_STATUS = "Extracting the key terms. This can take up to half a minute."
-ASK_OTHER_OUTPUTS = 6
+ASK_OTHER_OUTPUTS = 7
+MAX_REMEMBERED_TURNS = 8
+MAX_CACHED_DEFINITIONS = 4
 UNEXPECTED_ERROR = "Something went wrong; see the server log."
 DAMAGED_ANALYSIS = "The saved analysis of this contract is damaged or inconsistent."
 NO_MODEL = (
@@ -147,6 +160,7 @@ TERM_SHEET_WITHHELD = "The term sheet is not shown because {reason}."
 TERM_HEADERS = ["Term", "Value", "From clause", "Page"]
 TERM_DOWNLOAD_LABEL = "Download the term sheet (JSON)"
 GENERATION_FAILED = "The language model did not answer; see the server log."
+NOTHING_TO_EXPLAIN = "Ask about a clause first, then say 'explain that'."
 NOTHING_TO_SUMMARIZE = "No clause was found in this contract, so there is nothing to summarize."
 NOTHING_HIGHLIGHTED = (
     "Nothing is highlighted. Ask a question or select a clause in the checklist first."
@@ -189,11 +203,13 @@ CSS = """
 .tier-not_found { background: transparent; border-color: #9ca3af; color: #6b7280; }
 .tier-related { background: #e5e7eb; color: #374151; }
 .tier-generated { background: #dbeafe; color: #1e3a8a; }
+.tier-definition { background: #ede9fe; color: #4c1d95; }
 .dark .tier-found { background: #34a56f; color: #06210f; }
 .dark .tier-check { border-color: #fbbf24; color: #fbbf24; }
 .dark .tier-not_found { border-color: #6b7280; color: #9ca3af; }
 .dark .tier-related { background: #374151; color: #e5e7eb; }
 .dark .tier-generated { background: #1e3a8a; color: #dbeafe; }
+.dark .tier-definition { background: #4c1d95; color: #ede9fe; }
 #chat .message, #clause-table td, #clause-table td * {
   overflow-wrap: anywhere;
   white-space: normal;
@@ -216,6 +232,7 @@ CSS = """
 #clause-table th, #clause-table th * { white-space: nowrap; word-break: keep-all; }
 #upload svg.feather-upload { display: none; }
 #clause-table, #clause-table * { font-family: var(--font); }
+#definitions-table, #definitions-table * { font-family: var(--font); }
 #view { max-height: 520px; overflow-y: auto; }
 #view .textfield {
   display: block;
@@ -325,6 +342,7 @@ class Handlers:
         self.term_sheets = services.term_sheets or TermSheetStore(
             services.settings.cache_dir / TERM_SHEET_DIR
         )
+        self.definitions: OrderedDict[str, list[Definition]] = OrderedDict()
 
     @guarded
     def open_document(
@@ -360,6 +378,8 @@ class Handlers:
             gr.Radio(choices=[], value=None, visible=False),
             {},
             gr.DownloadButton(value=str(path)),
+            [],
+            definition_rows(self._definitions(cache)),
         )
 
     @guarded
@@ -370,8 +390,10 @@ class Handlers:
         cache: DocumentCache | None,
         tau_low: float,
         tau_high: float,
+        turns: list[dict] | None = None,
+        last: Answer | None = None,
     ):
-        """Route a question, answer it from the analysis and show the first passage."""
+        """Answer a definition or a chat command, else route a question and show the passage."""
         if not question or not question.strip():
             gr.Warning("Type a question first.")
             yield gr.skip()
@@ -381,14 +403,25 @@ class Handlers:
             yield gr.skip()
             return
         services = self.services
-        route = restrict_to_cache(services.router.route(question), cache)
+        asked = [*(history or []), {"role": "user", "content": question}]
+        definition = lookup(self._definitions(cache), question)
+        if definition is not None:
+            yield self._definition_reply(question, definition, asked, cache, tau_low, tau_high)
+            return
+        intent = detect_intent(question)
+        if intent is not None:
+            yield from self._command(intent, asked, cache, tau_low, tau_high, last)
+            return
+        earlier = [Turn.model_validate(turn) for turn in turns or []]
+        route = restrict_to_cache(services.router.route(question, earlier), cache)
+        turn = Turn(question=question, clause_types=route.clause_types)
+        remembered = [*(turns or []), turn.model_dump()][-MAX_REMEMBERED_TURNS:]
         try:
             result = answer(question, route, cache, tau_low, tau_high, services.unvalidated)
         except ValueError as error:
             gr.Warning(str(error))
             yield gr.skip()
             return
-        asked = [*(history or []), {"role": "user", "content": question}]
         if not route.clause_types:
             passages = services.search.search(cache, question)
             generated = yield from self._stream_answer(question, passages, asked)
@@ -404,6 +437,7 @@ class Handlers:
             segments,
             sources_json(result, cache),
             show_tab(DOCUMENT_TAB),
+            remembered,
         )
 
     @guarded
@@ -416,6 +450,9 @@ class Handlers:
         for item in last.items:
             if item.clause_type == clause_type and item.citation:
                 return document_view(cache, clause_type, item.citation)
+        if clause_type == DEFINITION_VALUE and last.definition is not None:
+            citation = definition_citation(last.definition)
+            return document_view(cache, DEFINITION_LABEL, citation)
         for index, passage in enumerate(last.passages):
             if clause_type == f"{PASSAGE_PREFIX}{index}":
                 return document_view(cache, RELATED_LABEL, passage_citation(passage))
@@ -473,6 +510,19 @@ class Handlers:
         return *document_view(cache, clause_type, citation), show_tab(DOCUMENT_TAB)
 
     @guarded
+    def show_definition(self, cache: DocumentCache | None, evt: gr.SelectData):
+        """Show the sentence that defines the selected term in the Document tab."""
+        if cache is None:
+            return gr.skip()
+        term = evt.row_value[0]
+        for definition in self._definitions(cache):
+            if definition.term == term:
+                citation = definition_citation(definition)
+                label, segments = document_view(cache, DEFINITION_LABEL, citation)
+                return label, segments, show_tab(DOCUMENT_TAB)
+        return gr.skip()
+
+    @guarded
     def summarize(self, cache: DocumentCache | None, tau_low: float, tau_high: float):
         """Summarize the clauses found in the open contract, reusing a saved summary."""
         services = self.services
@@ -485,36 +535,19 @@ class Handlers:
             gr.Warning(SUMMARIES_OFF)
             yield gr.skip()
             return
-        names = [clause_type.name for clause_type in services.clause_types]
         try:
-            items = summary_items(cache, names, tau_low, tau_high, services.unvalidated)
+            for step in self._summary_steps(cache, tau_low, tau_high):
+                if isinstance(step, Summary):
+                    yield summary_markdown(step, services.unvalidated)
+                else:
+                    yield step
         except ValueError as error:
             gr.Warning(str(error))
             yield gr.skip()
-            return
-        if not items:
-            yield NOTHING_TO_SUMMARIZE
-            return
-        summary = self.summaries.load(cache.doc_id, gen.model, tau_low, tau_high)
-        if summary is None:
-            request = summary_request(cache.doc_id, items)
-            try:
-                for step in _stream_checked(gen, WRITING_SUMMARY, request, APP_ATTEMPTS):
-                    if isinstance(step, Generation):
-                        summary = summary_from(
-                            step, cache.doc_id, items, gen, tau_low, tau_high
-                        )
-                    else:
-                        yield step
-            except LLMError:
-                logger.exception("summary of %s failed", cache.doc_id)
-                gr.Warning(GENERATION_FAILED)
-                yield gr.skip()
-                return
-            # A withheld summary is not saved, so the next click asks the model again.
-            if summary.text is not None:
-                self.summaries.save(summary)
-        yield summary_markdown(summary, services.unvalidated)
+        except LLMError:
+            logger.exception("summary of %s failed", cache.doc_id)
+            gr.Warning(GENERATION_FAILED)
+            yield gr.skip()
 
     @guarded
     def term_sheet(self, cache: DocumentCache | None, tau_low: float, tau_high: float):
@@ -643,6 +676,129 @@ class Handlers:
         services = self.services
         warm([services.gen, getattr(services.router, "client", None)])
 
+    def _summary_steps(
+        self, cache: DocumentCache, tau_low: float, tau_high: float
+    ) -> Iterator[str | Summary]:
+        services = self.services
+        gen = services.gen
+        names = [clause_type.name for clause_type in services.clause_types]
+        items = summary_items(cache, names, tau_low, tau_high, services.unvalidated)
+        if not items:
+            yield NOTHING_TO_SUMMARIZE
+            return
+        summary = self.summaries.load(cache.doc_id, gen.model, tau_low, tau_high)
+        if summary is None:
+            request = summary_request(cache.doc_id, items)
+            for step in _stream_checked(gen, WRITING_SUMMARY, request, APP_ATTEMPTS):
+                if isinstance(step, Generation):
+                    summary = summary_from(step, cache.doc_id, items, gen, tau_low, tau_high)
+                else:
+                    yield step
+            # A withheld summary is not saved, so the next click asks the model again.
+            if summary.text is not None:
+                self.summaries.save(summary)
+        yield summary
+
+    def _definitions(self, cache: DocumentCache) -> list[Definition]:
+        found = self.definitions.get(cache.doc_id)
+        if found is None:
+            found = find_definitions(cache.text, cache.page_starts)
+            self.definitions[cache.doc_id] = found
+            while len(self.definitions) > MAX_CACHED_DEFINITIONS:
+                self.definitions.popitem(last=False)
+        return found
+
+    def _definition_reply(
+        self,
+        question: str,
+        definition: Definition,
+        asked: list[dict],
+        cache: DocumentCache,
+        tau_low: float,
+        tau_high: float,
+    ) -> tuple:
+        route = RouteResult(clause_types=[], kind="definition", latency_ms=0.0)
+        result = Answer(
+            question=question,
+            route=route,
+            tau_low=tau_low,
+            tau_high=tau_high,
+            items=[],
+            dropped_quotes=0,
+            definition=definition,
+        )
+        reply = {"role": "assistant", "content": chat_reply(result, self.services.unvalidated)}
+        picker, label, segments = _citation_updates(result, cache)
+        return (
+            "",
+            [*asked, reply],
+            result,
+            picker,
+            label,
+            segments,
+            sources_json(result, cache),
+            show_tab(DOCUMENT_TAB),
+            gr.skip(),
+        )
+
+    def _command(
+        self,
+        intent: Intent,
+        asked: list[dict],
+        cache: DocumentCache,
+        tau_low: float,
+        tau_high: float,
+        last: Answer | None,
+    ) -> Iterator[tuple]:
+        if intent.kind == "explain":
+            yield from self._explain_last(intent, asked, last)
+        else:
+            yield from self._summarize_in_chat(asked, cache, tau_low, tau_high)
+
+    def _explain_last(
+        self, intent: Intent, asked: list[dict], last: Answer | None
+    ) -> Iterator[tuple]:
+        gen = self.services.gen
+        shown = _last_shown(last)
+        if shown is None:
+            yield _chat_only(asked, NOTHING_TO_EXPLAIN)
+            return
+        if gen is None:
+            yield _chat_only(asked, SUMMARIES_OFF)
+            return
+        clause_type, quote = shown
+        request = explanation_request(clause_type, quote, intent.language)
+        try:
+            for step in _stream_checked(gen, WRITING_EXPLANATION, request, 1):
+                if isinstance(step, Generation):
+                    explanation = explanation_from(
+                        step, clause_type, quote, intent.language, gen
+                    )
+                else:
+                    yield _chat_only(asked, step)
+        except LLMError:
+            logger.exception("explanation of %s failed", clause_type)
+            yield _chat_only(asked, GENERATION_FAILED)
+            return
+        yield _chat_only(asked, explanation_markdown(explanation))
+
+    def _summarize_in_chat(
+        self, asked: list[dict], cache: DocumentCache, tau_low: float, tau_high: float
+    ) -> Iterator[tuple]:
+        if self.services.gen is None:
+            yield _chat_only(asked, SUMMARIES_OFF)
+            return
+        try:
+            for step in self._summary_steps(cache, tau_low, tau_high):
+                if isinstance(step, Summary):
+                    step = summary_markdown(step, self.services.unvalidated)
+                yield _chat_only(asked, step)
+        except ValueError as error:
+            yield _chat_only(asked, str(error))
+        except LLMError:
+            logger.exception("summary of %s failed", cache.doc_id)
+            yield _chat_only(asked, GENERATION_FAILED)
+
     def _stream_answer(
         self, question: str, passages: list[Passage], asked: list[dict]
     ) -> Iterator[tuple]:
@@ -700,6 +856,24 @@ def _reporter(progress: gr.Progress) -> Callable[[int, int, str], None]:
     return report
 
 
+def _chat_only(asked: list[dict], content: str) -> tuple:
+    message = {"role": "assistant", "content": content}
+    return "", [*asked, message], *(gr.skip() for _ in range(ASK_OTHER_OUTPUTS))
+
+
+def _last_shown(last: Answer | None) -> tuple[str, str] | None:
+    if last is None:
+        return None
+    for item in last.items:
+        if item.citation:
+            return item.clause_type, item.citation.quote
+    if last.definition is not None:
+        return DEFINITION_LABEL, last.definition.quote
+    if last.passages:
+        return RELATED_LABEL, last.passages[0].quote
+    return None
+
+
 def _table(
     cache: DocumentCache | None,
     tau_low: float,
@@ -713,6 +887,17 @@ def _table(
 
 
 def _citation_updates(result: Answer, cache: DocumentCache):
+    if result.definition is not None:
+        definition = result.definition
+        picker = gr.Radio(
+            choices=[(f"{DEFINITION_LABEL}: {definition.term}", DEFINITION_VALUE)],
+            value=DEFINITION_VALUE,
+            visible=True,
+        )
+        label, segments = document_view(
+            cache, DEFINITION_LABEL, definition_citation(definition)
+        )
+        return picker, label, segments
     if result.passages:
         first = passage_citation(result.passages[0])
         label, segments = document_view(cache, RELATED_LABEL, first)
@@ -741,10 +926,12 @@ def build_app(services: Services) -> gr.Blocks:
     choices = document_choices(services.store)
     color_map = {display_name(c.name): HIGHLIGHT_COLOR for c in services.clause_types}
     color_map[RELATED_LABEL] = HIGHLIGHT_COLOR
+    color_map[DEFINITION_LABEL] = HIGHLIGHT_COLOR
 
     with gr.Blocks(title="Contract Assistant", fill_width=True) as demo:
         cache_state = gr.State(None)
         answer_state = gr.State(None)
+        turns_state = gr.State([])
         refresh_state = gr.State(None)
         with gr.Column(elem_id="top"):
             gr.Markdown(f"# Contract Assistant\n\n{INTRO}", elem_id="header")
@@ -804,6 +991,15 @@ def build_app(services: Services) -> gr.Blocks:
                         show_label=False,
                         elem_id="view",
                     )
+                    with gr.Accordion("Defined terms", open=False, elem_id="terms"):
+                        definitions_table = gr.Dataframe(
+                            headers=DEFINITION_HEADERS,
+                            datatype=["str", "str", "str"],
+                            interactive=False,
+                            wrap=True,
+                            max_height=DEFINITIONS_MAX_HEIGHT,
+                            elem_id="definitions-table",
+                        )
                     with gr.Row():
                         language = gr.Dropdown(
                             choices=LANGUAGE_CHOICES,
@@ -911,6 +1107,8 @@ def build_app(services: Services) -> gr.Blocks:
             picker,
             sources,
             download,
+            turns_state,
+            definitions_table,
         ]
         gr.on(
             triggers=[demo.load, document.change],
@@ -919,8 +1117,18 @@ def build_app(services: Services) -> gr.Blocks:
             outputs=open_outputs,
             api_name="load_document",
         )
-        ask_outputs = [question, chat, answer_state, picker, view_label, view, sources, tabs]
-        ask_inputs = [chat, cache_state, tau_low, tau_high]
+        ask_outputs = [
+            question,
+            chat,
+            answer_state,
+            picker,
+            view_label,
+            view,
+            sources,
+            tabs,
+            turns_state,
+        ]
+        ask_inputs = [chat, cache_state, tau_low, tau_high, turns_state, answer_state]
         running = [
             gr.on(
                 triggers=[ask.click, question.submit],
@@ -973,6 +1181,12 @@ def build_app(services: Services) -> gr.Blocks:
         )
         table.select(
             handlers.show_row, [cache_state], [view_label, view, tabs], api_name="show_row"
+        ).then(None, None, None, js=SCROLL_TO_HIGHLIGHT)
+        definitions_table.select(
+            handlers.show_definition,
+            [cache_state],
+            [view_label, view, tabs],
+            api_name="show_definition",
         ).then(None, None, None, js=SCROLL_TO_HIGHLIGHT)
         running.append(
             summarize.click(

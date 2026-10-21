@@ -13,7 +13,7 @@ from contract_assistant.answer import GeneratedAnswer, Passage
 from contract_assistant.clause_types import app_clause_types, load_extra_clause_types
 from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.extract.extractor import Extractor
-from contract_assistant.router.base import RouteResult
+from contract_assistant.router.base import RouteResult, Turn
 from contract_assistant.router.clients import LLMError
 from contract_assistant.search import PassageSearch
 from contract_assistant.store import Store
@@ -152,8 +152,8 @@ def test_document_choices_list_each_document_once(make_services):
 
 def test_open_document_resets_the_page(handlers, demo_cache):
     result = handlers.open_document(SHORT_DOC_ID, TAU_LOW, TAU_HIGH, ALL_CLAUSES)
-    cache, last, chat, title, rows, _, _, _, picker, sources, _ = result
-    assert (cache.doc_id, last, chat, sources) == (SHORT_DOC_ID, None, [], {})
+    cache, last, chat, title, rows, _, _, _, picker, sources, _, turns, _ = result
+    assert (cache.doc_id, last, chat, sources, turns) == (SHORT_DOC_ID, None, [], {}, [])
     assert "Short supply agreement" in title
     assert len(rows) == len(demo_cache.clauses)
     assert picker.visible is False
@@ -164,7 +164,7 @@ def test_ask_cites_the_governing_law_clause(make_services, settings):
     result = last(
         Handlers(make_services()).ask("which law governs?", [], cache, TAU_LOW, TAU_HIGH)
     )
-    textbox, history, _, picker, _, segments, sources, _ = result
+    textbox, history, _, picker, _, segments, sources, _, _ = result
     assert textbox == ""
     assert "tier-found" in history[-1]["content"]
     assert highlighted(segments) == [(LAW_SENTENCE, "Governing Law")]
@@ -175,7 +175,7 @@ def test_ask_cites_the_governing_law_clause(make_services, settings):
 def test_ask_with_two_types_offers_both_and_shows_the_first(handlers, demo_cache):
     question = "who are the parties and which law governs?"
     result = last(handlers.ask(question, [], demo_cache, TAU_LOW, TAU_HIGH))
-    _, history, answered, picker, _, segments, _, _ = result
+    _, history, answered, picker, _, segments, _, _, _ = result
     assert picker.choices == [("Parties", "Parties"), ("Governing Law", "Governing Law")]
     assert picker.value == "Parties"
     assert highlighted(segments)[0][1] == "Parties"
@@ -195,7 +195,7 @@ def test_ask_records_the_slider_thresholds(handlers, demo_cache):
 
 def test_ask_switches_to_the_document_tab(handlers, demo_cache):
     result = last(handlers.ask("which law governs?", [], demo_cache, TAU_LOW, TAU_HIGH))
-    assert result[-1].selected == DOCUMENT_TAB
+    assert result[7].selected == DOCUMENT_TAB
 
 
 def test_suggested_questions_are_asked_through_the_ask_handler(make_services):
@@ -1001,3 +1001,146 @@ def test_upload_of_a_new_text_does_not_precompute_without_a_model(
     extractor = Extractor(slow_fake_qa(0), clause_types, settings, "fake")
     upload_new_text(Handlers(make_services(extractor)), tmp_path)
     assert background_calls == []
+
+
+def test_ask_passes_the_earlier_turns_to_the_router(make_services, law_cache):
+    router = route_to("Governing Law")
+    handlers = Handlers(make_services(router=router))
+    earlier = [{"question": "who?", "clause_types": ["Parties"]}]
+    last(handlers.ask("q", [], law_cache, TAU_LOW, TAU_HIGH, earlier))
+    assert router.turns == [[Turn(question="who?", clause_types=["Parties"])]]
+
+
+def test_ask_appends_a_turn_after_a_routed_question(make_services, law_cache):
+    handlers = Handlers(make_services(router=route_to("Governing Law")))
+    result = last(handlers.ask("q", [], law_cache, TAU_LOW, TAU_HIGH, []))
+    assert result[8] == [{"question": "q", "clause_types": ["Governing Law"]}]
+
+
+def test_ask_keeps_at_most_eight_turns(make_services, law_cache):
+    handlers = Handlers(make_services(router=route_to("Governing Law")))
+    earlier = [{"question": f"q{n}", "clause_types": []} for n in range(8)]
+    result = last(handlers.ask("q", [], law_cache, TAU_LOW, TAU_HIGH, earlier))
+    assert [turn["question"] for turn in result[8]] == [*(f"q{n}" for n in range(1, 8)), "q"]
+
+
+def test_open_document_resets_the_turns(handlers):
+    result = handlers.open_document(SHORT_DOC_ID, TAU_LOW, TAU_HIGH, ALL_CLAUSES)
+    assert result[11] == []
+
+
+def test_a_definition_question_calls_no_router_and_adds_no_turn(make_services, demo_cache):
+    router = FixedRouter({})
+    handlers = Handlers(make_services(router=router))
+    result = last(handlers.ask("What is an RMA?", [], demo_cache, TAU_LOW, TAU_HIGH, []))
+    assert router.questions == []
+    assert is_skip(result[8])
+
+
+def test_a_definition_question_shows_the_definition(handlers, demo_cache):
+    result = last(handlers.ask("What is an RMA?", [], demo_cache, TAU_LOW, TAU_HIGH, []))
+    _, history, answered, picker, _, segments, _, _, _ = result
+    assert answered.definition.term == "RMA"
+    assert "tier-definition" in history[-1]["content"]
+    assert picker.choices == [("Definition: RMA", "definition")]
+    assert highlighted(segments) == [(answered.definition.quote, "Definition")]
+
+
+def test_pick_citation_shows_the_definition(handlers, demo_cache):
+    answered = last(handlers.ask("What is an RMA?", [], demo_cache, TAU_LOW, TAU_HIGH, []))[2]
+    _, segments = handlers.pick_citation("definition", answered, demo_cache)
+    assert highlighted(segments) == [(answered.definition.quote, "Definition")]
+
+
+def test_the_definitions_are_found_once_per_document(handlers, demo_cache, monkeypatch):
+    calls = []
+    monkeypatch.setattr(app, "find_definitions", lambda *args: calls.append(args) or [])
+    last(handlers.ask("What is an RMA?", [], demo_cache, TAU_LOW, TAU_HIGH, []))
+    last(handlers.ask("What is an RMA?", [], demo_cache, TAU_LOW, TAU_HIGH, []))
+    assert len(calls) == 1
+
+
+def routed_answer(make_services, law_cache):
+    router = route_to("Governing Law")
+    handlers = Handlers(make_services(router=router, gen=EchoTextClient()))
+    answered = last(handlers.ask("q", [], law_cache, TAU_LOW, TAU_HIGH, []))
+    return handlers, router, answered
+
+
+def test_explain_that_streams_an_explanation_into_the_chat(make_services, law_cache):
+    handlers, _, first = routed_answer(make_services, law_cache)
+    yields = list(
+        handlers.ask("explain that", first[1], law_cache, TAU_LOW, TAU_HIGH, [], first[2])
+    )
+    content = yields[-1][1][-1]["content"]
+    assert "The contract states" in content and "a restatement, not a quote" in content
+    assert len(yields) > 1
+    assert len(yields[-1]) == 9
+
+
+def test_explain_that_leaves_the_answer_and_turns_alone(make_services, law_cache):
+    handlers, router, first = routed_answer(make_services, law_cache)
+    result = last(
+        handlers.ask("explain that", first[1], law_cache, TAU_LOW, TAU_HIGH, [], first[2])
+    )
+    assert is_skip(result[2]) and is_skip(result[5]) and is_skip(result[8])
+    assert router.questions == ["q"]
+
+
+def test_explain_with_nothing_shown_says_so(make_services, law_cache):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    result = last(handlers.ask("explain that", [], law_cache, TAU_LOW, TAU_HIGH, [], None))
+    assert result[1][-1]["content"] == app.NOTHING_TO_EXPLAIN
+
+
+def test_explain_that_explains_the_last_definition(make_services, demo_cache):
+    handlers = Handlers(make_services(gen=EchoTextClient()))
+    first = last(handlers.ask("What is an RMA?", [], demo_cache, TAU_LOW, TAU_HIGH, []))
+    result = last(
+        handlers.ask("explain that", first[1], demo_cache, TAU_LOW, TAU_HIGH, [], first[2])
+    )
+    assert "a restatement, not a quote" in result[1][-1]["content"]
+
+
+def test_explain_that_without_a_model_replies_in_the_chat(make_services, law_cache, warnings):
+    _, _, first = routed_answer(make_services, law_cache)
+    handlers = Handlers(make_services())
+    result = last(
+        handlers.ask("explain that", first[1], law_cache, TAU_LOW, TAU_HIGH, [], first[2])
+    )
+    assert result[1][-1]["content"] == app.SUMMARIES_OFF
+    assert warnings == []
+
+
+def test_summarize_in_the_chat_streams_the_summary(make_services, law_cache):
+    router = FixedRouter({})
+    handlers = Handlers(make_services(router=router, gen=EchoTextClient()))
+    yields = list(handlers.ask("summarize", [], law_cache, TAU_LOW, TAU_HIGH, [], None))
+    assert "Based on: " in yields[-1][1][-1]["content"]
+    assert len(yields) > 1
+    assert router.questions == []
+
+
+def test_summarize_in_the_chat_without_a_model_replies_in_the_chat(make_services, law_cache):
+    result = last(Handlers(make_services()).ask("summarize", [], law_cache, TAU_LOW, TAU_HIGH))
+    assert result[1][-1]["content"] == app.SUMMARIES_OFF
+
+
+def test_open_document_fills_the_defined_terms(handlers):
+    rows = handlers.open_document(SHORT_DOC_ID, TAU_LOW, TAU_HIGH, ALL_CLAUSES)[12]
+    assert [row[0] for row in rows] == ["Manufacturer", "Customer", "RMA"]
+    assert all(len(row[1]) <= 120 and row[2] == "—" for row in rows)
+
+
+def test_selecting_a_defined_term_highlights_it_and_shows_the_document(handlers, demo_cache):
+    event = SimpleNamespace(index=[2, 0], row_value=["RMA", "", "—"])
+    _, segments, tabs = handlers.show_definition(demo_cache, event)
+    assert highlighted(segments)[0][1] == "Definition"
+    assert "RMA" in highlighted(segments)[0][0]
+    assert tabs.selected == DOCUMENT_TAB
+
+
+def test_the_defined_terms_are_in_a_closed_accordion_with_a_table(make_services):
+    demo = build_app(make_services())
+    assert find_component(demo, "terms").open is False
+    assert find_component(demo, "definitions-table").headers == ["Term", "Defined as", "Page"]

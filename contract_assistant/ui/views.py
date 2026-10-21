@@ -12,6 +12,7 @@ from contract_assistant.answer import (
     Answer,
     AnswerItem,
     Citation,
+    Definition,
     GeneratedAnswer,
     Passage,
     Status,
@@ -118,6 +119,11 @@ PASSAGES_TEXT = (
 )
 UNVALIDATED_TEXT = "Not validated on test data"
 RELATED_LABEL = "Related passage"
+DEFINITION_LABEL = "Definition"
+DEFINITION_VALUE = "definition"
+DEFINITION_HEADERS = ["Term", "Defined as", "Page"]
+DEFINITION_HEADING = '<span class="tier tier-definition">Definition</span> **{term}**'
+DEFINITION_NOTE = "The sentence of the contract that defines the term"
 PASSAGE_PREFIX = "passage-"
 HIGHLIGHT_TEXT = {
     1: "The passage is highlighted in the document on the right.",
@@ -211,6 +217,8 @@ def _percent(conf: float) -> str:
 
 def chat_reply(answer: Answer, unvalidated: Collection[str] = ()) -> str:
     """Return the Markdown shown in the chat for an answer."""
+    if answer.definition is not None:
+        return definition_block(answer.definition)
     if not answer.items:
         return (
             _passages_reply(answer.passages, answer.generated)
@@ -222,6 +230,38 @@ def chat_reply(answer: Answer, unvalidated: Collection[str] = ()) -> str:
     if shown:
         blocks.append(f"<small>{HIGHLIGHT_TEXT[min(shown, 2)]}</small>")
     return "\n\n".join(blocks)
+
+
+def definition_block(definition: Definition) -> str:
+    """Return the chat block that quotes the sentence defining a term."""
+    heading = DEFINITION_HEADING.format(term=definition.term)
+    note = DEFINITION_NOTE
+    if definition.page is not None:
+        note = f"{note} · Page {definition.page}"
+    return f"{heading}\n{blockquote(definition.quote)}\n\n<small>{note}</small>"
+
+
+def definition_citation(definition: Definition) -> Citation:
+    """Return a definition as a citation, with full confidence as it is a verbatim sentence."""
+    return Citation(
+        quote=definition.quote,
+        page=definition.page,
+        conf=1.0,
+        start=definition.start,
+        end=definition.end,
+    )
+
+
+def definition_rows(definitions: list[Definition]) -> list[list[str]]:
+    """Return one row per defined term: the term, a short form of its sentence and the page."""
+    return [
+        [
+            definition.term,
+            _short_passage(definition.quote),
+            NO_PAGE if definition.page is None else str(definition.page),
+        ]
+        for definition in definitions
+    ]
 
 
 def _passages_reply(passages: list[Passage], generated: GeneratedAnswer | None = None) -> str:
