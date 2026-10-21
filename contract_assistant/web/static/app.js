@@ -141,6 +141,14 @@
     }
   }
 
+  function abortWithin(container) {
+    // A stream whose form is about to leave the page would write into nothing, or start a
+    // second model run next to the first when the tab is opened again.
+    for (const [form, controller] of streams) {
+      if (container && container.contains(form)) controller.abort();
+    }
+  }
+
   function autosubmit(root) {
     root.querySelectorAll("form[data-stream][data-autosubmit]").forEach((form) => {
       if (form.dataset.submitted) return;
@@ -177,6 +185,12 @@
       const form = stop.closest("form");
       const controller = form && streams.get(form);
       if (controller) controller.abort();
+      return;
+    }
+    const link = event.target.closest("a[data-thresholds]");
+    if (link) {
+      // A plain link is not an htmx request, so the thresholds are added here.
+      link.href = withThresholds(link.getAttribute("href"));
       return;
     }
     const chip = event.target.closest("[data-fill]");
@@ -233,6 +247,10 @@
     toast("The server did not answer.");
   });
 
+  document.addEventListener("htmx:beforeSwap", (event) => {
+    abortWithin(event.detail.target);
+  });
+
   document.addEventListener("htmx:afterSwap", (event) => {
     settle(event.detail.target);
   });
@@ -241,5 +259,5 @@
     autosubmit(document);
   });
 
-  window.contractAssistant = { toast, activateTab, withThresholds, streamForm };
+  window.contractAssistant = { toast, activateTab, withThresholds, streamForm, abortWithin };
 })();

@@ -1,0 +1,44 @@
+{% import "components.html" as c %}
+{# The Summary tab: the summary in the chosen language, then the full-text overview. #}
+<div class="tab-head">
+  <h2 class="h2">Summary</h2>
+  {% if pending or (view and view.text) %}<span class="badge badge-generated">Generated</span>{% endif %}
+  <span class="grow"></span>
+  <div class="seg" role="group" aria-label="Language of the summary">
+    {% for code, name in languages %}
+    <button type="button" class="seg-item{% if code == language %} seg-item-active{% endif %}"
+            aria-pressed="{{ 'true' if code == language else 'false' }}"
+            hx-get="/documents/{{ cache.doc_id }}/summary?language={{ code }}" hx-target="#insight-body" hx-swap="innerHTML">{{ name }}</button>
+    {% endfor %}
+  </div>
+</div>
+{% if notice %}{{ c.notice(notice) }}{% endif %}
+{% if pending %}
+<form class="stream-form" data-stream data-autosubmit data-target="#summary-live-{{ language }}"
+      action="/documents/{{ cache.doc_id }}/summary" method="post">
+  <input type="hidden" name="language" value="{{ language }}">
+  <div id="summary-live-{{ language }}" class="live">{{ c.status_line(pending) }}</div>
+  <div class="row gap">
+    <button type="button" class="btn btn-stop btn-sm" data-stop hidden>Stop</button>
+  </div>
+</form>
+{% elif view and view.text %}
+<div class="generated-text">{{ view.text }}</div>
+{{ c.generated_note(view.meta) }}
+<div class="sources">
+  <span class="eyebrow">Based on</span>
+  <div class="chips">
+    {% for s in view.sources %}
+    <a class="chip source-chip" href="#document-pane" hx-get="{{ s.url }}" hx-target="#document-pane" hx-swap="innerHTML"
+       title="{{ s.status|status_label }}"><span class="source-dot source-dot-{{ s.status }}" aria-hidden="true"></span>{{ s.name }}{% if s.unvalidated %}*{% endif %}<span class="sr-only"> ({{ s.status|status_label }})</span></a>
+    {% endfor %}
+  </div>
+  {% if view.note %}<p class="muted small">{{ view.note }}</p>{% endif %}
+</div>
+{% elif view %}
+{{ c.notice(view.withheld) }}
+{% if view.mismatch %}<p class="muted small">{{ view.mismatch }}</p>{% endif %}
+{% endif %}
+{% if fulltext_panel %}
+{% with panel_id=fulltext_panel, body="insights/fulltext.html" %}{% include "insights/stack.html" %}{% endwith %}
+{% endif %}

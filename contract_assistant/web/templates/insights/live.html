@@ -1,0 +1,4 @@
+{% import "components.html" as c %}
+{# What a stream shows while the model works: the status and the text written so far. #}
+{{ c.status_line(status) }}
+{% if text %}<div class="generated-text">{{ text }}</div>{% endif %}

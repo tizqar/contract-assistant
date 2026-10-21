@@ -1,0 +1,37 @@
+/* Insights tabs: the parts app.css does not cover. */
+
+.insight-stack { display: flex; flex-direction: column; gap: 14px; }
+.live { display: flex; flex-direction: column; gap: 8px; }
+.live:empty { display: none; }
+
+/* Summary */
+.sources { display: flex; flex-direction: column; gap: 6px; }
+.source-chip { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.source-chip:hover { color: var(--ink); }
+.source-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--muted); }
+.source-dot-found { background: var(--found); }
+.source-dot-check { background: var(--check); }
+.section-item, .obligation { display: flex; flex-direction: column; gap: 6px; }
+
+/* Key terms */
+.term-row > * { overflow-wrap: anywhere; }
+.date-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+
+/* Review */
+.flag-note { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border-2); }
+.flag-note:empty { display: none; }
+
+/* Obligations and clauses */
+.party, .clause-group { display: flex; flex-direction: column; gap: 8px; }
+.clause-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center;
+  color: var(--ink); text-decoration: none;
+}
+a.clause-row:hover, a.clause-row:focus-visible { background: var(--surface-2); color: var(--ink); }
+.clause-name { font-weight: 600; }
+.clause-facts { display: inline-flex; align-items: center; gap: 8px; }
+.clause-passage { grid-column: 1 / -1; overflow-wrap: anywhere; }
+
+@media (max-width: 480px) {
+  .kv-3 { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}

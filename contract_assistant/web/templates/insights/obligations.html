@@ -1,0 +1,37 @@
+{% import "components.html" as c %}
+{# The Obligations tab: who must, may or must not do what, in the words of the clauses. #}
+<div class="tab-head">
+  <h2 class="h2">Obligations</h2>
+</div>
+<p class="muted small">{{ intro }}</p>
+{% if notice %}{{ c.notice(notice) }}{% endif %}
+{% if pending %}
+<form class="stream-form" data-stream data-autosubmit data-target="#obligations-live"
+      action="/documents/{{ cache.doc_id }}/obligations" method="post">
+  <div id="obligations-live" class="live">{{ c.status_line(pending) }}</div>
+  <div class="row gap">
+    <button type="button" class="btn btn-stop btn-sm" data-stop hidden>Stop</button>
+  </div>
+</form>
+{% endif %}
+{% if parties %}
+{% for party in parties %}
+<section class="party">
+  <h3 class="group-title">{{ party.name }}</h3>
+  <div class="rows">
+    {% for o in party.entries %}
+    <div class="obligation">
+      <div class="row gap wrap">
+        <span class="badge badge-{{ o.css }} badge-sm">{{ o.modality }}</span>
+        <span class="muted small">{{ o.clause }}{% if o.page %} · Page {{ o.page }}{% endif %}</span>
+        <span class="grow"></span>
+        {{ c.view_link(o.url, "Show in document") }}
+      </div>
+      <p class="serif">{{ o.action }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endif %}
+{% if dropped %}<p class="muted small">{{ dropped }}</p>{% endif %}

@@ -1,0 +1,48 @@
+{% import "components.html" as c %}
+{# The Key terms tab: values copied from the clauses, then the dates they give. #}
+<div class="tab-head">
+  <h2 class="h2">Key terms</h2>
+  <span class="grow"></span>
+  {% if download %}<a class="btn btn-sm" href="/documents/{{ cache.doc_id }}/terms.json" download data-thresholds>Download JSON</a>{% endif %}
+</div>
+<p class="muted small">{{ intro }}</p>
+{% if notice %}{{ c.notice(notice) }}{% endif %}
+{% if pending %}
+<form class="stream-form" data-stream data-autosubmit data-target="#terms-live"
+      action="/documents/{{ cache.doc_id }}/terms" method="post">
+  <div id="terms-live" class="live">{{ c.status_line(pending) }}</div>
+  <div class="row gap">
+    <button type="button" class="btn btn-stop btn-sm" data-stop hidden>Stop</button>
+  </div>
+</form>
+{% endif %}
+{% if terms %}
+<div class="rows">
+  {% for t in terms %}
+  <div class="kv kv-3 term-row">
+    <span class="key">{{ t.label }}</span>
+    {% if t.kind == "value" %}<span class="serif">{{ t.value }}</span>{% elif t.kind == "not_stated" %}<em class="muted">{{ t.value }}</em>{% else %}<span>{{ t.value }}</span>{% endif %}
+    <span class="muted small">{% if t.clauses %}from {{ t.clauses }}{% endif %}{% if t.page %}{% if t.clauses %} · {% endif %}Page {{ t.page }}{% endif %}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% if dates is defined %}
+<h3 class="h2">Key dates</h3>
+<p class="muted small">{{ dates_intro }}</p>
+{% if dates %}
+<div class="rows">
+  {% for d in dates %}
+  <div class="date-row">
+    <span class="date-when">{{ d.when }}</span>
+    <span class="date-label">
+      <span class="key">{{ d.label }}</span>
+      <span class="muted small">{{ d.source }} · {{ d.how }}</span>
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+{{ c.notice(no_dates) }}
+{% endif %}
+{% endif %}

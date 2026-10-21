@@ -407,12 +407,14 @@ def _percent(conf: float) -> str:
     return f"{conf:.0%}"
 
 
+BADGE_LABELS = {**STATUS_LABELS, "definition": DEFINITION_LABEL, "related": "Related"}
+
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 templates.env.filters.update(
     display_name=display_name,
     document_name=document_name,
     percent=_percent,
-    status_label=lambda status: STATUS_LABELS.get(status, status),
+    status_label=lambda status: BADGE_LABELS.get(status, status),
     severity_label=lambda severity: SEVERITY_LABELS.get(severity, severity),
     shorten=shorten,
     squash=lambda text: " ".join(str(text).split()),
