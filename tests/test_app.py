@@ -417,7 +417,7 @@ def test_serve_builds_the_services_without_a_model(monkeypatch, tmp_path, capsys
             demo=demo, services=services, share=share, port=port
         ),
     )
-    assert cli.main(["serve", "--port", "7999", "--share"]) == 0
+    assert cli.main(["serve", "--ui", "gradio", "--port", "7999", "--share"]) == 0
     assert launched["services"].extractor is None
     assert launched["services"].gen is gen
     assert (launched["port"], launched["share"]) == (7999, True)
