@@ -1,14 +1,16 @@
+{% import "library/macros.html" as m with context %}
 {# The contracts drawer: the list, adding a contract or a sample, and the analysis file. The workspace page includes it and GET /documents/{id}/rail renders it alone, from the same context. #}
 <div class="rail-head">
   <span class="eyebrow">{{ copy.CONTRACTS }}</span>
-  <a class="link small" href="/portfolio">Portfolio</a>
+  <a class="link small" href="/portfolio">{{ _("Portfolio") }}</a>
 </div>
 <nav class="doc-list" aria-label="{{ copy.CONTRACTS }}">
   {% for d in documents %}
   {% set active = d.doc_id == cache.doc_id %}
   <a class="doc-item{% if active %} doc-item-active{% endif %}" href="/documents/{{ d.doc_id }}"{% if active %} aria-current="page"{% endif %}>
     <span class="doc-name">{{ d.name }}</span>
-    <span class="doc-meta"><span>{{ 'PDF' if d.kind == 'pdf' else 'Text' }} · {{ d.size }}</span><span class="doc-meta-sep"> · </span><span class="doc-counts">{{ d.found }} {{ copy.STATUS.found|lower }} · {% if d.check %}{{ d.check }} to check{% else %}nothing to check{% endif %}</span></span>
+    <span class="doc-meta"><span>{{ m.kind(d.kind) }} · {{ m.size(d.size) }}</span><span class="doc-meta-sep"> · </span><span class="doc-counts">{{ d.found }} {{ copy.STATUS.found|lower }} · {% if d.check %}{{ m.to_check(d.check) }}{% else %}{{ _("nothing to check") }}{% endif %}</span>
+      {%- if d.scanned %}<span class="doc-meta-sep"> · </span><span class="doc-scanned">{{ m.scanned(d.scanned) }}</span>{% endif %}</span>
   </a>
   {% endfor %}
 </nav>
@@ -24,6 +26,6 @@
 {% if can_read %}{% include "library/samples.html" %}{% endif %}
 <div class="grow"></div>
 <details class="rail-more">
-  <summary class="link small">More</summary>
-  <a class="link small" href="/documents/{{ cache.doc_id }}/analysis.json" download>Download what the assistant found (JSON)</a>
+  <summary class="link small">{{ _("More") }}</summary>
+  <a class="link small" href="/documents/{{ cache.doc_id }}/analysis.json" download>{{ _("Download what the assistant found (JSON)") }}</a>
 </details>

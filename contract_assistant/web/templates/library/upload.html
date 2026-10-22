@@ -1,11 +1,11 @@
 {# The upload form. The route streams the steps of reading the contract, then opens it. #}
 <form class="upload" data-stream data-target="#upload-status" action="/upload" method="post" enctype="multipart/form-data">
-  <label class="sr-only" for="upload-file">PDF or text file</label>
+  <label class="sr-only" for="upload-file">{{ _("PDF or text file") }}</label>
   <input id="upload-file" class="file" type="file" name="file" accept=".pdf,.txt" required>
-  <p class="meta">A PDF with selectable text, or a .txt file. It stays on this computer.</p>
+  <p class="meta">{{ _("A PDF or a .txt file. Scanned pages are read with OCR, which takes longer. The file stays on this computer.") }}</p>
   <div class="row gap">
-    <button class="btn btn-primary btn-sm" type="submit">Upload and read</button>
-    <button class="btn btn-stop btn-sm" type="button" data-stop hidden>Stop</button>
+    <button class="btn btn-primary btn-sm" type="submit">{{ _("Upload and read") }}</button>
+    <button class="btn btn-stop btn-sm" type="button" data-stop hidden>{{ _("Stop") }}</button>
   </div>
 </form>
 <div id="upload-status" class="upload-status" aria-live="polite"></div>

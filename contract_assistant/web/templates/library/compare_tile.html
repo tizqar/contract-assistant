@@ -1,3 +1,3 @@
 {# The dark tile of the comparison: how many clauses and key terms differ. #}
-<span class="tile-value">{{ differ }} <span class="muted tile-unit">of {{ total }} clauses differ</span></span>
-<span class="muted small">{% if terms %}{{ terms_differ }} of {{ terms|length }} key terms differ. Each value is copied word for word from the contract.{% else %}The key terms are not compared.{% endif %}</span>
+<span class="tile-value">{{ differ }} <span class="muted tile-unit">{{ _("of {total} clauses differ").format(total=total) }}</span></span>
+<span class="muted small">{% if terms %}{{ _("{count} of {total} key terms differ.").format(count=terms_differ, total=terms|length) }} {{ _("Each value is copied word for word from the contract.") }}{% else %}{{ _("The key terms are not compared.") }}{% endif %}</span>

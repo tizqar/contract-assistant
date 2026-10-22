@@ -1,3 +1,4 @@
+{% import "library/macros.html" as m with context %}
 {# The sample contracts not read yet. Each is read the same way as an upload, then opened. #}
 {% if samples %}
 <section class="samples{% if wide is defined and wide %} samples-wide{% endif %}" aria-labelledby="samples-title">
@@ -7,9 +8,9 @@
     <form class="sample" data-stream data-target="#sample-status" action="/samples/{{ s.name }}" method="post">
       <button type="submit" class="sample-btn"{% if not can_read %} disabled title="{{ samples_need_model }}"{% endif %}>
         <span class="sample-name">{{ s.title }}</span>
-        <span class="sample-meta">{{ s.kind }} · {{ s.size }}</span>
+        <span class="sample-meta">{{ m.kind(s.kind) }} · {{ m.size(s.size) }}</span>
       </button>
-      <button class="btn btn-stop btn-sm" type="button" data-stop hidden>Stop</button>
+      <button class="btn btn-stop btn-sm" type="button" data-stop hidden>{{ _("Stop") }}</button>
     </form>
     {% endfor %}
   </div>

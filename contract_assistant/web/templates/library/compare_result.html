@@ -1,21 +1,24 @@
 {% import "components.html" as c with context %}
-{# The comparison: key terms and the things to check on the left, the clauses on the right. #}
+{% import "library/macros.html" as m with context %}
+{# The comparison: key terms and the things to check on the left, the clauses on the right. The values of the key terms are the contract's own words and stay as written. #}
 {% set left, right = sides %}
 <section class="column" aria-labelledby="terms-heading">
   <div class="tab-head">
-    <h2 class="h2" id="terms-heading">Key terms</h2>
-    {% if terms %}<span class="legend-chip legend-diff">Differs</span>{% endif %}
+    <h2 class="h2" id="terms-heading">{{ _("Key terms") }}</h2>
+    {% if terms %}<span class="legend-chip legend-diff">{{ _("Differs") }}</span>{% endif %}
   </div>
   {% if terms %}
   <div class="rows compare-terms">
     <div class="kv kv-3 kv-head">
-      <span>Term</span><span class="ink-left">{{ left.entry.name }}</span><span class="ink-right">{{ right.entry.name }}</span>
+      <span>{{ _("Term") }}</span><span class="ink-left">{{ left.entry.name }}</span><span class="ink-right">{{ right.entry.name }}</span>
     </div>
     {% for row in terms %}
     <div class="kv kv-3 {{ 'diff' if row.differs else 'same' }}">
-      <span class="key">{{ row.label }}</span>
+      <span class="key">{{ _(row.label) }}</span>
       {% for value in (row.left, row.right) %}
-      <span class="{{ 'absent' if value == not_stated else 'serif' }}">{{ value }}</span>
+      {%- if value == not_stated %}<span class="absent">{{ _(value) }}</span>
+      {%- elif value.startswith(not_verified) %}<span class="serif">{{ _(not_verified) ~ value[not_verified|length:] }}</span>
+      {%- else %}<span class="serif">{{ value }}</span>{% endif %}
       {% endfor %}
     </div>
     {% endfor %}
@@ -35,13 +38,11 @@
     {% for side in sides %}
     <div class="card side-card side-{{ side.key }}">
       <strong>{{ side.entry.name }}</strong>
-      <div class="counts">
-        {% for level, count in side.severities %}{{ c.tag(level, count ~ ' ' ~ level) }}{% else %}<span class="muted small">None</span>{% endfor %}
-      </div>
+      <div class="counts">{{ m.severity_tags(side.severities) }}</div>
       <p class="muted small">
-        {%- if side.high %}<strong class="ink-high">High:</strong> {{ side.high|join('; ') }}
+        {%- if side.high %}<strong class="ink-high">{{ _("Important:") }}</strong> {{ side.high|join('; ') }}
         {%- elif side.titles %}{{ side.titles|join('. ') }}
-        {%- else %}None of the rules applies to this contract.{% endif -%}
+        {%- else %}{{ _("None of the rules applies to this contract.") }}{% endif -%}
       </p>
     </div>
     {% endfor %}
@@ -51,25 +52,26 @@
 <section class="column" aria-labelledby="clauses-heading">
   {% set show = 'diff' if differ else 'all' %}
   <div class="tab-head">
-    <h2 class="h2" id="clauses-heading">Clauses</h2>
+    <h2 class="h2" id="clauses-heading">{{ _("Clauses") }}</h2>
     <span class="grow"></span>
-    <div class="seg" role="group" aria-label="Show clauses" data-checklist-filter="#checklist">
-      {% for value, text in (('all', 'All ' ~ total), ('diff', 'Differences ' ~ differ), ('same', 'Same ' ~ (total - differ))) %}
-      <button type="button" class="seg-item{% if value == show %} seg-item-active{% endif %}" data-show="{{ value }}" aria-pressed="{{ 'true' if value == show else 'false' }}">{{ text }}</button>
+    <div class="seg" role="group" aria-label="{{ _('Show clauses') }}" data-checklist-filter="#checklist">
+      {% for value, text, count in (('all', _('All'), total), ('diff', _('Differences'), differ), ('same', _('Same'), total - differ)) %}
+      <button type="button" class="seg-item{% if value == show %} seg-item-active{% endif %}" data-show="{{ value }}" aria-pressed="{{ 'true' if value == show else 'false' }}">{{ text }} {{ count }}</button>
       {% endfor %}
     </div>
   </div>
   <div id="checklist" class="checklist" data-show="{{ show }}">
     {% for group in groups %}
+    {% set size = group.rows|length %}
     <div class="card group" data-kind="{{ group.kind }}">
       <div class="group-head">
         <span class="group-name">{{ group.title }}</span>
-        <span class="muted small">{{ group.rows|length }} clause{{ 's' if group.rows|length != 1 }}{% if group.note %} · {{ group.note }}{% endif %}</span>
+        <span class="muted small">{{ (_("1 clause") if size == 1 else _("{count} clauses")).format(count=size) }}{% if group.note %} · {{ group.note }}{% endif %}</span>
       </div>
       <div class="group-grid">
         {% for row in group.rows %}
         <div class="group-row">
-          <span>{{ row.clause_type|display_name }}</span>
+          <span>{{ _(row.clause_type|display_name) }}</span>
           <span class="group-badges">
             {%- if row.left == row.right or row.right == 'not_found' %}{{ c.badge(row.left) }}
             {%- elif row.left == 'not_found' %}{{ c.badge(row.right) }}

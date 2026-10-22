@@ -1,4 +1,10 @@
-"""The contracts: first page, drawer, document pane, uploads, samples, compare and portfolio."""
+"""The contracts: first page, drawer, document pane and its search, uploads, samples, compare
+and portfolio.
+
+Every string these pages show is written here and in the templates in English. A string built
+here is translated for the request with `_t` before it is formatted; the ones the Serbian
+catalogue (`translations/sr_library.py`) must cover are listed in TRANSLATED.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +15,7 @@ import time
 from collections.abc import Callable, Generator, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlencode
@@ -33,7 +39,7 @@ from contract_assistant.pdf_view import (
     keep_copy,
     page_image,
 )
-from contract_assistant.portfolio import PortfolioRow, portfolio_rows, to_csv
+from contract_assistant.portfolio import NOT_EXTRACTED, PortfolioRow, portfolio_rows, to_csv
 from contract_assistant.review import Flag
 from contract_assistant.router.clients import LLMError
 from contract_assistant.store import (
@@ -42,17 +48,32 @@ from contract_assistant.store import (
     DocumentCache,
     doc_id_of,
 )
-from contract_assistant.term_sheet import NOT_STATED, TermSheet, term_sheet_items
+from contract_assistant.term_sheet import (
+    LABELS,
+    NOT_STATED,
+    NOT_VERIFIED,
+    TermSheet,
+    term_sheet_items,
+)
+from contract_assistant.textsearch import (
+    MAX_MATCHES,
+    SNIPPET_CHARS,
+    Match,
+    occurrences,
+    pattern_of,
+)
 from contract_assistant.ui.views import (
+    EXCERPT_LABEL,
     SUGGESTED_QUESTIONS,
+    TEXT_START_LABEL,
     display_name,
     document_name,
     document_view,
-    flag_title,
     page_of,
     technical_markdown,
 )
 from contract_assistant.web.core import (
+    DEFINITION_LABEL,
     ENGLISH,
     DocumentEntry,
     Tau,
@@ -61,11 +82,13 @@ from contract_assistant.web.core import (
     WorkspaceError,
     Ws,
     frame,
+    language,
     render,
     render_string,
     stream,
 )
 from contract_assistant.web.generate import term_sheet_steps
+from contract_assistant.web.i18n import translate
 
 router = APIRouter()
 
@@ -83,9 +106,17 @@ BOLD = re.compile(r"\*\*(.+?)\*\*")
 # Page breaks of the demo texts are runs of blank lines; one blank line is enough on screen.
 BLANK_LINES = re.compile(r"\n[ \t]*\n(?:[ \t]*\n)+")
 CODE = re.compile(r"`(.+?)`")
+# The marks of the text view: the passage shown, and every other occurrence of a searched term.
+HIGHLIGHT = "highlight"
+OCCURRENCE = "occurrence"
+ELLIPSIS = "…"
+# What the reading errors of pdf.py say, to tell the reader why in plain words.
+TESSERACT = "Tesseract"
+NOT_UTF8_ERROR = "not a UTF-8"
 
 CHOOSE_FILE = "Choose a PDF or TXT file first."
 # The steps of reading a contract, shown one at a time; no clause names, no model names.
+# Reading a scanned page with OCR takes longer, but it is still "Reading the file".
 READING_FILE = "Reading the file"
 FINDING = "Finding the clauses · {done} of {total} · {elapsed} s"
 SAVING = "Saving"
@@ -98,9 +129,38 @@ NO_MODEL = (
 )
 SAMPLES_NEED_MODEL = "The samples need that model too."
 UNKNOWN_SAMPLE = "There is no sample contract by that name."
+# Why a file could not be read.
+NEEDS_TESSERACT = (
+    "This PDF is a scan. Reading scans needs Tesseract with its language packs: "
+    "brew install tesseract tesseract-lang."
+)
+NO_TEXT = "This PDF has no text the assistant can read."
+UNSUPPORTED_FILE = "This file cannot be read: choose a PDF or a TXT file."
+NOT_UTF8 = "This text file is not saved as UTF-8; save it as UTF-8 and add it again."
+DAMAGED_FILE = "The saved analysis of this contract is damaged and cannot be opened."
 NO_PAGE_IMAGE = "No page image: the PDF of this contract is not kept on this computer."
 NO_SUCH_PAGE = "This page is not in the PDF."
 NO_ANALYSIS_FILE = "The analysis file of this contract was not found."
+# The document pane and the search in it.
+PAGE_HEADING = "Page {page}"
+PAGES_HEADING = "Pages {first}–{last}"
+SCANNED_PAGE = (
+    "This page is a scan read with OCR; the words are shown as read, and the page image "
+    "cannot box them."
+)
+PAGE_ALT = "Page {page} of the contract"
+PAGE_ALT_PASSAGE = "Page {page} of the contract with the {label} passage boxed"
+PAGE_ALT_TERM = "Page {page} of the contract with each occurrence of “{term}” boxed"
+TYPE_MORE = "Type at least two characters"
+NO_OCCURRENCES = "No occurrences"
+ONE_OCCURRENCE = "1 occurrence"
+OCCURRENCES = "{count} occurrences"
+ONE_ON_ONE_PAGE = "1 occurrence on 1 page"
+ON_ONE_PAGE = "{count} occurrences on 1 page"
+ON_PAGES = "{count} occurrences on {pages} pages"
+OCCURRENCE_OF = "Occurrence {index} of {count}"
+FIRST_SHOWN = "Showing the first {limit}."
+# The comparison.
 COMPARING = "Comparing the clauses"
 EXTRACTING_TERMS = "Reading the key terms of {name}"
 CHOOSE_OTHER = "Choose a contract to compare with."
@@ -112,6 +172,75 @@ TERMS_NEED_MODEL = "they need the local AI, which is off"
 TERMS_NEED_CLAUSES = "no clause they are read from was found in {name}"
 TERMS_FAILED = "the local AI did not answer"
 TERMS_WITHHELD = "The key terms of {name} are not shown because {reason}."
+ONLY_IN = "Only in {name}"
+FOUND_AND_CHECK = "In both, found in one and to check in the other"
+FIRST_SECOND = "{left} first, {right} second"
+SAME_IN_BOTH = "Same in both"
+# The portfolio's next notice deadline.
+DATE = "{day} {month} {year}"
+MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+# Every string above the reader sees, for the check that the Serbian catalogue covers them.
+TRANSLATED = (
+    PASSAGE_LABEL,
+    DEFINITION_LABEL,
+    CHOOSE_FILE,
+    READING_FILE,
+    FINDING,
+    SAVING,
+    ALREADY_ANALYSED,
+    ANALYSIS_UPDATED,
+    ANALYSIS_COMPLETE,
+    NO_MODEL,
+    SAMPLES_NEED_MODEL,
+    UNKNOWN_SAMPLE,
+    NEEDS_TESSERACT,
+    NO_TEXT,
+    UNSUPPORTED_FILE,
+    NOT_UTF8,
+    DAMAGED_FILE,
+    NO_PAGE_IMAGE,
+    NO_SUCH_PAGE,
+    NO_ANALYSIS_FILE,
+    EXCERPT_LABEL,
+    TEXT_START_LABEL,
+    PAGE_HEADING,
+    PAGES_HEADING,
+    SCANNED_PAGE,
+    PAGE_ALT,
+    PAGE_ALT_PASSAGE,
+    PAGE_ALT_TERM,
+    TYPE_MORE,
+    NO_OCCURRENCES,
+    ONE_OCCURRENCE,
+    OCCURRENCES,
+    ONE_ON_ONE_PAGE,
+    ON_ONE_PAGE,
+    ON_PAGES,
+    OCCURRENCE_OF,
+    FIRST_SHOWN,
+    COMPARING,
+    EXTRACTING_TERMS,
+    CHOOSE_OTHER,
+    CHOOSE_DIFFERENT,
+    OTHER_UNAVAILABLE,
+    ADD_SECOND,
+    TERMS_SKIPPED,
+    TERMS_NEED_MODEL,
+    TERMS_NEED_CLAUSES,
+    TERMS_FAILED,
+    TERMS_WITHHELD,
+    ONLY_IN,
+    FOUND_AND_CHECK,
+    FIRST_SECOND,
+    SAME_IN_BOTH,
+    NOT_STATED,
+    NOT_EXTRACTED,
+    NOT_VERIFIED,
+    DATE,
+    *MONTHS,
+    *LABELS.values(),
+)
 
 SAMPLES_DIR = ROOT / "demo"
 # The sample contracts the first page and the drawer offer: the allow-list of the samples route.
@@ -124,6 +253,9 @@ SAMPLE_FILES = (
 SAMPLE_ERRORS = (UnsupportedFileError, EmptyDocumentError)
 
 ProgressItem = tuple[int, int, str]
+Span = tuple[int, int]
+# A piece of the text view: its text, its mark (None, HIGHLIGHT or OCCURRENCE) and its label.
+Segment = tuple[str, str | None, str | None]
 
 
 @dataclass(frozen=True)
@@ -137,8 +269,24 @@ class Sample:
     doc_id: str
 
 
+@dataclass(frozen=True)
+class Hit:
+    """One occurrence of a searched term as the results list shows it."""
+
+    page: int | None
+    before: str
+    text: str
+    after: str
+    url: str
+
+
 # Each sample file is read once per version, to know its id and its size.
 _samples_read: dict[tuple[Path, int], Sample] = {}
+
+
+def _t(request: Request, text: str) -> str:
+    """Return a string of these pages in the language of the request."""
+    return translate(text, language(request))
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -151,8 +299,8 @@ def home(request: Request, ws: Ws, tau: Tau):
             "home.html",
             samples=_samples([]),
             can_read=ws.services.extractor is not None,
-            no_model=NO_MODEL,
-            samples_need_model=SAMPLES_NEED_MODEL,
+            no_model=_t(request, NO_MODEL),
+            samples_need_model=_t(request, SAMPLES_NEED_MODEL),
             tau=tau,
         )
     return RedirectResponse(f"/documents/{doc_id}", status_code=303)
@@ -170,7 +318,7 @@ def workspace_page(request: Request, doc_id: str, ws: Ws, tau: Tau):
         entry=entry,
         suggestions=SUGGESTED_QUESTIONS,
         tau=tau,
-        **_rail(ws, cache, documents),
+        **_rail(request, ws, cache, documents),
     )
 
 
@@ -178,7 +326,7 @@ def workspace_page(request: Request, doc_id: str, ws: Ws, tau: Tau):
 def rail(request: Request, doc_id: str, ws: Ws):
     """The contracts drawer alone, to refresh its counts after a decision or an upload."""
     cache = ws.load(doc_id)
-    return render(request, "library/rail.html", **_rail(ws, cache, ws.documents()))
+    return render(request, "library/rail.html", **_rail(request, ws, cache, ws.documents()))
 
 
 @router.get("/documents/{doc_id}/view", response_class=HTMLResponse)
@@ -194,21 +342,37 @@ def document_pane(
     status: str | None = None,
     mode: str | None = None,
     page: int | None = None,
+    q: str = "",
 ):
-    """The document pane: the PDF page or the text around a span, with the passage card."""
+    """The document pane: the PDF page or the text around a span, with the passage card.
+
+    With a term `q`, every occurrence of it is marked. A span without a label that is one of
+    them, or the first one when neither a span nor a page is asked for, is the main highlight
+    and has no passage card. A page read with OCR opens as text: its image cannot box words.
+    """
     cache = ws.load(doc_id)
+    lang = language(request)
+    term, pattern = _term(q)
+    spans = _spans(cache.text, pattern)
     citation = _citation(cache, start, end, conf)
+    if citation is None and spans and page is None:
+        citation = _citation(cache, *spans[0], conf)
+    hit = None if label else _hit_index(spans, citation)
     clause_type = ws.clause_type_of(label) if label else PASSAGE_LABEL
     copy = _pdf_copy(ws, cache)
-    mode = mode if copy is not None and mode in (PAGE_MODE, TEXT_MODE) else None
-    mode = mode or (PAGE_MODE if copy is not None else TEXT_MODE)
     pages = len(cache.page_starts)
     span_page = page_of(cache.page_starts, citation.start) if citation and pages else 1
     shown = min(max(page or span_page, 1), max(pages, 1))
+    scanned = bool(pages) and shown in cache.source.ocr_pages
+    # The mode the reader chose; without one, a scanned page opens as text, others as the page.
+    chosen = mode if copy is not None and mode in (PAGE_MODE, TEXT_MODE) else None
+    mode = chosen or (PAGE_MODE if copy is not None and not scanned else TEXT_MODE)
     if mode == TEXT_MODE and page is not None and pages:
-        heading, segments = f"Page {shown}", _page_segments(cache, shown, clause_type, citation)
+        lo, hi = _page_bounds(cache, shown)
     else:
-        heading, segments = document_view(cache, clause_type, citation)
+        lo, hi = _window(cache, clause_type, citation)
+    heading, own_page = _heading(cache, lo, hi, citation, lang)
+    segments = _segments(cache.text, lo, hi, citation, display_name(clause_type), pattern)
 
     def url(**changes) -> str:
         params = {
@@ -217,37 +381,88 @@ def document_pane(
             "end": citation.end if citation else None,
             "conf": f"{citation.conf:g}" if citation else None,
             "status": status,
-            "mode": mode,
+            "mode": chosen,
             "page": page,
+            "q": term or None,
             **changes,
         }
         query = urlencode({key: value for key, value in params.items() if value is not None})
         return f"/documents/{cache.doc_id}/view?{query}"
 
+    boxed = citation is not None and hit is None and shown == span_page
     image = None
     if mode == PAGE_MODE:
-        span = {"start": citation.start, "end": citation.end} if citation else {}
-        boxed = f"?{urlencode(span)}" if span and shown == span_page else ""
-        image = f"/documents/{cache.doc_id}/page/{shown}.png{boxed}"
+        image = _image_url(cache, shown, citation if boxed else None, term)
+    if label or not term:
+        clear_url = url(q=None)
+    else:
+        clear_url = url(q=None, start=None, end=None, conf=None, page=shown if pages else None)
     return render(
         request,
         "library/view.html",
         cache=cache,
         heading=heading,
-        segments=[(BLANK_LINES.sub("\n\n", text), mark) for text, mark in segments],
+        show_heading=mode == TEXT_MODE and own_page != shown,
+        segments=[(BLANK_LINES.sub("\n\n", text), mark, name) for text, mark, name in segments],
         label=label or PASSAGE_LABEL,
+        label_text=translate(label or PASSAGE_LABEL, lang),
         citation=citation,
         status=status,
+        hit=hit is not None,
         mode=mode,
         has_copy=copy is not None,
         image=image,
+        image_alt=_image_alt(shown, label or PASSAGE_LABEL, boxed, term, lang),
+        scanned_note=translate(SCANNED_PAGE, lang) if scanned else None,
         page=shown,
         pages=pages,
         page_url=url(mode=PAGE_MODE),
         text_url=url(mode=TEXT_MODE),
         previous_url=url(page=shown - 1) if shown > 1 else None,
         next_url=url(page=shown + 1) if shown < pages else None,
+        query=q,
+        term=term,
+        search_url=_search_url(cache, "", chosen),
+        found=_found(spans, hit, lang) if term else None,
+        list_url=_search_url(cache, term, chosen) if term else None,
+        previous_hit=_hit_url(cache, spans[hit - 1], term, chosen) if hit else None,
+        next_hit=(
+            _hit_url(cache, spans[hit + 1], term, chosen)
+            if hit is not None and hit + 1 < len(spans)
+            else None
+        ),
+        clear_url=clear_url,
         tau=tau,
+    )
+
+
+@router.get("/documents/{doc_id}/search", response_class=HTMLResponse)
+def search(request: Request, doc_id: str, ws: Ws, q: str = "", mode: str | None = None):
+    """Every occurrence of a term in the contract, each a link that opens it in the pane.
+
+    The mode is the one the reader chose in the pane, if any; an occurrence on a scanned page
+    opens as text whatever it is.
+    """
+    cache = ws.load(doc_id)
+    lang = language(request)
+    term, pattern = _term(q)
+    mode = mode if mode in (PAGE_MODE, TEXT_MODE) else None
+    if pattern is None:
+        summary = translate(TYPE_MORE, lang) if q.strip() else None
+        return render(request, "library/search.html", summary=summary, hits=[])
+    spans = _spans(cache.text, pattern)
+    starts = cache.page_starts
+    pages = len({page_of(starts, start) for start, _ in spans}) if starts else None
+    found = occurrences(cache.text, term, starts, MAX_MATCHES)
+    more = len(spans) > len(found)
+    every_mode = _mode_at(cache, spans[0][0], mode) if spans else None
+    return render(
+        request,
+        "library/search.html",
+        summary=_occurrences(len(spans), pages, lang),
+        hits=[_hit(cache, match, term, mode) for match in found],
+        more=translate(FIRST_SHOWN, lang).format(limit=len(found)) if more else None,
+        every_url=_view_of_term(cache, term, every_mode) if spans else None,
     )
 
 
@@ -259,32 +474,35 @@ def page_png(
     ws: Ws,
     start: int | None = None,
     end: int | None = None,
+    q: str = "",
 ):
-    """One page of the contract's PDF as an image, the passage between start and end boxed."""
+    """One page of the contract's PDF as an image, the passage between start and end boxed,
+    and every occurrence of the term q."""
     cache = ws.load(doc_id)
     copy = _pdf_copy(ws, cache)
     if copy is None:
-        raise HTTPException(status_code=404, detail=NO_PAGE_IMAGE)
+        raise HTTPException(status_code=404, detail=_t(request, NO_PAGE_IMAGE))
     citation = _citation(cache, start, end, 1.0)
-    key = (cache.doc_id, number, citation.quote if citation else None)
+    term, _ = _term(q)
+    key = (cache.doc_id, number, citation.quote if citation else None, term or None)
     # Paging back and forth asks for the same image again; the last one is kept.
     rendered = getattr(request.app.state, "rendered_page", None)
     if rendered is None or rendered[0] != key:
         try:
-            rendered = (key, page_image(copy, number, key[2]))
+            rendered = (key, page_image(copy, number, key[2], key[3]))
         except PageError as error:
-            raise HTTPException(status_code=404, detail=NO_SUCH_PAGE) from error
+            raise HTTPException(status_code=404, detail=_t(request, NO_SUCH_PAGE)) from error
         request.app.state.rendered_page = rendered
     return Response(rendered[1], media_type="image/png", headers=PAGE_CACHE_HEADERS)
 
 
 @router.get("/documents/{doc_id}/analysis.json")
-def analysis_json(doc_id: str, ws: Ws):
+def analysis_json(request: Request, doc_id: str, ws: Ws):
     """The saved analysis of a contract: the clause candidates the encoder located."""
     cache = ws.load(doc_id)
     path = ws.store.find(cache.doc_id)
     if path is None:
-        raise HTTPException(status_code=404, detail=NO_ANALYSIS_FILE)
+        raise HTTPException(status_code=404, detail=_t(request, NO_ANALYSIS_FILE))
     filename = f"{Path(cache.source.filename).stem}.analysis.json"
     return FileResponse(path, media_type="application/json", filename=filename)
 
@@ -303,7 +521,7 @@ def upload(
 def sample(request: Request, name: str, ws: Ws):
     """Analyse a sample contract the way an upload is, unless it was analysed before."""
     if name not in SAMPLE_FILES:
-        raise WorkspaceError(UNKNOWN_SAMPLE, status_code=404)
+        raise WorkspaceError(_t(request, UNKNOWN_SAMPLE), status_code=404)
     return stream(_sample_frames(request, ws, SAMPLES_DIR / name))
 
 
@@ -325,7 +543,7 @@ def compare_page(
         left=by_id.get(left_id) if left_id else None,
         right=by_id.get(right_id) if right_id else None,
         total=total,
-        notice=None if right_id else ADD_SECOND,
+        notice=None if right_id else _t(request, ADD_SECOND),
         tau=tau,
         cache=None,
     )
@@ -346,10 +564,11 @@ def compare_result(
 @router.get("/portfolio", response_class=HTMLResponse)
 def portfolio_page(request: Request, ws: Ws, tau: Tau):
     """Every analysed contract in one table, with totals and the next notice deadline."""
+    lang = language(request)
     rows = _portfolio(ws)
     entries = {entry.doc_id: entry for entry in ws.documents()}
     total = len(ws.names)
-    contracts = [_portfolio_item(row, entries.get(row.doc_id), total) for row in rows]
+    contracts = [_portfolio_item(row, entries.get(row.doc_id), total, lang) for row in rows]
     pdfs = sum(item["kind"] == "pdf" for item in contracts)
     return render(
         request,
@@ -363,7 +582,7 @@ def portfolio_page(request: Request, ws: Ws, tau: Tau):
         flags_low=sum(row.flags_low for row in rows),
         pdfs=pdfs,
         texts=len(contracts) - pdfs,
-        deadline=_next_notice(ws, rows),
+        deadline=_next_notice(ws, rows, lang),
         tau=tau,
         cache=None,
     )
@@ -403,33 +622,192 @@ def _pdf_copy(ws: Workspace, cache: DocumentCache) -> Path | None:
     return copy if copy.exists() else None
 
 
-def _page_segments(
-    cache: DocumentCache, number: int, clause_type: str, citation: Citation | None
-) -> list[tuple[str, str | None]]:
-    """Return the text of one page, the part of the citation on it marked."""
-    starts, text = cache.page_starts, cache.text
-    lo = starts[number - 1]
-    hi = starts[number] if number < len(starts) else len(text)
-    if citation is None or citation.end <= lo or citation.start >= hi:
-        return [(text[lo:hi], None)]
-    mark_lo, mark_hi = max(citation.start, lo), min(citation.end, hi)
-    parts = [
-        (text[lo:mark_lo], None),
-        (text[mark_lo:mark_hi], display_name(clause_type)),
-        (text[mark_hi:hi], None),
-    ]
-    return [part for part in parts if part[0]]
+def _term(q: str) -> tuple[str, re.Pattern[str] | None]:
+    """Return a searched term on one line and its pattern; a term too short is ignored."""
+    term = " ".join(q.split())
+    pattern = pattern_of(term)
+    return (term, pattern) if pattern is not None else ("", None)
+
+
+def _spans(text: str, pattern: re.Pattern[str] | None) -> list[Span]:
+    """Return the span of every occurrence of a pattern, in document order."""
+    return [] if pattern is None else [found.span() for found in pattern.finditer(text)]
+
+
+def _hit_index(spans: list[Span], citation: Citation | None) -> int | None:
+    """Return which occurrence a citation is, or None when it is not one of them."""
+    if citation is None:
+        return None
+    try:
+        return spans.index((citation.start, citation.end))
+    except ValueError:
+        return None
+
+
+def _page_bounds(cache: DocumentCache, number: int) -> Span:
+    starts = cache.page_starts
+    hi = starts[number] if number < len(starts) else len(cache.text)
+    return starts[number - 1], hi
+
+
+def _window(cache: DocumentCache, clause_type: str, citation: Citation | None) -> Span:
+    """Return the part of the text shown around a citation: its pages, or an excerpt."""
+    _, segments = document_view(cache, clause_type, citation)
+    lo = 0
+    if citation is not None:
+        before = segments[0][0] if segments and segments[0][1] is None else ""
+        lo = citation.start - len(before)
+    return lo, lo + sum(len(text) for text, _ in segments)
+
+
+def _heading(
+    cache: DocumentCache, lo: int, hi: int, citation: Citation | None, lang: str
+) -> tuple[str, int | None]:
+    """Return the heading of the text shown, and its page when it is a single page."""
+    starts = cache.page_starts
+    if not starts:
+        return translate(EXCERPT_LABEL if citation else TEXT_START_LABEL, lang), None
+    first, last = page_of(starts, lo), page_of(starts, max(hi - 1, lo))
+    if first == last:
+        return translate(PAGE_HEADING, lang).format(page=first), first
+    return translate(PAGES_HEADING, lang).format(first=first, last=last), None
+
+
+def _segments(
+    text: str,
+    lo: int,
+    hi: int,
+    citation: Citation | None,
+    label: str,
+    pattern: re.Pattern[str] | None,
+) -> list[Segment]:
+    """Return the text between lo and hi in pieces: the citation marked as the highlight,
+    every other occurrence of the pattern marked as an occurrence."""
+    marks: list[tuple[int, int, str]] = []
+    if citation is not None and citation.start < hi and citation.end > lo:
+        marks.append((max(citation.start, lo), min(citation.end, hi), HIGHLIGHT))
+    for found in pattern.finditer(text, lo, hi) if pattern is not None else ():
+        start, end = found.span()
+        if citation is None or end <= citation.start or start >= citation.end:
+            marks.append((start, end, OCCURRENCE))
+    segments: list[Segment] = []
+    position = lo
+    for start, end, mark in sorted(marks):
+        if start > position:
+            segments.append((text[position:start], None, None))
+        segments.append((text[start:end], mark, label if mark == HIGHLIGHT else None))
+        position = end
+    if position < hi:
+        segments.append((text[position:hi], None, None))
+    return segments
+
+
+def _image_url(
+    cache: DocumentCache, number: int, citation: Citation | None, term: str
+) -> str:
+    params: dict[str, object] = {}
+    if citation is not None:
+        params.update(start=citation.start, end=citation.end)
+    if term:
+        params["q"] = term
+    query = f"?{urlencode(params)}" if params else ""
+    return f"/documents/{cache.doc_id}/page/{number}.png{query}"
+
+
+def _image_alt(number: int, label: str, boxed: bool, term: str, lang: str) -> str:
+    if boxed:
+        label = translate(label, lang)
+        return translate(PAGE_ALT_PASSAGE, lang).format(page=number, label=label)
+    if term:
+        return translate(PAGE_ALT_TERM, lang).format(page=number, term=term)
+    return translate(PAGE_ALT, lang).format(page=number)
+
+
+def _occurrences(count: int, pages: int | None, lang: str) -> str:
+    """Return how many occurrences there are, and on how many pages when it has pages."""
+    if count == 0:
+        text = NO_OCCURRENCES
+    elif pages is None:
+        text = ONE_OCCURRENCE if count == 1 else OCCURRENCES
+    elif pages == 1:
+        text = ONE_ON_ONE_PAGE if count == 1 else ON_ONE_PAGE
+    else:
+        text = ON_PAGES
+    return translate(text, lang).format(count=count, pages=pages)
+
+
+def _found(spans: list[Span], hit: int | None, lang: str) -> str:
+    """Return the pane's line about the term: which occurrence is shown, or how many."""
+    if hit is None:
+        return _occurrences(len(spans), None, lang)
+    return translate(OCCURRENCE_OF, lang).format(index=hit + 1, count=len(spans))
+
+
+def _search_url(cache: DocumentCache, term: str, mode: str | None) -> str:
+    params = {key: value for key, value in (("q", term), ("mode", mode)) if value}
+    query = f"?{urlencode(params)}" if params else ""
+    return f"/documents/{cache.doc_id}/search{query}"
+
+
+def _view_of_term(cache: DocumentCache, term: str, mode: str | None) -> str:
+    """Return the URL of the pane with every occurrence of a term marked, from the first."""
+    params = {key: value for key, value in (("q", term), ("mode", mode)) if value}
+    return f"/documents/{cache.doc_id}/view?{urlencode(params)}"
+
+
+def _mode_at(cache: DocumentCache, start: int, mode: str | None) -> str | None:
+    """Return the mode to open an occurrence in: the image of a scanned page cannot box it,
+    so the pane opens such a page as text whatever mode the reader chose."""
+    page = page_of(cache.page_starts, start) if cache.page_starts else None
+    return None if mode == PAGE_MODE and page in cache.source.ocr_pages else mode
+
+
+def _hit_url(cache: DocumentCache, span: Span, term: str, mode: str | None) -> str:
+    """Return the URL of the pane showing one occurrence, the others marked around it."""
+    start, end = span
+    mode = _mode_at(cache, start, mode)
+    params: dict[str, object] = {"label": "", "start": start, "end": end, "q": term}
+    if mode:
+        params["mode"] = mode
+    return f"/documents/{cache.doc_id}/view?{urlencode(params)}"
+
+
+def _hit(cache: DocumentCache, match: Match, term: str, mode: str | None) -> Hit:
+    """Return an occurrence for the results list: the words around it on one line."""
+    text = cache.text
+    before, after = match.before, match.after
+    if before and text[match.start - 1].isspace():
+        before += " "
+    if match.start > SNIPPET_CHARS:
+        before = ELLIPSIS + before
+    if after and text[match.end].isspace():
+        after = " " + after
+    if match.end + SNIPPET_CHARS < len(text):
+        after += ELLIPSIS
+    url = _hit_url(cache, (match.start, match.end), term, mode)
+    return Hit(match.page, before, " ".join(match.text.split()), after, url)
 
 
 def _status(request: Request, text: str, spinning: bool = True) -> str:
+    """Return a line of progress; the text is already in the reader's language."""
     return render_string(request, "library/status.html", text=text, spinning=spinning)
+
+
+def _read_error(error: Exception) -> str:
+    """Return why a file could not be read, in plain words."""
+    message = str(error)
+    if isinstance(error, EmptyDocumentError):
+        return NEEDS_TESSERACT if TESSERACT in message else NO_TEXT
+    if isinstance(error, UnsupportedFileError):
+        return NOT_UTF8 if message.startswith(NOT_UTF8_ERROR) else UNSUPPORTED_FILE
+    return DAMAGED_FILE
 
 
 def _upload_frames(request: Request, ws: Ws, name: str, data: bytes) -> Iterator[str]:
     if not name:
-        yield frame("", notice=CHOOSE_FILE, done=True)
+        yield frame("", notice=_t(request, CHOOSE_FILE), done=True)
         return
-    yield frame(_status(request, READING_FILE))
+    yield frame(_status(request, _t(request, READING_FILE)))
     # The file keeps its name: the analysis records it and the lists show it.
     with tempfile.TemporaryDirectory(prefix="contract-upload-") as directory:
         path = Path(directory) / name
@@ -438,29 +816,33 @@ def _upload_frames(request: Request, ws: Ws, name: str, data: bytes) -> Iterator
 
 
 def _sample_frames(request: Request, ws: Ws, path: Path) -> Iterator[str]:
-    yield frame(_status(request, READING_FILE))
+    yield frame(_status(request, _t(request, READING_FILE)))
     yield from _analyse(request, ws, path)
 
 
 def _analyse(request: Request, ws: Ws, path: Path) -> Iterator[str]:
-    """Read a contract file, find its clauses unless that was done before, then open it."""
+    """Read a contract file, find its clauses unless that was done before, then open it.
+
+    A scanned PDF page is read with OCR here; the pages read that way are saved with the
+    analysis, and the drawer and the document pane say so.
+    """
     try:
         doc = load_document(path)
         cached = _cached(ws, doc_id_of(doc.text))
     except UPLOAD_ERRORS as error:
-        yield frame("", notice=str(error), done=True)
+        yield frame("", notice=_t(request, _read_error(error)), done=True)
         return
     if cached is not None:
         yield from _reopen(request, ws, path, cached)
         return
     extractor = ws.services.extractor
     if extractor is None:
-        yield frame("", notice=NO_MODEL, done=True)
+        yield frame("", notice=_t(request, NO_MODEL), done=True)
         return
     analysed = yield from _with_progress(request, lambda report: extractor.extract(doc, report))
-    yield frame(_status(request, SAVING))
+    yield frame(_status(request, _t(request, SAVING)))
     _save(ws, path, analysed)
-    yield _redirect(request, analysed.doc_id, ANALYSIS_COMPLETE)
+    yield _redirect(request, analysed.doc_id, _t(request, ANALYSIS_COMPLETE))
 
 
 def _reopen(request: Request, ws: Ws, path: Path, cached: DocumentCache) -> Iterator[str]:
@@ -471,14 +853,14 @@ def _reopen(request: Request, ws: Ws, path: Path, cached: DocumentCache) -> Iter
             request, lambda report: extractor.extend(cached, report)
         )
         if extended is not cached:
-            yield frame(_status(request, SAVING))
+            yield frame(_status(request, _t(request, SAVING)))
             _save(ws, path, extended)
-            yield _redirect(request, cached.doc_id, ANALYSIS_UPDATED)
+            yield _redirect(request, cached.doc_id, _t(request, ANALYSIS_UPDATED))
             return
     if not copy_path(ws.settings.cache_dir / DOCUMENTS_DIR, cached.doc_id).exists():
         _keep_pdf(ws, path, cached.doc_id)
     name = document_name(path.name)
-    yield _redirect(request, cached.doc_id, ALREADY_ANALYSED.format(name=name))
+    yield _redirect(request, cached.doc_id, _t(request, ALREADY_ANALYSED).format(name=name))
 
 
 def _save(ws: Workspace, path: Path, cache: DocumentCache) -> None:
@@ -496,6 +878,7 @@ def _with_progress(
     The extractor reports synchronously from inside its loop, so the frames come from a
     queue the callback fills. Returns the extraction's result.
     """
+    finding = _t(request, FINDING)
     items: queue.Queue[ProgressItem | None] = queue.Queue()
     started = time.perf_counter()
     executor = ThreadPoolExecutor(max_workers=1)
@@ -505,7 +888,7 @@ def _with_progress(
     while (item := items.get()) is not None:
         done, total, _ = item
         elapsed = f"{time.perf_counter() - started:.0f}"
-        yield frame(_status(request, FINDING.format(done=done, total=total, elapsed=elapsed)))
+        yield frame(_status(request, finding.format(done=done, total=total, elapsed=elapsed)))
     return future.result()
 
 
@@ -563,8 +946,9 @@ def _compare_frames(
     try:
         yield from _comparison(request, ws, tau, left_id, right_id)
     except WorkspaceError as error:
-        notice = render_string(request, "library/status.html", text=error.message, notice=True)
-        yield frame(notice, notice=error.message, done=True)
+        message = _t(request, error.message)
+        notice = render_string(request, "library/status.html", text=message, notice=True)
+        yield frame(notice, notice=message, done=True)
 
 
 def _comparison(
@@ -577,7 +961,8 @@ def _comparison(
     entries = [ws.entry(left_id), ws.entry(right_id)]
     if None in entries:
         raise WorkspaceError(OTHER_UNAVAILABLE)
-    yield frame(_status(request, COMPARING))
+    lang = language(request)
+    yield frame(_status(request, translate(COMPARING, lang)))
     caches = [ws.load(left_id), ws.load(right_id)]
     try:
         rows = compare_checklists(*caches, ws.names, tau.low, tau.high, ws.services.unvalidated)
@@ -593,24 +978,27 @@ def _comparison(
         sheets.append(result)
     terms = compare_terms(*sheets) if reason is None else []
     withheld = [
-        TERMS_WITHHELD.format(name=document_name(cache.source.filename), reason=sheet.reason)
+        translate(TERMS_WITHHELD, lang).format(
+            name=document_name(cache.source.filename), reason=translate(sheet.reason, lang)
+        )
         for cache, sheet in zip(caches, sheets, strict=False)
         if sheet.reason
     ]
     sides = [
-        _side(ws, entry, cache, rows, index, tau)
+        _side(ws, entry, cache, rows, index, tau, lang)
         for index, (entry, cache) in enumerate(zip(entries, caches, strict=True))
     ]
     context = {
         "sides": sides,
         "terms": terms,
-        "terms_note": TERMS_SKIPPED.format(reason=reason) if reason else None,
+        "terms_note": translate(TERMS_SKIPPED, lang).format(reason=reason) if reason else None,
         "withheld": withheld,
-        "groups": _groups(rows, *sides),
+        "groups": _groups(rows, *sides, lang),
         "differ": sum(row.differs for row in rows),
         "terms_differ": sum(row.differs for row in terms),
         "total": len(rows),
         "not_stated": NOT_STATED,
+        "not_verified": NOT_VERIFIED,
         "tau": tau,
     }
     oob = {
@@ -627,22 +1015,26 @@ def _comparison(
 def _term_sheet(
     request: Request, ws: Ws, cache: DocumentCache, tau: Thresholds
 ) -> Generator[str, None, TermSheet | str]:
-    """Yield status frames while the key terms are extracted; return the sheet or why not."""
+    """Yield status frames while the key terms are extracted; return the sheet or why not.
+
+    The reason is in the reader's language.
+    """
+    lang = language(request)
     name = document_name(cache.source.filename)
     if ws.services.gen is None:
-        return TERMS_NEED_MODEL
+        return translate(TERMS_NEED_MODEL, lang)
     if not term_sheet_items(cache, tau.low, tau.high, ws.services.unvalidated):
-        return TERMS_NEED_CLAUSES.format(name=name)
+        return translate(TERMS_NEED_CLAUSES, lang).format(name=name)
     try:
         for step in term_sheet_steps(ws, cache, tau):
             if isinstance(step, TermSheet):
                 return step
-            yield frame(_status(request, EXTRACTING_TERMS.format(name=name)))
+            yield frame(_status(request, translate(EXTRACTING_TERMS, lang).format(name=name)))
     except LLMError:
-        return TERMS_FAILED
+        return translate(TERMS_FAILED, lang)
     except WorkspaceError as error:
-        return error.message.rstrip(".")
-    return TERMS_FAILED
+        return translate(error.message, lang).rstrip(".")
+    return translate(TERMS_FAILED, lang)
 
 
 def _side(
@@ -652,8 +1044,12 @@ def _side(
     rows: list[ChecklistRow],
     index: int,
     tau: Thresholds,
+    lang: str,
 ) -> dict:
-    """Return what the page shows of one contract: its counts and its review flags."""
+    """Return what the page shows of one contract: its counts and its review flags.
+
+    The flag titles come from the fixed rule list, so the catalogue has them.
+    """
     statuses: list[Status] = [row.right if index else row.left for row in rows]
     flags = ws.flags(cache, tau)
     return {
@@ -663,8 +1059,8 @@ def _side(
         "check": statuses.count("check"),
         "not_found": statuses.count("not_found"),
         "severities": _severities(flags),
-        "high": [flag_title(flag) for flag in flags if flag.severity == "high"],
-        "titles": [flag_title(flag) for flag in flags],
+        "high": [translate(flag.title, lang) for flag in flags if flag.severity == "high"],
+        "titles": [translate(flag.title, lang) for flag in flags],
     }
 
 
@@ -673,18 +1069,19 @@ def _severities(flags: list[Flag]) -> list[tuple[str, int]]:
     return [(level, count) for level, count in counts if count]
 
 
-def _groups(rows: list[ChecklistRow], left: dict, right: dict) -> list[dict]:
+def _groups(rows: list[ChecklistRow], left: dict, right: dict, lang: str) -> list[dict]:
     """Return the clauses grouped by how the two contracts differ, differences first."""
     left_name, right_name = left["entry"].name, right["entry"].name
+    only_in = translate(ONLY_IN, lang)
     groups = [
-        ("diff", f"Only in {right_name}", None,
+        ("diff", only_in.format(name=right_name), None,
          [row for row in rows if row.left == "not_found" and row.right != "not_found"]),
-        ("diff", f"Only in {left_name}", None,
+        ("diff", only_in.format(name=left_name), None,
          [row for row in rows if row.right == "not_found" and row.left != "not_found"]),
-        ("diff", "In both, found in one and to check in the other",
-         f"{left_name} first, {right_name} second",
+        ("diff", translate(FOUND_AND_CHECK, lang),
+         translate(FIRST_SECOND, lang).format(left=left_name, right=right_name),
          [row for row in rows if row.differs and "not_found" not in (row.left, row.right)]),
-        ("same", "Same in both", None, [row for row in rows if not row.differs]),
+        ("same", translate(SAME_IN_BOTH, lang), None, [row for row in rows if not row.differs]),
     ]
     return [
         {"kind": kind, "title": title, "note": note, "rows": members}
@@ -710,9 +1107,14 @@ def _portfolio(ws: Ws) -> list[PortfolioRow]:
     return rows
 
 
-def _portfolio_item(row: PortfolioRow, entry: DocumentEntry | None, total: int) -> dict:
+def _portfolio_item(
+    row: PortfolioRow, entry: DocumentEntry | None, total: int, lang: str
+) -> dict:
     """Return one row of the portfolio table as the template shows it."""
-    terms = {field: (value, _stated(value)) for field, value in row.terms.items()}
+    terms = {
+        field: (value, True) if _stated(value) else (_absent(value, lang), False)
+        for field, value in row.terms.items()
+    }
     parties = row.terms.get("parties", "")
     kind = entry.kind if entry else Path(row.name).suffix.lstrip(".").lower()
     name = document_name(row.name)
@@ -743,12 +1145,20 @@ def _stated(value: str) -> bool:
     return bool(value) and not value.startswith("not ")
 
 
+def _absent(value: str, lang: str) -> str:
+    """Return why a term sheet cell is empty in the reader's language; the values it names
+    after "not verified" stay as the contract has them."""
+    if value.startswith(NOT_VERIFIED):
+        return translate(NOT_VERIFIED, lang) + value.removeprefix(NOT_VERIFIED)
+    return translate(value, lang)
+
+
 def _shorten(text: str, limit: int) -> str:
     squashed = " ".join(text.split())
     return squashed if len(squashed) <= limit else squashed[: limit - 1] + "…"
 
 
-def _next_notice(ws: Ws, rows: list[PortfolioRow]) -> dict | None:
+def _next_notice(ws: Ws, rows: list[PortfolioRow], lang: str) -> dict | None:
     """Return the earliest notice deadline still ahead, from the saved term sheets."""
     if ws.gen_model is None:
         return None
@@ -765,11 +1175,17 @@ def _next_notice(ws: Ws, rows: list[PortfolioRow]) -> dict | None:
         return None
     when, row, item = min(upcoming, key=lambda found: found[0])
     return {
-        "when": f"{when.day} {when:%b %Y}",
+        "when": _date(when, lang),
         "name": document_name(row.name),
         "source": item.source,
         "doc_id": row.doc_id,
     }
+
+
+def _date(day: date, lang: str) -> str:
+    """Return a date as "1 Jul 2027", or the way the language writes it."""
+    month = translate(MONTHS[day.month - 1], lang)
+    return translate(DATE, lang).format(day=day.day, month=month, year=day.year)
 
 
 def _markup(line: str) -> Markup:
@@ -779,7 +1195,9 @@ def _markup(line: str) -> Markup:
     return Markup(CODE.sub(r"<code>\1</code>", html))
 
 
-def _rail(ws: Workspace, cache: DocumentCache, documents: list[DocumentEntry]) -> dict:
+def _rail(
+    request: Request, ws: Workspace, cache: DocumentCache, documents: list[DocumentEntry]
+) -> dict:
     """Return what the drawer shows, the same in the workspace page and in its refresh."""
     can_read = ws.services.extractor is not None
     return {
@@ -787,6 +1205,7 @@ def _rail(ws: Workspace, cache: DocumentCache, documents: list[DocumentEntry]) -
         "documents": documents,
         "can_read": can_read,
         "samples": _samples(documents) if can_read else [],
+        "samples_need_model": _t(request, SAMPLES_NEED_MODEL),
     }
 
 
@@ -813,6 +1232,6 @@ def _sample(name: str) -> Sample | None:
         return None
     pdf = doc.kind == "pdf"
     size = f"{len(doc.page_starts)} pages" if pdf else f"{len(doc.text.split()):,} words"
-    known = Sample(name, document_name(name), "PDF" if pdf else "Text", size, doc_id_of(doc.text))
+    known = Sample(name, document_name(name), doc.kind, size, doc_id_of(doc.text))
     _samples_read[key] = known
     return known

@@ -1,7 +1,9 @@
 /* Contract Assistant: the browser side of the contracts pages.
  *
  * Copying a quote, the filters of the comparison checklist and of the portfolio table, the
- * portfolio rows that open a contract, and page navigation that keeps the thresholds.
+ * portfolio rows that open a contract, and page navigation that keeps the thresholds. The
+ * words of the copy toasts come from the button (data-copied, data-not-copied), in the
+ * language of the page.
  */
 (function () {
   "use strict";
@@ -69,8 +71,8 @@
     const copy = event.target.closest("[data-copy]");
     if (copy) {
       copyText(copy.dataset.copy).then(
-        () => app().toast(COPIED),
-        () => app().toast(NOT_COPIED)
+        () => app().toast(copy.dataset.copied || COPIED),
+        () => app().toast(copy.dataset.notCopied || NOT_COPIED)
       );
       return;
     }

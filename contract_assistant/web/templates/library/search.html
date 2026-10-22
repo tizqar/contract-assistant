@@ -1,0 +1,22 @@
+{# The occurrences of a searched term, under the search box of the document pane. Each opens its page or its text in the pane, with the other occurrences marked around it. #}
+{% if summary %}
+<div class="search-head">
+  <span class="search-summary">{{ summary }}</span>
+  {% if every_url %}
+  <a class="link small" href="#document-pane" hx-get="{{ every_url }}" hx-target="#document-pane" hx-swap="innerHTML">{{ _("Show every occurrence") }}</a>
+  {% endif %}
+</div>
+{% endif %}
+{% if hits %}
+<ol class="search-hits">
+  {% for h in hits %}
+  <li>
+    <a class="search-hit" href="#document-pane" hx-get="{{ h.url }}" hx-target="#document-pane" hx-swap="innerHTML">
+      {%- if h.page %}<span class="search-page">{{ copy.PAGE.format(page=h.page) }}</span>{% endif -%}
+      <span class="search-snippet">{{ h.before }}<mark class="occurrence">{{ h.text }}</mark>{{ h.after }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ol>
+{% endif %}
+{% if more %}<p class="muted small">{{ more }}</p>{% endif %}

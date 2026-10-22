@@ -1,0 +1,35 @@
+{#- Small pieces the contracts pages share: the kind and size of a contract, the severity counts. Import them "with context" so that `_` is the page's language. -#}
+{% import "components.html" as c with context %}
+
+{#- "PDF" or "Text" from a kind ("pdf", "txt", or already "PDF"). -#}
+{% macro kind(value) -%}
+{{ _("PDF") if value|lower == "pdf" else _("Text") }}
+{%- endmacro %}
+
+{#- "5 pages" or "1,234 words" as the lists write a size, in the page's language. -#}
+{% macro size(text) -%}
+{%- set parts = text.split(" ") -%}
+{%- if parts|length == 2 and parts[1] == "pages" -%}
+{{ _("{count} pages").format(count=parts[0]) }}
+{%- elif parts|length == 2 and parts[1] == "words" -%}
+{{ _("{count} words").format(count=parts[0] if lang == "en" else parts[0]|replace(",", ".")) }}
+{%- else -%}
+{{ text }}
+{%- endif -%}
+{%- endmacro %}
+
+{#- The pages of a contract read with OCR, for the drawer line. -#}
+{% macro scanned(count) -%}
+{{ (_("1 scanned page read with OCR") if count == 1 else _("{count} scanned pages read with OCR")).format(count=count) }}
+{%- endmacro %}
+
+{#- One tag per review severity that has points, or "None". -#}
+{% macro severity_tags(severities) -%}
+{%- set words = {"high": _("{count} high"), "medium": _("{count} medium"), "low": _("{count} low")} -%}
+{%- for level, count in severities %}{{ c.tag(level, words[level].format(count=count)) }}{% else %}<span class="muted small">{{ _("None") }}</span>{% endfor -%}
+{%- endmacro %}
+
+{#- "3 to check", the count of passages the reader should look at. -#}
+{% macro to_check(count) -%}
+{{ _("{count} to check").format(count=count) }}
+{%- endmacro %}

@@ -1,5 +1,6 @@
 {% import "components.html" as c with context %}
+{% import "library/macros.html" as m with context %}
 {# The found, to check and not found counts of one contract. #}
 {{ c.tag('found', found ~ ' ' ~ copy.STATUS.found|lower) }}
-{{ c.tag('check', check ~ ' to check') }}
+{{ c.tag('check', m.to_check(check)) }}
 {{ c.tag('not_found', not_found ~ ' ' ~ copy.STATUS.not_found|lower) }}

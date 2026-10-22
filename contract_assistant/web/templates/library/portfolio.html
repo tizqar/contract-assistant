@@ -1,75 +1,76 @@
 {% extends "base.html" %}
 {% import "components.html" as c with context %}
+{% import "library/macros.html" as m with context %}
 {# The portfolio: totals, then one row per contract read; a row opens its workspace. #}
-{% block title %}Portfolio · Contract Assistant{% endblock %}
+{% block title %}{{ _("Portfolio") }} · {{ _("Contract Assistant") }}{% endblock %}
 {% block switcher %}
-<nav class="crumbs" aria-label="Breadcrumb">
-  <a href="/">Workspace</a>
+<nav class="crumbs" aria-label="{{ _('Breadcrumb') }}">
+  <a href="/">{{ _("Workspace") }}</a>
   <span aria-hidden="true">/</span>
-  <span class="crumb-current" aria-current="page">Portfolio</span>
+  <span class="crumb-current" aria-current="page">{{ _("Portfolio") }}</span>
 </nav>
 {% endblock %}
 {% block actions %}
-<a class="btn" href="/portfolio.csv" download>Export CSV</a>
+<a class="btn" href="/portfolio.csv" download>{{ _("Export CSV") }}</a>
 {% endblock %}
 {% block main %}
-<main class="page" aria-label="Portfolio">
+<main class="page" aria-label="{{ _('Portfolio') }}">
   {% if not contracts %}
-  <p class="notice">No contracts yet. <a class="link" href="/">Add one or try a sample</a>.</p>
+  <p class="notice">{{ _("No contracts yet.") }} <a class="link" href="/">{{ _("Add one or try a sample") }}</a>.</p>
   {% else %}
   <div class="stats">
     <div class="stat">
-      <span class="stat-label">Contracts</span>
+      <span class="stat-label">{{ copy.CONTRACTS }}</span>
       <span class="stat-value">{{ contracts|length }}</span>
-      <span class="muted small">{{ pdfs }} PDF{{ 's' if pdfs != 1 }}, {{ texts }} text file{{ 's' if texts != 1 }}</span>
+      <span class="muted small">{{ (_("1 PDF") if pdfs == 1 else _("{count} PDFs")).format(count=pdfs) }}, {{ (_("1 text file") if texts == 1 else _("{count} text files")).format(count=texts) }}</span>
     </div>
     <div class="stat">
-      <span class="stat-label">Clauses found</span>
+      <span class="stat-label">{{ _("Clauses found") }}</span>
       <span class="stat-value ink-found">{{ found }}</span>
-      <span class="muted small">of {{ total }} looked for in each contract</span>
+      <span class="muted small">{{ _("of {total} looked for in each contract").format(total=total) }}</span>
     </div>
     <div class="stat">
-      <span class="stat-label">Passages to check</span>
+      <span class="stat-label">{{ _("Passages to check") }}</span>
       <span class="stat-value ink-check">{{ check }}</span>
-      <span class="muted small">read each, then confirm or reject it</span>
+      <span class="muted small">{{ _("read each, then confirm or reject it") }}</span>
     </div>
     <div class="stat">
-      <span class="stat-label">High-priority points</span>
+      <span class="stat-label">{{ _("High-priority points") }}</span>
       <span class="stat-value ink-high">{{ flags_high }}</span>
-      <span class="muted small">{{ flags_medium }} medium, {{ flags_low }} low</span>
+      <span class="muted small">{{ _("{medium} medium, {low} low").format(medium=flags_medium, low=flags_low) }}</span>
     </div>
     {% if deadline %}
     <a class="stat stat-dark stat-link" href="/documents/{{ deadline.doc_id }}">
-      <span class="stat-label muted">Next notice deadline</span>
+      <span class="stat-label muted">{{ _("Next notice deadline") }}</span>
       <span class="stat-value stat-date">{{ deadline.when }}</span>
-      <span class="muted small">{{ deadline.name }}, {{ deadline.source }} before the term ends</span>
+      <span class="muted small">{{ _("{name}, {period} before the term ends").format(name=deadline.name, period=deadline.source) }}</span>
     </a>
     {% endif %}
   </div>
 
   <div class="portfolio-tools">
-    <label class="sr-only" for="portfolio-search">Search contracts</label>
+    <label class="sr-only" for="portfolio-search">{{ _("Search contracts") }}</label>
     <input id="portfolio-search" class="input search" type="search" autocomplete="off"
-           placeholder="Search by name, party or governing law" data-row-search="#portfolio-rows">
-    <div class="chips" role="group" aria-label="Filter the contracts" data-row-filters="#portfolio-rows">
-      <button type="button" class="chip chip-active" data-row-filter="" aria-pressed="true">All</button>
-      <button type="button" class="chip" data-row-filter="high" aria-pressed="false">With high-priority points</button>
-      <button type="button" class="chip" data-row-filter="renews" aria-pressed="false">With a renewal term</button>
-      <button type="button" class="chip" data-row-filter="nolaw" aria-pressed="false">No governing law</button>
+           placeholder="{{ _('Search by name, party or governing law') }}" data-row-search="#portfolio-rows">
+    <div class="chips" role="group" aria-label="{{ _('Filter the contracts') }}" data-row-filters="#portfolio-rows">
+      <button type="button" class="chip chip-active" data-row-filter="" aria-pressed="true">{{ _("All") }}</button>
+      <button type="button" class="chip" data-row-filter="high" aria-pressed="false">{{ _("With high-priority points") }}</button>
+      <button type="button" class="chip" data-row-filter="renews" aria-pressed="false">{{ _("With a renewal term") }}</button>
+      <button type="button" class="chip" data-row-filter="nolaw" aria-pressed="false">{{ _("No governing law") }}</button>
     </div>
     <span class="grow"></span>
-    <span class="meta">{% if ws.gen_model %}Key terms are copied word for word from the contract.{% else %}The key terms need the local AI, which is off.{% endif %}</span>
+    <span class="meta">{% if ws.gen_model %}{{ _("Key terms are copied word for word from the contract.") }}{% else %}{{ _("The key terms need the local AI, which is off.") }}{% endif %}</span>
   </div>
 
   <div class="table-scroll">
     <table class="table portfolio-table">
       <thead>
         <tr>
-          <th scope="col">Contract</th>
-          <th scope="col">Clauses found, of {{ total }}</th>
-          <th scope="col">Governing law</th>
-          <th scope="col">Notice period</th>
-          <th scope="col">Renewal</th>
+          <th scope="col">{{ _("Contract") }}</th>
+          <th scope="col">{{ _("Clauses found, of {total}").format(total=total) }}</th>
+          <th scope="col">{{ _("Governing law") }}</th>
+          <th scope="col">{{ _("Notice period") }}</th>
+          <th scope="col">{{ _("Renewal") }}</th>
           <th scope="col">{% for key, title, line in copy.SECTIONS if key == 'checks' %}{{ title }}{% endfor %}</th>
         </tr>
       </thead>
@@ -80,31 +81,31 @@
             data-high="{{ 1 if row.flags_high else 0 }}" data-renews="{{ 1 if item.renews else 0 }}" data-nolaw="{{ 1 if item.no_law else 0 }}">
           <td>
             <a class="link" href="/documents/{{ row.doc_id }}">{{ item.name }}</a>
-            <span class="block meta">{{ 'PDF' if item.kind == 'pdf' else 'Text' }} · {{ row.size }}{% if item.parties %} · {{ item.parties }}{% endif %}</span>
+            <span class="block meta">{{ m.kind(item.kind) }} · {{ m.size(row.size) }}{% if item.parties %} · {{ item.parties }}{% endif %}</span>
           </td>
           <td>
             <span class="coverage" aria-hidden="true"><span class="found" style="width: {{ item.found_width }}%"></span><span class="check" style="width: {{ item.check_width }}%"></span></span>
-            <span class="block meta">{{ row.found }} {{ copy.STATUS.found|lower }} · {{ row.check }} to check · {{ row.not_found }} {{ copy.STATUS.not_found|lower }}</span>
+            <span class="block meta">{{ row.found }} {{ copy.STATUS.found|lower }} · {{ m.to_check(row.check) }} · {{ row.not_found }} {{ copy.STATUS.not_found|lower }}</span>
           </td>
           {% for field in ('governing_law', 'notice_period', 'renewal_term') %}
           {% set value, stated = item.terms[field] %}
           <td class="{{ 'serif' if stated else 'absent' }}">{{ value }}</td>
           {% endfor %}
           <td>
-            <span class="counts">{% for level, count in item.severities %}{{ c.tag(level, count ~ ' ' ~ level) }}{% else %}<span class="muted small">None</span>{% endfor %}</span>
+            <span class="counts">{{ m.severity_tags(item.severities) }}</span>
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <p class="muted small" id="portfolio-empty" hidden>No contract matches the search.</p>
+  <p class="muted small" id="portfolio-empty" hidden>{{ _("No contract matches the search.") }}</p>
 
   <div class="legend">
     <span class="legend-item" title="{{ copy.STATUS_HELP.found }}"><span class="swatch swatch-found"></span>{{ copy.STATUS.found }}</span>
     <span class="legend-item" title="{{ copy.STATUS_HELP.check }}"><span class="swatch swatch-check"></span>{{ copy.STATUS.check }}</span>
     <span class="legend-item" title="{{ copy.STATUS_HELP.not_found }}"><span class="swatch swatch-none"></span>{{ copy.STATUS.not_found }}</span>
-    <span>Open a row to work on that contract.</span>
+    <span>{{ _("Open a row to work on that contract.") }}</span>
   </div>
   {% endif %}
 </main>

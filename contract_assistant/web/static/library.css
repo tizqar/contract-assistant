@@ -43,7 +43,7 @@
 /* Drawer */
 /* The counts of a contract on a line of their own, so that a wrap never splits them. */
 .doc-meta-sep { display: none; }
-.doc-counts { display: block; }
+.doc-counts, .doc-scanned { display: block; }
 .upload-status:empty { display: none; }
 .rail-more { padding: 0 8px; font-size: 12px; }
 .rail-more summary { list-style: none; color: var(--muted); }
@@ -66,6 +66,35 @@
 .passage-label { font-size: 15px; }
 .passage-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .inline-form { display: inline-flex; align-items: center; gap: 4px; margin: 0; }
+.doc-ocr {
+  max-width: 760px; width: 100%; align-self: center; margin: 0; padding: 8px 12px;
+  border-left: 3px solid var(--check); border-radius: 6px; background: var(--check-soft);
+  font-size: 13px; color: var(--check-ink);
+}
+
+/* Search in the document: the box, the line about the term, the list of occurrences */
+.doc-search { display: flex; align-items: center; gap: 6px; flex: 1 1 240px; min-width: 0; max-width: 420px; margin: 0 0 0 auto; }
+.doc-search-input { min-height: 36px; padding: 6px 12px; font-size: 14px; }
+.doc-found { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.doc-found-count { font-weight: 600; font-variant-numeric: tabular-nums; }
+.icon-btn-sm { width: 32px; height: 32px; }
+.doc-search-results:empty { display: none; }
+.doc-search-results {
+  max-width: 760px; width: 100%; align-self: center; display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+}
+.search-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.search-summary { font-weight: 600; }
+.search-hits { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; }
+.search-hit {
+  display: flex; gap: 10px; align-items: baseline; padding: 6px 4px; min-height: 36px;
+  border-bottom: 1px solid var(--border-2); color: var(--ink); text-decoration: none; font-size: 13px;
+}
+.search-hit:hover { background: var(--surface-2); }
+.search-hit:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.search-page { flex: 0 0 auto; min-width: 64px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.search-snippet { min-width: 0; font-family: var(--serif); overflow-wrap: anywhere; }
+mark.occurrence { background: transparent; color: inherit; padding: 0 1px; border-radius: 2px; box-shadow: inset 0 -0.45em 0 var(--highlight), 0 0 0 1px var(--highlight-edge); }
 
 /* Full pages */
 .crumb-current { font-weight: 600; color: var(--ink); }
@@ -145,6 +174,7 @@
 
 @media (max-width: 760px) {
   .passage-card { position: static; }
+  .doc-search { flex-basis: 100%; max-width: none; margin-left: 0; }
   .welcome-title { font-size: 24px; }
   .compare-top .swap { transform: rotate(90deg); }
   .compare-tile { flex-basis: 100%; }

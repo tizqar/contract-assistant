@@ -1,9 +1,11 @@
 {% import "components.html" as c with context %}
-{# The document pane: the PDF page with the passage boxed, or the text with the passage highlighted, then the passage card with the reader's decision and the actions. #}
+{# The document pane: the PDF page with the passage boxed, or the text with the passage highlighted and every occurrence of a searched term marked; the search in the contract; then the passage card with the reader's decision and the actions. #}
+{% set chevron_left %}<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>{% endset %}
+{% set chevron_right %}<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m6 3 5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>{% endset %}
 <div class="doc-toolbar">
   {% if has_copy %}
-  <div class="seg" role="group" aria-label="Show the contract as">
-    {% for value, text, target in (('page', 'Page', page_url), ('text', 'Text', text_url)) %}
+  <div class="seg" role="group" aria-label="{{ _('Show the contract as') }}">
+    {% for value, text, target in (('page', _('Page'), page_url), ('text', _('Text'), text_url)) %}
     {% if value == mode %}
     <button type="button" class="seg-item seg-item-active" aria-pressed="true">{{ text }}</button>
     {% else %}
@@ -14,34 +16,65 @@
   {% endif %}
   {% if pages %}
   <div class="pager">
-    <button type="button" class="icon-btn" aria-label="Previous page"
+    <button type="button" class="icon-btn" aria-label="{{ _('Previous page') }}"
             {% if previous_url %}hx-get="{{ previous_url }}" hx-target="#document-pane" hx-swap="innerHTML"{% else %}disabled{% endif %}>
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      {{ chevron_left }}
     </button>
-    <span class="pager-label">Page {{ page }} <span class="muted">of {{ pages }}</span></span>
-    <button type="button" class="icon-btn" aria-label="Next page"
+    <span class="pager-label">{{ copy.PAGE.format(page=page) }} <span class="muted">{{ _("of {pages}").format(pages=pages) }}</span></span>
+    <button type="button" class="icon-btn" aria-label="{{ _('Next page') }}"
             {% if next_url %}hx-get="{{ next_url }}" hx-target="#document-pane" hx-swap="innerHTML"{% else %}disabled{% endif %}>
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m6 3 5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      {{ chevron_right }}
     </button>
   </div>
   {% endif %}
-  {% if mode == 'text' and heading != 'Page %d' % page %}<span class="doc-heading">{{ heading }}</span>{% endif %}
+  {% if show_heading %}<span class="doc-heading">{{ heading }}</span>{% endif %}
+  <form class="doc-search" role="search" hx-get="{{ search_url }}" hx-trigger="submit, keyup changed delay:300ms"
+        hx-target="#doc-search-results" hx-swap="innerHTML">
+    <label class="sr-only" for="doc-search-q">{{ _("Search the contract") }}</label>
+    <input id="doc-search-q" class="input doc-search-input" type="search" name="q" value="{{ query }}"
+           autocomplete="off" spellcheck="false" placeholder="{{ _('Find a word or a phrase') }}">
+    <button type="submit" class="btn btn-sm">{{ _("Find") }}</button>
+  </form>
 </div>
-{% if not citation %}
-<p class="doc-hint">Pick a passage in the overview or ask a question to see it here.</p>
+{% if term %}
+<div class="doc-found">
+  <span class="doc-found-count" aria-live="polite">{{ found }}</span>
+  {% if hit %}
+  <button type="button" class="icon-btn icon-btn-sm" aria-label="{{ _('Previous occurrence') }}"
+          {% if previous_hit %}hx-get="{{ previous_hit }}" hx-target="#document-pane" hx-swap="innerHTML"{% else %}disabled{% endif %}>
+    {{ chevron_left }}
+  </button>
+  <button type="button" class="icon-btn icon-btn-sm" aria-label="{{ _('Next occurrence') }}"
+          {% if next_hit %}hx-get="{{ next_hit }}" hx-target="#document-pane" hx-swap="innerHTML"{% else %}disabled{% endif %}>
+    {{ chevron_right }}
+  </button>
+  {% endif %}
+  <span class="grow"></span>
+  <button type="button" class="btn btn-sm btn-ghost" hx-get="{{ list_url }}" hx-target="#doc-search-results" hx-swap="innerHTML">{{ _("List them all") }}</button>
+  <a class="link small" href="#document-pane" hx-get="{{ clear_url }}" hx-target="#document-pane" hx-swap="innerHTML">{{ _("Clear") }}</a>
+</div>
 {% endif %}
-{% if citation %}
+<div id="doc-search-results" class="doc-search-results" aria-live="polite"></div>
+{% if scanned_note %}
+<p class="doc-ocr">{{ scanned_note }}</p>
+{% endif %}
+{% if not citation and not term %}
+<p class="doc-hint">{{ _("Pick a passage in the overview or ask a question to see it here.") }}</p>
+{% endif %}
+{% if citation and not hit %}
 <div class="card passage-card">
   <div class="passage-head">
     {% if status %}{{ c.badge(status) }}{% endif %}
-    {% if label != RELATED_LABEL %}<strong class="passage-label">{{ label }}</strong>{% endif %}
+    {% if label != RELATED_LABEL %}<strong class="passage-label">{{ label_text }}</strong>{% endif %}
     {% if citation.page %}<span class="muted small">{{ copy.PAGE.format(page=citation.page) }}</span>{% endif %}
   </div>
   {{ c.quote(citation.quote) }}
   <div class="passage-actions">
     {{ c.decide(cache.doc_id, label, citation, status) }}
     <span class="grow"></span>
-    {% for language, text in (('en', copy.EXPLAIN), ('sr', copy.EXPLAIN_SR)) %}
+    {#- Explain in the language of the page first, then in the other one. -#}
+    {% set other = ('sr', copy.EXPLAIN_SR) if lang == 'en' else ('en', copy.EXPLAIN_EN) %}
+    {% for language, text in ((lang, copy.EXPLAIN), other) %}
     <form class="inline-form" data-stream data-target="#chat-body"
           action="/documents/{{ cache.doc_id }}/explain" method="post" enctype="multipart/form-data">
       <input type="hidden" name="label" value="{{ label }}">
@@ -52,19 +85,22 @@
       <input type="hidden" name="conf" value="{{ '%g' % citation.conf }}">
       {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
       <button type="submit" class="btn btn-sm">{{ text }}</button>
-      <button type="button" class="btn btn-stop btn-sm" data-stop hidden>Stop</button>
+      <button type="button" class="btn btn-stop btn-sm" data-stop hidden>{{ _("Stop") }}</button>
     </form>
     {% endfor %}
-    <button type="button" class="btn btn-sm" data-copy="{{ citation.quote }}">{{ copy.COPY_QUOTE }}</button>
+    <button type="button" class="btn btn-sm" data-copy="{{ citation.quote }}"
+            data-copied="{{ _('Quote copied.') }}" data-not-copied="{{ _('The quote could not be copied; select it and copy it by hand.') }}">{{ copy.COPY_QUOTE }}</button>
   </div>
 </div>
 {% endif %}
 {% if mode == 'page' %}
-<img class="doc-page" src="{{ image }}" alt="Page {{ page }} of the contract{% if citation and page == citation.page %} with the {{ label }} passage boxed{% endif %}">
+<img class="doc-page" src="{{ image }}" alt="{{ image_alt }}">
 {% else %}
 <article class="doc-text">
-  {%- for text, mark in segments -%}
-    {%- if mark %}<mark class="highlight" data-label="{{ mark }}">{{ text }}</mark>{% else %}{{ text }}{% endif -%}
+  {%- for text, mark, name in segments -%}
+    {%- if mark == 'highlight' %}<mark class="highlight" data-label="{{ name }}">{{ text }}</mark>
+    {%- elif mark %}<mark class="occurrence">{{ text }}</mark>
+    {%- else %}{{ text }}{% endif -%}
   {%- endfor -%}
 </article>
 {% endif %}

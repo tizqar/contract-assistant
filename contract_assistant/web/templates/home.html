@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% import "components.html" as c with context %}
 {# The first page when no contract has been read yet: what the assistant does, the upload and the sample contracts. #}
-{% block title %}Contract Assistant{% endblock %}
+{% block title %}{{ _("Contract Assistant") }}{% endblock %}
 {% block main %}
 <main class="empty-state first-run" aria-labelledby="first-run-title">
   <div class="welcome">
-    <h1 class="welcome-title" id="first-run-title">Read a contract with a local assistant</h1>
-    <p class="welcome-lead">Upload a contract. The assistant reads it once on this computer, finds the clauses a lawyer checks first, and then answers your questions with quotes.</p>
+    <h1 class="welcome-title" id="first-run-title">{{ _("Read a contract with a local assistant") }}</h1>
+    <p class="welcome-lead">{{ _("Upload a contract. The assistant reads it once on this computer, finds the clauses a lawyer checks first, and then answers your questions with quotes.") }}</p>
     {% if not can_read %}{{ c.notice(no_model) }}{% endif %}
     <div class="card card-wide welcome-card">
       <h2 class="h2">{{ copy.ADD_CONTRACT }}</h2>

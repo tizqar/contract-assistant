@@ -6,12 +6,15 @@ from datetime import UTC, datetime
 
 import pytest
 from fpdf import FPDF
+from PIL import Image, ImageDraw, ImageFont
 
+from contract_assistant import pdf as pdf_module
 from contract_assistant.extract.extractor import Extractor
 from contract_assistant.pdf import load_document
 from contract_assistant.pdf_view import DOCUMENTS_DIR, copy_path
 from contract_assistant.store import doc_id_of
 from contract_assistant.term_sheet import FIELDS, TermSheet, TermValue
+from contract_assistant.textsearch import count
 from contract_assistant.web import library
 from tests.support.caches import make_cache
 from tests.support.fakes import EchoTextClient, FakeQA, slow_fake_qa
@@ -21,6 +24,7 @@ PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 PAGE_ONE = "Alpha supplies the goods to Beta."
 PAGE_TWO = "This agreement is governed by the laws of Vanuatu."
 TEXT = f"Preamble. {PAGE_TWO} Final words."
+SCANNED_LINE = "GOVERNING LAW This agreement is governed by the laws of England."
 
 
 def law_question(clause_types) -> str:
@@ -35,6 +39,23 @@ def write_pdf(path, pages: list[str]):
         pdf.cell(text=text)
     pdf.output(str(path))
     return path
+
+
+def write_scan(path, pages: int):
+    """Write a PDF whose pages are images of text, without a text layer."""
+    images = []
+    for number in range(pages):
+        image = Image.new("RGB", (1400, 400), "white")
+        font = ImageFont.load_default(size=36)
+        ImageDraw.Draw(image).text((40, 120), f"Page {number + 1}.", fill="black", font=font)
+        images.append(image)
+    images[0].save(path, save_all=True, append_images=images[1:])
+    return path
+
+
+def read_scan(page) -> str:
+    """Stand in for Tesseract: the text of a scanned page."""
+    return f"Page {page.page_number}. {SCANNED_LINE}"
 
 
 def upload(client, name: str, data: bytes) -> list[dict]:
@@ -207,8 +228,9 @@ def test_the_upload_starts_the_background_writing_when_generating(
 
 def test_an_unsupported_file_is_a_notice(client):
     sent = upload(client, "notes.docx", b"x")
-    assert sent[-1]["notice"] == "unsupported file type: .docx"
+    assert sent[-1]["notice"] == library.UNSUPPORTED_FILE
     assert "redirect" not in sent[-1]
+    assert upload(client, "notes.txt", b"\xff\xfe\x00x")[-1]["notice"] == library.NOT_UTF8
 
 
 def test_a_request_without_a_file_is_a_notice(client):
@@ -493,3 +515,168 @@ def test_only_the_listed_samples_can_be_read(client):
     for name in ("notes.txt", "demo_documents.json", "README.md", "..%2Fpyproject.toml"):
         response = client.post(f"/samples/{name}")
         assert response.status_code == 404
+
+
+# Search in the document
+
+
+def test_the_search_lists_each_occurrence_with_its_page_and_a_link(pdf_client):
+    doc_id = pdf_client.doc_id
+    text = pdf_client.app.state.workspace.load(doc_id).text
+    html = pdf_client.get(f"/documents/{doc_id}/search?q=THE").text
+    assert "2 occurrences on 2 pages" in html
+    assert '<span class="search-page">Page 1</span>' in html
+    assert '<span class="search-page">Page 2</span>' in html
+    assert 'Alpha supplies <mark class="occurrence">the</mark> goods to Beta.' in html
+    first, second = text.index("the goods"), text.index("the laws")
+    for start in (first, second):
+        url = f"/documents/{doc_id}/view?label=&amp;start={start}&amp;end={start + 3}&amp;q=THE"
+        assert f'hx-get="{url}" hx-target="#document-pane"' in html
+    assert f'hx-get="/documents/{doc_id}/view?q=THE"' in html
+    assert "Show every occurrence" in html
+
+
+def test_the_search_asks_for_more_letters_and_says_when_nothing_matches(pdf_client):
+    doc_id = pdf_client.doc_id
+    short = pdf_client.get(f"/documents/{doc_id}/search?q=a").text
+    assert "Type at least two characters" in short
+    assert pdf_client.get(f"/documents/{doc_id}/search?q=").text.strip() == ""
+    nothing = pdf_client.get(f"/documents/{doc_id}/search?q=zebra").text
+    assert "No occurrences" in nothing and "search-hit" not in nothing
+
+
+def test_the_pane_has_a_search_box_that_keeps_the_term(client):
+    html = client.get(f"/documents/{SHORT_DOC_ID}/view?q=supply").text
+    assert f'hx-get="/documents/{SHORT_DOC_ID}/search"' in html
+    assert 'hx-trigger="submit, keyup changed delay:300ms"' in html
+    assert 'hx-target="#doc-search-results"' in html and 'id="doc-search-results"' in html
+    assert '<label class="sr-only" for="doc-search-q">' in html
+    assert 'name="q" value="supply"' in html
+
+
+def test_the_text_view_with_a_term_marks_every_occurrence_around_the_first(client):
+    text = client.app.state.workspace.load(SHORT_DOC_ID).text
+    total = count(text, "agreement")
+    html = client.get(f"/documents/{SHORT_DOC_ID}/view?q=agreement&mode=text").text
+    assert html.count('<mark class="highlight" data-label="Passage">') == 1
+    assert '<mark class="occurrence">' in html
+    assert f"Occurrence 1 of {total}" in html
+    assert re.search(r'aria-label="Previous occurrence"\s+disabled', html)
+    assert re.search(r'aria-label="Next occurrence"\s+hx-get="[^"]*q=agreement', html)
+    assert ">Clear</a>" in html and "passage-card" not in html and "Pick a passage" not in html
+
+
+def test_the_page_view_with_a_term_boxes_every_occurrence_on_the_page(pdf_client, monkeypatch):
+    doc_id = pdf_client.doc_id
+    text = pdf_client.app.state.workspace.load(doc_id).text
+    start = text.index("the laws")
+    html = pdf_client.get(
+        f"/documents/{doc_id}/view?label=&start={start}&end={start + 3}&q=the"
+    ).text
+    assert f'src="/documents/{doc_id}/page/2.png?q=the"' in html
+    assert "each occurrence of “the” boxed" in html and "Occurrence 2 of 2" in html
+    first = text.index("the goods")
+    assert re.search(rf'aria-label="Previous occurrence"\s+hx-get="[^"]*start={first}&', html)
+    assert re.search(r'aria-label="Next occurrence"\s+disabled', html)
+    calls = []
+    monkeypatch.setattr(library, "page_image", lambda *args: calls.append(args) or b"x")
+    pdf_client.get(f"/documents/{doc_id}/page/2.png?q=the")
+    assert calls and calls[0][1:] == (2, None, "the")
+
+
+def test_the_text_of_a_page_marks_each_occurrence_without_a_highlight(pdf_client):
+    doc_id = pdf_client.doc_id
+    html = pdf_client.get(f"/documents/{doc_id}/view?mode=text&page=1&q=the").text
+    assert 'Alpha supplies <mark class="occurrence">the</mark> goods to Beta.' in html
+    assert 'class="highlight"' not in html and "2 occurrences" in html
+
+
+# Scanned PDFs
+
+
+@pytest.fixture
+def scan_client(make_client, settings, tmp_path, monkeypatch):
+    """A client over a two-page scanned PDF uploaded and read by a stand-in for Tesseract."""
+    monkeypatch.setattr(pdf_module, "_default_reader", lambda: read_scan)
+    client = make_client(extractor=Extractor(FakeQA(), [], settings, "fake"))
+    path = write_scan(tmp_path / "scan.pdf", pages=2)
+    sent = upload(client, "scan.pdf", path.read_bytes())
+    client.doc_id = doc_id_of(load_document(path, ocr=read_scan).text)
+    assert sent[-1]["redirect"] == f"/documents/{client.doc_id}"
+    return client
+
+
+def test_a_scanned_pdf_is_read_with_ocr_and_the_rail_says_so(scan_client):
+    doc_id = scan_client.doc_id
+    assert scan_client.app.state.workspace.entry(doc_id).scanned == 2
+    rail = re.sub(r"<[^>]+>", "", scan_client.get(f"/documents/{doc_id}/rail").text)
+    assert "PDF · 2 pages · 0 found · nothing to check · 2 scanned pages read with OCR" in rail
+
+
+def test_a_scanned_page_opens_as_text_with_the_ocr_note(scan_client):
+    doc_id = scan_client.doc_id
+    html = scan_client.get(f"/documents/{doc_id}/view").text
+    assert "<img" not in html and 'aria-pressed="true">Text</button>' in html
+    assert library.SCANNED_PAGE in html and f"Page 1. {SCANNED_LINE}" in html
+    page = scan_client.get(f"/documents/{doc_id}/view?mode=page").text
+    assert '<img class="doc-page"' in page and library.SCANNED_PAGE in page
+    hits = scan_client.get(f"/documents/{doc_id}/search?q=England&mode=page").text
+    assert "2 occurrences on 2 pages" in hits and "mode=page" not in hits
+
+
+def test_a_scan_without_tesseract_says_what_to_install(
+    make_client, settings, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(pdf_module, "_default_reader", lambda: False)
+    client = make_client(extractor=Extractor(FakeQA(), [], settings, "fake"))
+    path = write_scan(tmp_path / "scan.pdf", pages=1)
+    sent = upload(client, "scan.pdf", path.read_bytes())
+    assert sent[-1]["notice"] == library.NEEDS_TESSERACT and "redirect" not in sent[-1]
+
+
+# The Serbian interface
+
+
+def test_the_first_page_is_in_serbian_with_the_cookie(make_client, settings, tmp_path):
+    client = fresh(make_client(extractor=Extractor(FakeQA(), [], settings, "fake")), tmp_path)
+    client.cookies.set("lang", "sr")
+    html = client.get("/").text
+    assert "Pročitajte ugovor uz pomoć lokalnog asistenta" in html
+    assert "Ili isprobajte primer ugovora" in html and "PDF · 5 str." in html
+    assert "Otpremi i pročitaj" in html and "Zaustavi" in html
+    assert "Upload and read" not in html and "Read a contract" not in html
+
+
+def test_the_rail_and_the_document_pane_are_in_serbian_with_the_cookie(client):
+    client.cookies.set("lang", "sr")
+    short = client.app.state.workspace.entry(SHORT_DOC_ID)
+    rail = re.sub(r"<[^>]+>", "", client.get(f"/documents/{SHORT_DOC_ID}/rail").text)
+    size = short.size.replace(" words", " reči").replace(",", ".")
+    assert f"Tekst · {size} · {short.found} pronađeno · {short.check} za proveru" in rail
+    assert "Preuzmi ono što je asistent pronašao (JSON)" in rail
+    start, end = law_span(client, SHORT_DOC_ID)
+    query = f"label=Governing+Law&start={start}&end={end}&status=found"
+    pane = client.get(f"/documents/{SHORT_DOC_ID}/view?{query}").text
+    assert "Merodavno pravo</strong>" in pane and "Izvod oko označenog odlomka" in pane
+    explain = re.findall(r'name="language" value="(\w+)">.*?>([^<]+)</button>', pane, re.DOTALL)
+    assert explain == [("sr", "Objasni"), ("en", "Objasni na engleskom")]
+    assert "Kopiraj citat" in pane and 'data-copied="Citat je kopiran."' in pane
+    hits = client.get(f"/documents/{SHORT_DOC_ID}/search?q=agreement").text
+    assert "Broj pojavljivanja: " in hits and "Prikaži sva pojavljivanja" in hits
+
+
+def test_the_compare_page_and_its_result_are_in_serbian_with_the_cookie(client):
+    client.cookies.set("lang", "sr")
+    html = client.get(f"/compare?left={SHORT_DOC_ID}").text
+    assert "Prvi ugovor" in html and "Drugi ugovor" in html
+    assert "Zameni mesta ugovorima" in html and "Poredim klauzule" in html
+    assert "Swap the two contracts" not in html
+    sent = frames(
+        client, "POST", "/compare/result", data={"left": SHORT_DOC_ID, "right": LONG_DOC_ID}
+    )
+    result = sent[-1]["html"]
+    assert "Klauzule</h2>" in result and "Isto u oba" in result
+    assert "Samo u ugovoru „Long outsourcing agreement“" in result
+    assert "za njih je potreban lokalni AI" in result
+    assert "od 49 klauzula se razlikuje" in sent[-1]["oob"]["compare-summary"]
+    assert "za proveru" in sent[-1]["oob"]["left-counts"]
