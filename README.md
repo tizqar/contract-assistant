@@ -29,12 +29,16 @@ matches no clause from the passages closest to it. This text is generated and la
 such. Quotes inside it are verified against the contract.
 
 The web app is a FastAPI application with server-rendered pages (Jinja2 templates, htmx and
-a small script; no build step). Its workspace has three panes: the contracts, the document
-with the cited passage highlighted (the page of the PDF with the passage boxed, for a PDF),
-and an insights panel with the chat, the summary, the key terms, the review flags, the
-obligations, the clause checklist and the defined terms. Two more pages compare two
-contracts and list the portfolio. Generated text streams in as it is written and is checked
-when complete; a Stop button cancels it.
+a small script; no build step), written for readers who are not lawyers or developers. The
+workspace shows an overview of the contract (summary, key facts, things to check, who must
+do what, all clauses, defined terms) or the document itself with the cited passage
+highlighted (the page of the PDF with the passage boxed, for a PDF), next to a chat that is
+always open. The contracts live in a sidebar that slides in. A passage the assistant is not
+sure about is marked "Check this" and carries Confirm and Not this buttons: a confirmed
+passage counts as found everywhere, a rejected one is dropped, and the decision is kept per
+contract under `cache/decisions/`. Generated text carries a small AI badge and streams in as
+it is written; one notice under the chat says that AI text can be wrong. Two more pages
+compare two contracts and list the portfolio.
 
 ## Install
 
@@ -86,6 +90,7 @@ a new contract needs the model, and the app says so.
 make demo         # the web app at http://127.0.0.1:7860
 make web-dev      # the web app on fake backends at http://127.0.0.1:7861, reloads on save
 make ui-dev       # the older Gradio app on fake backends
+.venv/bin/contract-assistant serve --fresh   # empty cache: analyse the sample contracts live
 make test         # fast tests
 make lint         # ruff
 make router-eval  # router-eval --router llm --split test
@@ -100,7 +105,10 @@ make passage-eval # passage-eval
 prepares the summaries, key terms and obligations of the cached contracts in the background
 at start-up and after an upload; `serve --no-precompute` turns it off. Generated text
 appears in the web app as it is written and is checked when complete. A Stop button cancels
-a running request.
+a running request. `serve --fresh` starts with an empty temporary cache and no demo caches,
+so the first page offers the sample contracts of `demo/` (three texts and a five-page PDF)
+to analyse live, with the progress shown step by step, and the summaries are then written
+in front of the reader.
 
 The first `make demo` loads the embedding model and downloads it if it is not cached. With
 Ollama, the app loads the router model at start-up (up to 120 s) and keeps it loaded for 30
@@ -202,36 +210,41 @@ the reply says that the question does not match a clause.
 That is the command-line template. The demo documents are plain text, so there are no page
 numbers (`p. n/a`); a PDF gives the page.
 
-The web app labels the same tiers Found, Verify and Not found. An answer in the chat is a
-card per clause type with the quote, the page and the confidence; the document pane opens
-at the passage, highlighted in the text or boxed on the page of the PDF (rendered from the
-copy kept under `cache/documents/` for a PDF uploaded through the app or analysed with
-`extract`; the demo text files show the excerpt). Under the page or the excerpt, a passage
-card offers Explain, Explain in Serbian and Copy quote. The Clauses tab lists all 49 clause
-types by topic with a status filter; a row opens its passage. The thresholds are two sliders
-in the settings menu (the gear in the top bar), next to the technical details; every panel
-follows them at once. Build report, in the top bar, writes the DOCX and Markdown report
-from the saved parts and offers both files in the contracts rail.
+The web app calls the same tiers Found, Check this and Not found, and explains them in a
+help popover (the question mark in the top bar). An answer in the chat is a card per clause
+with the quote and the page; the document pane opens at the passage, highlighted in the text
+or boxed on the page of the PDF (rendered from the copy kept under `cache/documents/` for a
+PDF uploaded through the app or analysed with `extract`; the demo text files show the
+excerpt). A passage marked Check this carries Confirm and Not this, in the chat, in the
+overview and under the document; Undo takes a decision back. The overview lists what the
+assistant did ("49 clauses: 8 found, 17 to check, 24 not found") and the six sections, each
+reachable from a row of chips. Confidence numbers, model names and the thresholds stay out
+of the main screens: the thresholds are two sliders under Advanced (the gear), next to the
+technical details. Report, in the top bar, writes the DOCX and Markdown report from the
+saved parts.
 
 | | |
 |---|---|
-| ![The workspace with a found answer](docs/screenshots/workspace.png) | ![The passage card under the PDF page](docs/screenshots/page.png) |
-| A found answer: the card in the chat, the passage boxed on the page of the PDF. | The passage card under the page, with Explain and Copy quote. |
-| ![A clause restated in Serbian](docs/screenshots/chat.png) | ![A defined term](docs/screenshots/definition.png) |
-| "explain that in Serbian": a restatement, labelled Generated. | "What is an RMA?": the sentence of the contract that defines the term, no model. |
-| ![An answer written from the passages](docs/screenshots/generated.png) | ![The summary of a contract](docs/screenshots/summary.png) |
-| A question outside the clause types: the related passages, each a verbatim slice. | The Summary tab, written from the clauses found, English or Serbian. |
-| ![The key terms of a contract](docs/screenshots/terms.png) | ![The review flags of a contract](docs/screenshots/review.png) |
-| The key terms, each a verbatim value from a clause found, and the key dates. | Review flags from the rule file, with a passage and a note on request. |
-| ![Obligations by party](docs/screenshots/obligations.png) | ![The clause checklist](docs/screenshots/checklist.png) |
-| Who must, may or must not do what, each entry a verbatim slice of a clause. | All 49 clause types by topic, with the status filter. |
-| ![Two contracts compared](docs/screenshots/compare.png) | ![The portfolio](docs/screenshots/portfolio.png) |
-| Two contracts side by side: the key terms, the flags and the clause types that differ. | Every analysed contract with its coverage, key terms and flags. |
+| ![The first page of a fresh start](docs/screenshots/first-run.png) | ![A sample contract being analysed](docs/screenshots/progress.png) |
+| A fresh start: upload a contract or analyse a sample. | The analysis runs on this computer, with its progress shown. |
+| ![The overview filling in](docs/screenshots/generating.png) | ![The overview of a contract](docs/screenshots/overview.png) |
+| Right after the analysis the summary and the key facts are written in front of the reader. | The overview: what the assistant did, the summary and the sections below it. |
+| ![All clauses with Confirm and Not this](docs/screenshots/clauses.png) | ![A passage confirmed by the reader](docs/screenshots/confirmed.png) |
+| All clauses: a passage to check carries Confirm and Not this. | After Confirm the passage counts as found and the document shows it boxed. |
+| ![A found answer in the chat](docs/screenshots/chat.png) | ![A clause restated in plain English](docs/screenshots/explain.png) |
+| A question answered with the quote and its page; the document opens at the passage. | "explain that": a restatement with the AI badge. |
+| ![The closest passages for a question outside the clauses](docs/screenshots/passages.png) | ![The contracts sidebar](docs/screenshots/drawer.png) |
+| A question outside the clauses: the closest passages, each copied word for word. | The contracts slide in from the left. |
+| ![The help popover](docs/screenshots/help.png) | ![Two contracts compared](docs/screenshots/compare.png) |
+| How to read the labels, in the reader's words. | Two contracts side by side: the key terms, the things to check and the clauses that differ. |
+| ![The portfolio](docs/screenshots/portfolio.png) | |
+| Every analysed contract with its coverage, key terms and flags. | |
 
 ### Defined terms and chat commands
 
 Defined terms are found by pattern: `("Term")`, `(the "Term")` and `"Term" means ...`. The web
-app lists them in the Definitions tab, each with a link to its sentence in the document. A
+app lists them in the Defined terms section of the overview, each with a link to its sentence
+in the document. A
 definition question is answered from the defining sentence, verbatim with its page, and
 labelled Definition.
 
@@ -255,8 +268,9 @@ summary is saved under `cache/summaries/` per contract, model and thresholds, so
 the thresholds writes a new one; a withheld one is not saved, so the next request asks the
 model again.
 
-The summary can be written in Serbian: the Summary tab has an English / Serbian switch, the
-command line has `summarize --language sr`, and the chat understands "summarize in Serbian". The
+The summary can be written in Serbian: the Summary section has an English / Serbian switch,
+the command line has `summarize --language sr`, and the chat understands "summarize in
+Serbian". The
 quotes stay in English. The Serbian summary is saved apart from the English one. On an Apple M4 with 16 GB, qwen3.5:4b takes about 15 to 25 s for a demo
 contract, at about 27 tokens per second.
 
@@ -267,8 +281,8 @@ for word from the quote of one clause and located in the contract with its offse
 the model gave that is not in a clause is shown as "not verified" with what the model
 wrote. A term the clauses do not state is "not stated". A value taken from the clause of
 another field names that clause. A term sheet is saved under `cache/term_sheets/`. The Key
-terms tab shows it with the key dates read from it and offers the JSON. On the command line,
-`term-sheet a.txt b.txt` prints one column per document, which is the comparison.
+facts section shows it with the key dates read from it and offers the JSON. On the command
+line, `term-sheet a.txt b.txt` prints one column per document, which is the comparison.
 
 When a question matches no clause type, the language model writes up to three sentences
 from the related passages. The same checks as for the summary apply: quoted text is
@@ -339,9 +353,9 @@ clause type that is missing, present, present together with others (all present)
 without another one (present without). The check is rule-based and uses no model. Each flag
 shows the clauses it rests on, with their quotes. A flag that rests on one of the extra
 clause types is marked as not validated. The file can be edited; a rule that names an
-unknown clause type is rejected with a message at start-up. In the Review tab, "Write a
-note" asks the language model for a short note on a flag, written from the flag's quotes and
-checked against them.
+unknown clause type is rejected with a message at start-up. In the Things to check section,
+"Write a note" asks the language model for a short note on a flag, written from the flag's
+quotes and checked against them; the severities read Important, Worth a look and Minor.
 
 The Compare page and `compare a b` put the key terms and the clause checklist of two
 contracts side by side. On the command line, rows that differ are marked with "≠"; the page
@@ -409,10 +423,11 @@ Separate git history, separate virtualenv.
 
 Inside `contract_assistant/`: `extract/` runs the encoder, `router/` maps questions to clause
 types, `web/` is the web app (`core.py` the shared state and the streamed frames,
-`generate.py` the generation steps, `chat.py`, `insights.py` and `library.py` the routes,
-`templates/` and `static/`), `ui/` is the older Gradio app, and the other modules are one
-feature each (`summary.py`, `term_sheet.py`, `review.py`, `compare.py`, `report.py`, ...).
-Tests of the web app are in `tests/web/`.
+`generate.py` the generation steps, `copy.py` the words the pages show, `chat.py`,
+`insights.py`, `library.py` and `decide.py` the routes, `templates/` and `static/`),
+`decisions.py` keeps the reader's Confirm and Not this decisions, `ui/` is the older Gradio
+app, and the other modules are one feature each (`summary.py`, `term_sheet.py`, `review.py`,
+`compare.py`, `report.py`, ...). Tests of the web app are in `tests/web/`.
 
 ## Relationship to `cuad-encoder`
 
