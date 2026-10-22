@@ -1,10 +1,11 @@
 {% import "components.html" as c with context %}
-{# A plain-language restatement of a passage, or why it is held back. #}
-{% if withheld %}
-<p class="chat-withheld">{{ withheld }}</p>
-{% else %}
-<div class="bubble-head">{{ c.ai() }}<strong>{{ heading }}</strong></div>
+{# A plain-language restatement of a passage, or why it is held back. The heading names the
+   language it is written in, in the language of the page. #}
+{% if heading %}
+<div class="bubble-head">{{ c.ai() }}<strong>{{ _(heading).format(label=_(shown.label)) }}</strong></div>
 <p class="generated-text">{{ text }}</p>
+{% else %}
+<p class="chat-withheld">{{ copy.AI_WITHHELD.format(reason=_(reason)) }}</p>
 {% endif %}
 {% set view = shown.view(cache.doc_id, status_of(shown, shown.status)) %}
 {% if view %}

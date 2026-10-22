@@ -1,16 +1,17 @@
 {% import "components.html" as c with context %}
 {# The summary of the contract asked for in the chat, or why it is held back. "Based on" names
-   the first clauses it was written from, with a dot for found (green) or to check (amber). #}
-{% if withheld %}
-<p class="chat-withheld">{{ withheld }}</p>
-{% else %}
-<div class="bubble-head">{{ c.ai() }}<strong>{{ heading }}</strong></div>
+   the first clauses it was written from, with a dot for found (green) or to check (amber).
+   A summary in the language of the page is headed Summary; another one names its language. #}
+{% if text %}
+<div class="bubble-head">{{ c.ai() }}<strong>{{ _(heading) if language == lang else _(heading_in) }}</strong></div>
 <p class="generated-text">{{ text }}</p>
 <div class="chat-sources">
-  <span>{{ based_on_text }}</span>
+  <span>{{ _(based_on_text) }}</span>
   {% for name, status in based_on %}
-  <span class="chat-source chat-source-{{ status }}" title="{{ status|status_label }}"><span class="dot" aria-hidden="true"></span>{{ name }}<span class="sr-only"> ({{ status|status_label }})</span></span>
+  <span class="chat-source chat-source-{{ status }}" title="{{ status|status_label }}"><span class="dot" aria-hidden="true"></span>{{ _(name) }}<span class="sr-only"> ({{ status|status_label }})</span></span>
   {% endfor %}
-  {% if based_on_more %}<span>{{ based_on_more }}</span>{% endif %}
+  {% if hidden %}<span>{{ _(based_on_more).format(count=hidden) }}</span>{% endif %}
 </div>
+{% else %}
+<p class="chat-withheld">{{ copy.AI_WITHHELD.format(reason=_(reason)) }}</p>
 {% endif %}

@@ -8,6 +8,7 @@ the feedback given. The chat always renders into the element `#chat-body`, which
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from collections.abc import Callable, Generator, Iterator
 from dataclasses import dataclass, field
@@ -52,7 +53,6 @@ from contract_assistant.ui.views import (
     display_name,
     passage_citation,
 )
-from contract_assistant.web import copy
 from contract_assistant.web.core import (
     DEFINITION_LABEL,
     RELATED_LABEL,
@@ -65,11 +65,21 @@ from contract_assistant.web.core import (
     WorkspaceError,
     Ws,
     frame,
+    language,
     render_string,
     stream,
     view_url,
 )
-from contract_assistant.web.generate import Step, checked, explanation_steps, summary_steps
+from contract_assistant.web.generate import (
+    NOTHING_TO_SUMMARIZE,
+    WRITING_EXPLANATION,
+    WRITING_SUMMARY,
+    Step,
+    checked,
+    explanation_steps,
+    summary_steps,
+)
+from contract_assistant.web.i18n import ENGLISH, translate
 
 logger = logging.getLogger(__name__)
 
@@ -78,12 +88,16 @@ THINKING = "Reading the contract"
 WRITING_ANSWER = "Writing the answer"
 NOTHING_TO_EXPLAIN = "Ask about a clause first, then say 'explain that'."
 NO_QUOTE = "There is no passage to explain."
-UNKNOWN_LANGUAGE = "Explanations are written in {languages}."
+UNKNOWN_LANGUAGE = "Explanations are written in English or Serbian."
+# The reader's bubble for an Explain button; the language is named when it is not the page's.
 EXPLAIN_ASKED = "Explain: {label}"
-EXPLAIN_ASKED_IN = "Explain in {language}: {label}"
-EXPLANATION_HEADING = "{label} in plain {language}"
+EXPLAIN_ASKED_IN = {"en": "Explain in English: {label}", "sr": "Explain in Serbian: {label}"}
+EXPLANATION_HEADING = {"en": "{label} in plain English", "sr": "{label} in plain Serbian"}
+# A summary in the language of the page is the Summary; another one names its language.
 SUMMARY_HEADING = "Summary"
-SUMMARY_HEADING_IN = "Summary in {language}"
+SUMMARY_HEADING_IN = {"en": "Summary in English", "sr": "Summary in Serbian"}
+# English named in a chat command; detect_intent recognises Serbian, and says English otherwise.
+ENGLISH_NAMED = re.compile(r"\b(english|engleski|engleskog|engleskom|engleskome)\b", re.IGNORECASE)
 BASED_ON = "Based on"
 BASED_ON_MORE = "and {count} more"
 # The clauses named under a summary; the overview lists all of them.
@@ -162,6 +176,31 @@ class Reply:
     shown: Shown | None = None
 
 
+@dataclass(frozen=True)
+class Asked:
+    """What the reader asked: their own words, or the passage and language of an Explain button."""
+
+    text: str = ""
+    label: str | None = None
+    language: str | None = None
+
+    def words(self, lang: str) -> str:
+        """Return the reader's bubble in the language of the page; typed words stay as typed."""
+        if self.label is None:
+            return self.text
+        wording = EXPLAIN_ASKED
+        if self.language != lang:
+            wording = EXPLAIN_ASKED_IN.get(self.language or "", EXPLAIN_ASKED)
+        return translate(wording, lang).format(label=translate(self.label, lang))
+
+
+@dataclass
+class Said(Message):
+    """A user message with what was asked, drawn again in the language of the page."""
+
+    asked: Asked = field(default_factory=Asked)
+
+
 @dataclass
 class Bubble(Message):
     """An assistant message with the reply behind it, drawn again whenever the chat is shown."""
@@ -184,7 +223,8 @@ class ExplainForm(BaseModel):
 
     label: str
     quote: str
-    language: str = DEFAULT_LANGUAGE
+    # The language of the page when the form names none.
+    language: str | None = None
     start: int | None = None
     end: int | None = None
     conf: float = Field(default=1.0, ge=0.0, le=1.0)
@@ -231,7 +271,7 @@ def feedback(
         messages = conversation.messages
         message = messages[index] if 0 <= index < len(messages) else None
         if not isinstance(message, Bubble) or message.answer is None:
-            raise WorkspaceError(ANSWER_GONE)
+            raise WorkspaceError(translate(ANSWER_GONE, language(request)))
         result = message.answer
         verdict = Feedback(
             doc_id=cache.doc_id,
@@ -261,26 +301,27 @@ def clear_chat(request: Request, doc_id: str, ws: Ws):
 def _ask(
     request: Request, ws: Workspace, cache: DocumentCache, tau: Thresholds, question: str
 ) -> Iterator[str]:
+    lang = language(request)
     if not question:
-        yield frame(notice=TYPE_A_QUESTION, done=True)
+        yield frame(notice=translate(TYPE_A_QUESTION, lang), done=True)
         return
-    yield from _converse(request, ws, cache, question, _replies(ws, cache, tau, question))
+    replies = _replies(ws, cache, tau, question, lang)
+    yield from _converse(request, ws, cache, Asked(question), replies)
 
 
 def _explain(
     request: Request, ws: Workspace, cache: DocumentCache, form: ExplainForm
 ) -> Iterator[str]:
-    if form.language not in LANGUAGES:
-        languages = " or ".join(_language_name(code) for code in LANGUAGES)
-        yield frame(notice=UNKNOWN_LANGUAGE.format(languages=languages), done=True)
+    lang = language(request)
+    chosen = form.language or lang
+    if chosen not in LANGUAGES:
+        yield frame(notice=translate(UNKNOWN_LANGUAGE, lang), done=True)
         return
     if not form.quote.strip():
-        yield frame(notice=NO_QUOTE, done=True)
+        yield frame(notice=translate(NO_QUOTE, lang), done=True)
         return
-    asked = EXPLAIN_ASKED.format(label=form.label)
-    if form.language != DEFAULT_LANGUAGE:
-        asked = EXPLAIN_ASKED_IN.format(language=_language_name(form.language), label=form.label)
-    replies = _explanation(ws, _posted(ws, cache, form), form.language)
+    asked = Asked(label=form.label, language=chosen)
+    replies = _explanation(ws, _posted(ws, cache, form), chosen)
     yield from _converse(request, ws, cache, asked, replies, inline=form.inline)
 
 
@@ -288,7 +329,7 @@ def _converse(
     request: Request,
     ws: Workspace,
     cache: DocumentCache,
-    asked: str,
+    asked: Asked,
     replies: Iterator[Step | Reply],
     inline: bool = False,
 ) -> Iterator[str]:
@@ -299,10 +340,12 @@ def _converse(
     the button that asked stays on the page while the reply is written.
     """
     conversation = ws.conversation(cache.doc_id)
-    user = render_string(request, "chat/user.html", text=asked)
+    said = Said("user", _said(request, asked), asked=asked)
 
     def pending(status: str, text: str = "") -> str:
-        return render_string(request, "chat/pending.html", user=user, status=status, text=text)
+        return render_string(
+            request, "chat/pending.html", user=said.html, status=status, text=text
+        )
 
     if inline:
         yield frame(oob={PENDING_ID: pending(THINKING)})
@@ -328,11 +371,11 @@ def _converse(
         logger.exception("chat reply failed for %s", cache.doc_id)
         reply = _text(SOMETHING_WRONG)
     try:
-        _add(request, ws, cache, conversation, user, reply)
+        _add(request, ws, cache, conversation, said, reply)
     except Exception:
         logger.exception("cannot show the reply in the chat about %s", cache.doc_id)
         reply = _text(SOMETHING_WRONG)
-        _add(request, ws, cache, conversation, user, reply)
+        _add(request, ws, cache, conversation, said, reply)
     follow = None
     if reply.shown is not None:
         status_of = _status_of(ws.decided(cache.doc_id))
@@ -345,7 +388,7 @@ def _add(
     ws: Workspace,
     cache: DocumentCache,
     conversation: Conversation,
-    user: str,
+    said: Said,
     reply: Reply,
 ) -> None:
     status_of = _status_of(ws.decided(cache.doc_id))
@@ -353,7 +396,7 @@ def _add(
         index = len(conversation.messages) + 1
         bubble = Bubble("assistant", "", answer=reply.answer, reply=reply, index=index)
         bubble.html = _draw(request, cache, bubble, status_of)
-        conversation.messages.extend([Message(role="user", html=user), bubble])
+        conversation.messages.extend([said, bubble])
         if reply.turn is not None:
             conversation.remember(reply.turn)
         if reply.answer is not None:
@@ -374,6 +417,8 @@ def _body(
         for message in conversation.messages:
             if isinstance(message, Bubble):
                 message.html = _draw(request, cache, message, status_of)
+            elif isinstance(message, Said):
+                message.html = _said(request, message.asked)
         messages = list(conversation.messages)
     return render_string(
         request,
@@ -385,6 +430,10 @@ def _body(
         empty_title=EMPTY_TITLE,
         empty_text=EMPTY_TEXT,
     )
+
+
+def _said(request: Request, asked: Asked) -> str:
+    return render_string(request, "chat/user.html", asked=asked)
 
 
 def _draw(request: Request, cache: DocumentCache, bubble: Bubble, status_of: StatusOf) -> str:
@@ -418,9 +467,12 @@ def _status_of(decisions: dict[str, Decision]) -> StatusOf:
 
 
 def _replies(
-    ws: Workspace, cache: DocumentCache, tau: Thresholds, question: str
+    ws: Workspace, cache: DocumentCache, tau: Thresholds, question: str, lang: str
 ) -> Iterator[Step | Reply]:
-    """Answer a defined term, else a chat command, else route the question to clause types."""
+    """Answer a defined term, else a chat command, else route the question to clause types.
+
+    A command is answered in the language it names, else in the language of the page.
+    """
     conversation = ws.conversation(cache.doc_id)
     definition = lookup(ws.definitions(cache), question)
     if definition is not None:
@@ -432,10 +484,10 @@ def _replies(
         if shown is None:
             yield _text(NOTHING_TO_EXPLAIN)
             return
-        yield from _explanation(ws, shown, intent.language)
+        yield from _explanation(ws, shown, _named_language(question, intent.language, lang))
         return
     if intent is not None:
-        yield from _summary(ws, cache, tau, intent.language)
+        yield from _summary(ws, cache, tau, _named_language(question, intent.language, lang))
         return
     earlier = list(conversation.turns)
     route = restrict_to_cache(ws.services.router.route(question, earlier), cache)
@@ -448,6 +500,13 @@ def _replies(
         generated = yield from _passage_answer(ws, question, passages)
         result = result.model_copy(update={"passages": passages, "generated": generated})
     yield _answer_reply(ws, result, Turn(question=question, clause_types=route.clause_types))
+
+
+def _named_language(question: str, detected: str, lang: str) -> str:
+    """Return the language a command names, else the language of the page."""
+    if detected != DEFAULT_LANGUAGE:
+        return detected
+    return ENGLISH if ENGLISH_NAMED.search(question) else lang
 
 
 def _passage_answer(
@@ -560,7 +619,7 @@ def _answer_reply(ws: Workspace, result: Answer, turn: Turn | None = None) -> Re
     if generated is not None and generated.text is not None:
         context["generated"] = generated.text.strip()
     elif generated is not None:
-        context["withheld"] = copy.AI_WITHHELD.format(reason=generated.reason)
+        context["reason"] = generated.reason
     if result.passages and not result.items:
         context["intro"] = PASSAGES_INTRO
     if not cards:
@@ -575,42 +634,40 @@ def _answer_reply(ws: Workspace, result: Answer, turn: Turn | None = None) -> Re
     return Reply("chat/answer.html", context, answer=result, turn=turn, shown=shown)
 
 
-def _topics(unvalidated: frozenset[str]) -> list[tuple[str, str]]:
+def _topics(unvalidated: frozenset[str]) -> list[tuple[str, list[str]]]:
     topics = dict(CLAUSE_GROUPS)
     if unvalidated:
         topics[OTHER_TOPIC] = tuple(sorted(unvalidated))
-    return [
-        (topic, ", ".join(display_name(name) for name in names))
-        for topic, names in topics.items()
-    ]
+    return [(topic, [display_name(name) for name in names]) for topic, names in topics.items()]
+
+
+# The replies keep the English text; the templates put it in the language of the page, so a
+# reply drawn again after the reader switches languages follows the switch.
 
 
 def _explanation_reply(explanation: Explanation, shown: Shown) -> Reply:
     context: dict[str, object] = {"shown": shown}
     if explanation.text is None:
-        context["withheld"] = copy.AI_WITHHELD.format(reason=explanation.reason)
+        context["reason"] = explanation.reason
     else:
-        language = _language_name(explanation.language)
-        heading = EXPLANATION_HEADING.format(label=shown.label, language=language)
+        heading = EXPLANATION_HEADING[explanation.language]
         context.update(heading=heading, text=explanation.text)
     return Reply("chat/explanation.html", context, shown=shown)
 
 
 def _summary_reply(summary: Summary) -> Reply:
     if summary.text is None:
-        withheld = copy.AI_WITHHELD.format(reason=summary.reason)
-        return Reply("chat/summary.html", {"withheld": withheld})
-    heading = SUMMARY_HEADING
-    if summary.language != DEFAULT_LANGUAGE:
-        heading = SUMMARY_HEADING_IN.format(language=_language_name(summary.language))
+        return Reply("chat/summary.html", {"reason": summary.reason})
     based_on = [(display_name(item.clause_type), item.status) for item in summary.items]
-    hidden = len(based_on) - BASED_ON_SHOWN
     context = {
-        "heading": heading,
+        "language": summary.language,
+        "heading": SUMMARY_HEADING,
+        "heading_in": SUMMARY_HEADING_IN[summary.language],
         "text": summary.text,
         "based_on_text": BASED_ON,
         "based_on": based_on[:BASED_ON_SHOWN],
-        "based_on_more": BASED_ON_MORE.format(count=hidden) if hidden > 0 else None,
+        "hidden": max(len(based_on) - BASED_ON_SHOWN, 0),
+        "based_on_more": BASED_ON_MORE,
     }
     return Reply("chat/summary.html", context)
 
@@ -619,5 +676,40 @@ def _text(text: str) -> Reply:
     return Reply("chat/text.html", {"text": text})
 
 
-def _language_name(code: str) -> str:
-    return LANGUAGES.get(code, code).split(",")[0]
+# The English texts this module shows, for the check that the Serbian catalogue covers them.
+TRANSLATED = (
+    TYPE_A_QUESTION,
+    THINKING,
+    WRITING_ANSWER,
+    WRITING_SUMMARY,
+    WRITING_EXPLANATION,
+    NOTHING_TO_EXPLAIN,
+    NOTHING_TO_SUMMARIZE,
+    NO_QUOTE,
+    UNKNOWN_LANGUAGE,
+    EXPLAIN_ASKED,
+    *EXPLAIN_ASKED_IN.values(),
+    *EXPLANATION_HEADING.values(),
+    SUMMARY_HEADING,
+    *SUMMARY_HEADING_IN.values(),
+    BASED_ON,
+    BASED_ON_MORE,
+    PASSAGES_INTRO,
+    NO_MATCH,
+    TOPICS,
+    EXAMPLES,
+    *CLAUSE_GROUPS,
+    OTHER_TOPIC,
+    *SUGGESTED_QUESTIONS[:EXAMPLE_QUESTIONS],
+    NOT_FOUND_TEXT,
+    WITHHELD_TEXT,
+    DEFINITION_LABEL,
+    RELATED_LABEL,
+    EMPTY_TITLE,
+    EMPTY_TEXT,
+    FEEDBACK_THANKS,
+    ANSWER_GONE,
+    AI_OFF,
+    NO_ANSWER,
+    SOMETHING_WRONG,
+)

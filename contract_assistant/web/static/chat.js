@@ -1,7 +1,8 @@
 /* Chat: three things app.js does not do.
  *
  * - A reply the user stops is marked as stopped, so that its status line does not keep
- *   spinning. The server keeps nothing of a stopped exchange.
+ *   spinning. The server keeps nothing of a stopped exchange. The note comes from the chat's
+ *   `data-stopped`, in the language of the page.
  * - At the end of a reply the server sends a `data-follow` marker with the passage it quoted;
  *   the document pane loads it as its own request, so the passage is ready in the document
  *   while the centre stays on what the reader is looking at.
@@ -13,6 +14,11 @@
 
   const STOPPED = "Stopped. This question was not answered.";
   const CHAT_ROUTE = /\/(ask|explain)$/;
+
+  function stoppedNote() {
+    const list = document.getElementById("chat-messages");
+    return (list && list.dataset.stopped) || STOPPED;
+  }
 
   function chatBody() {
     return document.getElementById("chat-body");
@@ -30,7 +36,7 @@
     if (!pending) return;
     const note = document.createElement("p");
     note.className = "chat-stopped";
-    note.textContent = STOPPED;
+    note.textContent = stoppedNote();
     pending.replaceChildren(note);
     pending.classList.remove("bubble-pending");
     pending.removeAttribute("aria-busy");

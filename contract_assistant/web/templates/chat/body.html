@@ -1,10 +1,11 @@
 {# The chat about a contract: the messages oldest first, the reply being written, Clear chat.
-   `follow`, sent once at the end of a reply, is the passage chat.js moves the document pane to. #}
-<div class="chat-list" id="chat-messages">
+   `follow`, sent once at the end of a reply, is the passage chat.js moves the document pane to;
+   `data-stopped` is the note chat.js puts in place of a reply the reader stops. #}
+<div class="chat-list" id="chat-messages" data-stopped="{{ _('Stopped. This question was not answered.') }}">
   {% if not messages and not pending %}
   <div class="chat-empty">
-    <strong>{{ empty_title }}</strong>
-    <p class="muted">{{ empty_text }}</p>
+    <strong>{{ _(empty_title) }}</strong>
+    <p class="muted">{{ _(empty_text) }}</p>
   </div>
   {% endif %}
   {% for m in messages %}
@@ -14,7 +15,7 @@
 </div>
 {% if messages and not pending %}
 <div class="chat-tools">
-  <button type="button" class="btn btn-sm" hx-post="/documents/{{ cache.doc_id }}/chat/clear" hx-target="#chat-body" hx-swap="innerHTML">Clear chat</button>
+  <button type="button" class="btn btn-sm" hx-post="/documents/{{ cache.doc_id }}/chat/clear" hx-target="#chat-body" hx-swap="innerHTML">{{ _("Clear chat") }}</button>
 </div>
 {% endif %}
 {% if follow %}<span hidden data-follow="{{ follow }}"></span>{% endif %}

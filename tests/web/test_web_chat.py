@@ -26,6 +26,7 @@ from contract_assistant.web.chat import (
 )
 from contract_assistant.web.core import SUMMARIES_OFF
 from contract_assistant.web.generate import WRITING_EXPLANATION, WRITING_SUMMARY
+from contract_assistant.web.i18n import SERBIAN, translate
 from tests.support.fakes import EchoTextClient, FakeLLMClient, FixedRouter
 from tests.web.conftest import SHORT_DOC_ID, frames
 
@@ -382,3 +383,83 @@ def test_an_empty_question_is_a_notice(client):
 def test_a_question_about_an_unknown_contract_is_not_found(client):
     response = client.post("/documents/sha256:nope/ask", data={"question": "Who?"})
     assert response.status_code == 404
+
+
+def in_serbian(client):
+    client.cookies.set("lang", SERBIAN)
+    return client
+
+
+def explain_forms(html: str) -> list[str]:
+    return html.split('class="chat-explain"')[1:]
+
+
+def test_the_cookie_puts_the_chat_and_its_cards_in_serbian(client):
+    in_serbian(client)
+    html = client.get(CHAT).text
+    assert translate(EMPTY_TITLE, SERBIAN) in html and EMPTY_TITLE not in html
+    assert 'data-stopped="Zaustavljeno. Na ovo pitanje nije odgovoreno."' in html
+    replies = ask(client, LAW_QUESTION)
+    assert "Čitam ugovor" in body(replies[0]) and THINKING not in body(replies[0])
+    html = body(replies[-1])
+    assert "Pronađeno" in html and "Prikaži u dokumentu" in html and "Obriši razgovor" in html
+    assert copy.STATUS["found"] not in html and copy.SHOW_IN_DOCUMENT not in html
+    assert 'title="Korisno"' in html and 'title="Nije korisno"' in html
+    response = client.post(FEEDBACK, data={"index": "1", "liked": "1"})
+    assert "Zabeleženo, hvala." in response.text
+    assert ask(client, "  ") == [{"notice": "Prvo upišite pitanje.", "done": True}]
+
+
+def test_an_empty_route_lists_the_topics_and_examples_in_serbian(make_client):
+    client = in_serbian(make_client(router=FixedRouter({MARS_QUESTION: route()})))
+    html = body(ask(client, MARS_QUESTION)[-1])
+    assert translate(NO_MATCH, SERBIAN) in html and "Osnovni podaci" in html
+    assert "Ostale uobičajene klauzule" in html and "Na primer:" in html
+    assert 'data-fill="Ko su ugovorne strane?"' in html
+
+
+def test_the_explain_buttons_start_with_the_interface_language(make_client):
+    client = in_serbian(make_client(gen=EchoTextClient()))
+    first, second = explain_forms(body(ask(client, LAW_QUESTION)[-1]))
+    assert 'name="language" value="sr"' in first and f">{copy.EXPLAIN}<" not in first
+    assert ">Objasni<" in first and ">Zaustavi<" in first
+    assert 'name="language" value="en"' in second and ">Objasni na engleskom<" in second
+    english = make_client(gen=EchoTextClient())
+    first, second = explain_forms(body(ask(english, LAW_QUESTION)[-1]))
+    assert 'value="en"' in first and 'value="sr"' in second and copy.EXPLAIN_SR in second
+
+
+def test_explain_that_writes_in_the_interface_language_unless_one_is_named(make_client):
+    gen = EchoTextClient()
+    client = in_serbian(make_client(gen=gen))
+    ask(client, LAW_QUESTION)
+    replies = ask(client, "explain that")
+    assert any("Pišem objašnjenje" in text for text in pending_texts(replies))
+    assert "<strong>Merodavno pravo na jednostavnom srpskom</strong>" in body(replies[-1])
+    assert "Serbian" in gen.text_calls[-1][0]
+    html = body(ask(client, "objasni to na engleskom")[-1])
+    assert "<strong>Merodavno pravo na jednostavnom engleskom</strong>" in html
+    assert "Serbian" not in gen.text_calls[-1][0]
+
+
+def test_summarize_writes_in_the_interface_language_unless_one_is_named(make_client):
+    gen = EchoTextClient()
+    client = in_serbian(make_client(gen=gen))
+    html = body(ask(client, "sažetak")[-1])
+    assert "<strong>Sažetak</strong>" in html and "Na osnovu" in html and "i još " in html
+    assert "Serbian" in gen.text_calls[-1][0]
+    html = body(ask(client, "summarize in English")[-1])
+    assert "<strong>Sažetak na engleskom</strong>" in html
+    assert "Serbian" not in gen.text_calls[-1][0]
+
+
+def test_the_chat_is_drawn_again_in_the_language_chosen_later(make_client):
+    client = in_serbian(make_client(gen=EchoTextClient()))
+    data = {"label": "Governing Law", "quote": top(client, "Governing Law").text}
+    replies = frames(client, "POST", EXPLAIN, data=data)
+    assert "Objasni: Merodavno pravo" in body(replies[0])
+    assert "Merodavno pravo na jednostavnom srpskom" in body(replies[-1])
+    client.cookies.set("lang", "en")
+    html = client.get(CHAT).text
+    assert "Explain in Serbian: Governing Law" in html and "Objasni" not in html
+    assert "Governing Law in plain Serbian" in html and "Clear chat" in html
