@@ -76,3 +76,18 @@ def test_the_language_form_sets_the_cookie_and_goes_back(client):
     assert elsewhere.headers["location"] == "/"
     unknown = client.post("/language", data={"lang": "xx", "next": "/"}, follow_redirects=False)
     assert "lang" not in unknown.cookies
+
+
+def test_each_serbian_entry_lives_in_one_catalogue():
+    import importlib
+    import pkgutil
+
+    from contract_assistant.web import translations
+
+    homes: dict[str, list[str]] = {}
+    for module in pkgutil.iter_modules(translations.__path__):
+        if module.name.startswith("sr_"):
+            loaded = importlib.import_module(f"{translations.__name__}.{module.name}")
+            for key in loaded.CATALOGUE:
+                homes.setdefault(key, []).append(module.name)
+    assert {key: where for key, where in homes.items() if len(where) > 1} == {}

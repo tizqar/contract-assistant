@@ -319,8 +319,9 @@ def _extract_file(
     print(CLEAR_LINE, end="", file=sys.stderr)
     target = _save(cache, settings.demo_cache_dir / f"{path.stem}.json", args, store)
     seconds = cache.timing["extract_s"]
+    scanned = f", {len(doc.ocr_pages)} pages read with OCR" if doc.ocr_pages else ""
     return (
-        f"{path.name}: {cache.source.n_chars} chars, {seconds} s -> {_relative(target)}",
+        f"{path.name}: {cache.source.n_chars} chars{scanned}, {seconds} s -> {_relative(target)}",
         extractor,
     )
 

@@ -37,8 +37,10 @@ always open. The contracts live in a sidebar that slides in. A passage the assis
 sure about is marked "Check this" and carries Confirm and Not this buttons: a confirmed
 passage counts as found everywhere, a rejected one is dropped, and the decision is kept per
 contract under `cache/decisions/`. Generated text carries a small AI badge and streams in as
-it is written; one notice under the chat says that AI text can be wrong. Two more pages
-compare two contracts and list the portfolio.
+it is written; one notice under the chat says that AI text can be wrong. A search box in the
+document pane finds every occurrence of a term, with page jumps. The interface is in English
+or Serbian (the EN / SR switch in the top bar). Two more pages compare two contracts and
+list the portfolio.
 
 ## Install
 
@@ -50,6 +52,17 @@ cp .env.example .env
 ```
 
 The report export needs `python-docx`, which is a dependency. The `api` extra (`openai`) is optional. The Makefile expects the environment in `.venv/`.
+
+Scanned PDFs need Tesseract with its language packs; this step is optional:
+
+```bash
+brew install tesseract tesseract-lang
+```
+
+A PDF page without a text layer is read with Tesseract in the languages of `OCR_LANGUAGES`
+(default `eng+srp_latn+srp`: English and Serbian in both scripts); the languages that are
+not installed are dropped. Without Tesseract a scanned PDF is refused with a message that
+says so, and a PDF with some scanned pages keeps its text pages.
 
 The language model router needs Ollama and the model. This step is optional:
 
@@ -237,8 +250,33 @@ saved parts.
 | A question outside the clauses: the closest passages, each copied word for word. | The contracts slide in from the left. |
 | ![The help popover](docs/screenshots/help.png) | ![Two contracts compared](docs/screenshots/compare.png) |
 | How to read the labels, in the reader's words. | Two contracts side by side: the key terms, the things to check and the clauses that differ. |
-| ![The portfolio](docs/screenshots/portfolio.png) | |
-| Every analysed contract with its coverage, key terms and flags. | |
+| ![The portfolio](docs/screenshots/portfolio.png) | ![Search inside the document](docs/screenshots/search.png) |
+| Every analysed contract with its coverage, key terms and flags. | Search inside the document: every occurrence with its page. |
+| ![Every occurrence boxed on the page](docs/screenshots/occurrences.png) | ![The Serbian interface](docs/screenshots/serbian.png) |
+| One hit opened on the page, with every occurrence boxed and previous / next. | The same workspace in Serbian, with the summary written in Serbian. |
+| ![A scanned PDF read with OCR](docs/screenshots/scanned.png) | |
+| A scanned PDF: both pages read with Tesseract, opened in text mode with the OCR note. | |
+
+### Search, scans and the Serbian interface
+
+The search box in the document pane lists every occurrence of a term with its page and a
+snippet; each one opens the document at that place with all the occurrences marked, boxed on
+the page of a PDF or highlighted in the text. The Defined terms section offers the same for
+each term ("Show every occurrence"). The matching ignores case and line breaks and needs at
+least two characters.
+
+A scanned PDF is read with Tesseract page by page (see Install). The pages read that way are
+kept in the analysis, the contracts list says how many there were, and the document pane
+opens such a page in text mode, because the page image has no text layer to box.
+
+The EN / SR switch sets the interface language in a cookie. English is the source of every
+string; the Serbian versions live in `contract_assistant/web/translations/`, one catalogue
+per area, and a test checks that every string the pages show has a Serbian entry. With the
+Serbian interface the summary and the explanations default to Serbian; the key facts, the
+obligations and the full-text overview stay in English, because they are checked against
+the English quotes. The contract itself can be in any language the extractor handles, which
+today means English: the encoder was trained on English contracts, so a Serbian contract
+would get unreliable clauses (see the thesis notes on a cross-lingual encoder).
 
 ### Defined terms and chat commands
 
