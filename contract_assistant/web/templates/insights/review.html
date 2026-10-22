@@ -1,19 +1,14 @@
 {% import "components.html" as c %}
-{# The Review tab: the flags of the rule file, each with its passage and a note on request. #}
-<div class="tab-head">
-  <h2 class="h2">Review</h2>
-  <span class="muted small">{{ flags|length }} {{ "flag" if flags|length == 1 else "flags" }}</span>
-</div>
-<p class="muted small">{{ intro }}</p>
+{# The Things to check section: points from a fixed rule list, each with its passage and a note on request. #}
+<div class="checks" data-refresh="/documents/{{ cache.doc_id }}/review">
 {% if not flags %}{{ c.notice(no_flags) }}{% endif %}
 {% for f in flags %}
 <article class="card flag-card">
   <div class="row gap wrap">
-    <span class="badge badge-{{ f.severity }} badge-sm">{{ f.severity|severity_label }}</span>
-    <strong>{{ f.title }}</strong>
+    <span class="badge badge-{{ f.severity }} badge-sm">{{ f.label }}</span>
+    <strong title="{{ f.basis }}">{{ f.title }}</strong>
   </div>
   <p>{{ f.note }}</p>
-  <p class="muted small">Rests on {{ f.clauses }}</p>
   <div class="row gap wrap">
     {% if f.url %}{{ c.view_link(f.url, "Show passage") }}{% else %}<span class="muted small">{{ no_passage }}</span>{% endif %}
     {% if f.can_note %}
@@ -28,3 +23,4 @@
   <div id="flag-note-{{ loop.index0 }}" class="flag-note"></div>
 </article>
 {% endfor %}
+</div>

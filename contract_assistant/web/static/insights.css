@@ -1,37 +1,67 @@
-/* Insights tabs: the parts app.css does not cover. */
+/* The overview: the parts app.css does not cover. */
 
-.insight-stack { display: flex; flex-direction: column; gap: 14px; }
+.overview { display: flex; flex-direction: column; gap: 28px; width: 100%; max-width: 880px; margin: 0 auto; }
+.section-chips {
+  position: sticky; top: var(--topbar-h); z-index: 5;
+  display: flex; gap: 6px; overflow-x: auto; padding: 8px 0;
+  background: var(--ground); scrollbar-width: thin; -webkit-overflow-scrolling: touch;
+}
+.section-chip { flex: 0 0 auto; display: inline-flex; align-items: center; text-decoration: none; }
+.section-chip:hover { color: var(--ink); }
+.overview-section { display: flex; flex-direction: column; gap: 12px; scroll-margin-top: calc(var(--topbar-h) + 64px); }
+.section-head { display: flex; flex-direction: column; gap: 2px; }
+.section-title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.section-body, .insight-stack, .checks, .clauses, .fulltext, .dates { display: flex; flex-direction: column; gap: 12px; }
+.section-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sub-title { font-size: 15px; font-weight: 700; }
 .live { display: flex; flex-direction: column; gap: 8px; }
 .live:empty { display: none; }
 
-/* Summary */
+/* What happened */
+.happened { border-left: 3px solid var(--primary); gap: 6px; }
+.happened-line { font-size: 15px; font-weight: 600; }
+.happened-confirmed { color: var(--found-ink); font-weight: 600; }
+
+/* Summary and the overview of the whole text */
 .sources { display: flex; flex-direction: column; gap: 6px; }
 .source-chip { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
 .source-chip:hover { color: var(--ink); }
 .source-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--muted); }
-.source-dot-found { background: var(--found); }
+.source-dot-found, .source-dot-confirmed { background: var(--found); }
 .source-dot-check { background: var(--check); }
+.fulltext { padding-top: 12px; border-top: 1px solid var(--border); }
+.fulltext-sections summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--primary); padding: 4px 0; }
+.fulltext-sections[open] summary { margin-bottom: 8px; }
 .section-item, .obligation { display: flex; flex-direction: column; gap: 6px; }
 
-/* Key terms */
-.term-row > * { overflow-wrap: anywhere; }
-.date-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+/* Key facts */
+.term-row > * { overflow-wrap: anywhere; min-width: 0; }
+.term-unverified { display: flex; flex-direction: column; gap: 2px; }
+.term-where { text-align: right; }
 
-/* Review */
+/* Things to check */
 .flag-note { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border-2); }
 .flag-note:empty { display: none; }
 
-/* Obligations and clauses */
+/* Who must do what, all clauses */
 .party, .clause-group { display: flex; flex-direction: column; gap: 8px; }
-.clause-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center;
-  color: var(--ink); text-decoration: none;
-}
-a.clause-row:hover, a.clause-row:focus-visible { background: var(--surface-2); color: var(--ink); }
+.clause-row { display: flex; flex-direction: column; gap: 6px; }
+.clause-row-check { border-left: 3px solid var(--check); }
+.clause-head { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; flex-wrap: wrap; }
 .clause-name { font-weight: 600; }
 .clause-facts { display: inline-flex; align-items: center; gap: 8px; }
-.clause-passage { grid-column: 1 / -1; overflow-wrap: anywhere; }
+.clause-facts .badge { font-size: 11px; padding: 1px 8px; }
+.clause-passage { font-family: var(--serif); font-size: 14px; line-height: 1.5; color: var(--ink-2); overflow-wrap: anywhere; }
+.clause-actions { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; font-size: 13px; }
+.chip-count { margin-left: 6px; color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+.chip-active .chip-count { color: inherit; }
 
+/* On a phone the top bar wraps and is taller than --topbar-h, so the chips scroll with the page. */
+@media (max-width: 760px) {
+  .section-chips { position: static; }
+  .overview-section { scroll-margin-top: calc(var(--topbar-h) + 16px); }
+}
 @media (max-width: 480px) {
   .kv-3 { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .term-where { text-align: left; }
 }

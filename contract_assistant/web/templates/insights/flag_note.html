@@ -1,9 +1,8 @@
 {% import "components.html" as c %}
-{# A note on a flag written from its quotes, or why it is not shown. #}
+{# A note on a point to check, written from its quotes, or why it is held back. #}
 {% if withheld %}
 <p class="muted small">{{ withheld }}</p>
 {% else %}
-<div class="row gap wrap"><span class="badge badge-generated badge-sm">Generated</span><strong>{{ title }}</strong></div>
+<div class="row gap wrap">{{ c.ai() }}</div>
 <p class="generated-text">{{ text }}</p>
-{{ c.generated_note(meta) }}
 {% endif %}

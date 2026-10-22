@@ -1,32 +1,43 @@
 {% import "components.html" as c %}
-{# The Clauses tab: every clause type by topic with its status; a row opens its passage. #}
-<div class="tab-head">
-  <h2 class="h2">Clauses</h2>
-</div>
-<p class="muted small">{{ intro }}</p>
+{# The All clauses section: every clause by topic with what was found; a passage to check has Confirm and Not this. #}
+<div class="clauses" data-refresh="/documents/{{ cache.doc_id }}/checklist?status={{ status }}">
 <div class="chips" role="group" aria-label="Show the clauses by status">
-  {% for value, label in filters.items() %}
+  {% for value, label, count in filters %}
   <button type="button" class="chip{% if value == status %} chip-active{% endif %}"
           aria-pressed="{{ 'true' if value == status else 'false' }}"
-          hx-get="/documents/{{ cache.doc_id }}/checklist?status={{ value }}" hx-target="#insight-body" hx-swap="innerHTML">{{ label }}</button>
+          hx-get="/documents/{{ cache.doc_id }}/checklist?status={{ value }}" hx-target="#sec-clauses-body" hx-swap="innerHTML">{{ label }}<span class="chip-count">{{ count }}</span></button>
   {% endfor %}
 </div>
 {% for topic in topics %}
 <section class="clause-group">
   <h3 class="group-title">{{ topic.name }}</h3>
+  {% if topic.note %}<p class="muted small">{{ topic.note }}</p>{% endif %}
   <div class="rows">
     {% for row in topic.rows %}
-    {% if row.url %}<a class="clause-row" href="#document-pane" hx-get="{{ row.url }}" hx-target="#document-pane" hx-swap="innerHTML">{% else %}<div class="clause-row">{% endif %}
-      <span class="clause-name">{{ row.name }}</span>
-      <span class="clause-facts">
-        <span class="badge badge-{{ row.status }} badge-sm">{{ row.status|status_label }}</span>
-        {% if row.conf is not none %}<span class="muted small">{{ row.conf|percent }}{% if row.page %} · Page {{ row.page }}{% endif %}</span>{% endif %}
-      </span>
-      {% if row.passage %}<span class="clause-passage muted small">{{ row.passage }}</span>{% endif %}
-    {% if row.url %}</a>{% else %}</div>{% endif %}
+    <div class="clause-row clause-row-{{ row.status }}">
+      <div class="clause-head">
+        <span class="clause-name">{{ row.name }}</span>
+        <span class="clause-facts">
+          {{ c.badge(row.status) }}
+          {% if row.page %}<span class="muted small">{{ copy.PAGE.format(page=row.page) }}</span>{% endif %}
+        </span>
+      </div>
+      {% if row.passage %}<p class="clause-passage">{{ row.passage }}</p>{% endif %}
+      {% if row.url or row.status in ('check', 'confirmed') or row.rejected %}
+      <div class="clause-actions">
+        {% if row.url %}{{ c.view_link(row.url, copy.SHOW_IN_DOCUMENT) }}{% endif %}
+        {{ c.decide(cache.doc_id, row.name, row.citation, row.status) }}
+        {% if row.rejected %}
+        <span class="muted small">You pressed Not this on a passage here.</span>
+        {{ c.decide(cache.doc_id, row.name, none, 'rejected') }}
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
     {% endfor %}
   </div>
 </section>
 {% else %}
 {{ c.notice(no_rows) }}
 {% endfor %}
+</div>

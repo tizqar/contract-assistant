@@ -1,22 +1,29 @@
-"""The insight tabs of one contract: summary, key terms, review, obligations, clauses, terms."""
+"""The overview of one contract: what happened, then six sections that each load on their own.
+
+The sections, in the order of copy.SECTIONS, are the summary (with the overview of the whole
+text), the key facts, the things to check, who must do what, all clauses and the defined terms.
+The words are plain on purpose: no model names, timings, confidence values or thresholds.
+"""
 
 from __future__ import annotations
 
 import time
 from collections.abc import Collection, Iterator
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse
 
-from contract_assistant.answer import Citation, Status, tier
-from contract_assistant.dates import key_dates
+from contract_assistant.answer import Citation, tier
+from contract_assistant.dates import KeyDate, key_dates
+from contract_assistant.decisions import Decision
 from contract_assistant.explain import LANGUAGES
 from contract_assistant.fulltext import APP_ATTEMPTS as FULLTEXT_ATTEMPTS
 from contract_assistant.fulltext import FullTextSummary, Progress, write_fulltext
-from contract_assistant.generation import MS_PER_S, Generation
+from contract_assistant.generation import Generation
 from contract_assistant.obligations import APP_ATTEMPTS as OBLIGATION_ATTEMPTS
 from contract_assistant.obligations import (
     ObligationSheet,
@@ -28,35 +35,26 @@ from contract_assistant.report import build_report, write_report
 from contract_assistant.review import Flag, flag_request
 from contract_assistant.store import DOC_ID_PREFIX, DocumentCache
 from contract_assistant.summary import Summary, summary_items
-from contract_assistant.term_sheet import FIELDS, NOT_STATED, TermSheet, term_sheet_items
+from contract_assistant.term_sheet import (
+    FIELDS,
+    LABELS,
+    NOT_STATED,
+    TermSheet,
+    term_sheet_items,
+)
 from contract_assistant.ui.views import (
     CLAUSE_GROUPS,
-    FULLTEXT_META_TEXT,
-    FULLTEXT_WITHHELD_TEXT,
-    NO_PAGE,
     OTHER_TOPIC,
-    SECTION_WITHHELD,
-    STATUS_LABELS,
-    SUMMARY_LANGUAGE_TEXT,
-    SUMMARY_META_TEXT,
-    SUMMARY_MISMATCH_TEXT,
-    SUMMARY_WITHHELD_TEXT,
-    UNVALIDATED_MARK,
-    UNVALIDATED_TEXT,
-    checklist_intro,
-    date_rows,
     definition_citation,
     display_name,
     document_name,
-    flag_title,
-    term_rows,
     top_citation,
 )
+from contract_assistant.web import copy
 from contract_assistant.web.core import (
     DEFINITION_LABEL,
     ENGLISH,
     SECTION_LABEL,
-    SUMMARIES_OFF,
     Tau,
     Thresholds,
     Workspace,
@@ -84,6 +82,8 @@ from contract_assistant.web.generate import (
 
 router = APIRouter()
 
+OVERVIEW = "insights/overview.html"
+HAPPENED = "insights/happened.html"
 STACK = "insights/stack.html"
 LIVE = "insights/live.html"
 SUMMARY = "insights/summary.html"
@@ -95,16 +95,33 @@ OBLIGATIONS = "insights/obligations.html"
 CHECKLIST = "insights/checklist.html"
 DEFINITIONS = "insights/definitions.html"
 REPORT = "insights/report.html"
-# A tab that needs the model renders its saved record, or a form that app.js submits at once.
-# The stream writes into a live element next to the Stop button, which a frame replacing the
-# whole tab would remove; its last frame replaces the tab's panel instead. The panel ids are
-# unique to the tab and the language, so a stream that ends after the user moved on is a no-op.
+# The route each section of the overview loads, by the section ids of copy.SECTIONS.
+SECTION_ROUTES = {
+    "summary": "summary",
+    "facts": "terms",
+    "checks": "review",
+    "duties": "obligations",
+    "clauses": "checklist",
+    "terms": "definitions",
+}
+# A section that needs the model renders its saved record, or a form that app.js submits at
+# once. The stream writes into a live element next to the Stop button, which a frame replacing
+# the whole section would remove; its last frame replaces the section's panel instead. The
+# panel ids are unique to the section and the language, so a stream that ends after the reader
+# moved on is a no-op.
 SUMMARY_PANEL = "summary-panel-{language}"
 FULLTEXT_PANEL = "fulltext-block"
 TERMS_PANEL = "terms-panel"
 OBLIGATIONS_PANEL = "obligations-panel"
 ALL_CLAUSES = "all"
-STATUS_FILTERS = {ALL_CLAUSES: "All", **STATUS_LABELS}
+FOUND_STATUSES = ("found", "confirmed")
+STATUS_FILTERS = {
+    ALL_CLAUSES: "All",
+    "found": copy.STATUS["found"],
+    "check": copy.STATUS["check"],
+    "not_found": copy.STATUS["not_found"],
+}
+SEVERITY_TEXT = {"high": "Important", "medium": "Worth a look", "low": "Minor"}
 LANGUAGE_CHOICES = [(code, name.split(",")[0]) for code, name in LANGUAGES.items()]
 OVERVIEW_STAGE = "overview"
 REPORTS_DIR = "reports"
@@ -116,94 +133,101 @@ REPORT_TYPES = {
 }
 JSON_TYPE = "application/json"
 
+LOADING = "Loading"
+CHECK_HINT = (
+    "Passages marked Check this are likely but not certain: "
+    "read them and press Confirm or Not this."
+)
+CONFIRMED_LINE = "You confirmed {count} {passages}."
+SHOW_TO_CHECK = "Show the {count} {passages} to check"
+AI_NEEDED = "This part is written by the local AI, which is not running on this computer."
+RETRYING = "The first draft did not match the contract; writing it again"
 WRITING_FLAG = "Writing the note"
-WRITING_OBLIGATIONS = "Reading the obligations. This can take half a minute."
-WRITING_FULLTEXT = "Writing the overview · {stage}"
-MERGING_STAGE = "merging the sections"
+WRITING_OBLIGATIONS = "Reading who must do what. This can take half a minute."
+WRITING_FULLTEXT = "Writing the overview of the whole text: {stage}"
+MERGING_STAGE = "putting the sections together"
 UNKNOWN_LANGUAGE = "The summary is written in English or Serbian."
-UNKNOWN_FILTER = "Show all clauses, or those that are Found, Verify or Not found."
-FLAG_CHANGED = "The flags changed since the page was shown; open the Review tab again."
-NO_PASSAGE_ATTACHED = "No passage is attached to this flag."
-NO_FLAGS = "No review flags."
-NO_SAVED_TERMS = "The key terms of this contract were not extracted at these thresholds."
-NO_REPORT = "No report of this contract was built at these thresholds; build it first."
+UNKNOWN_FILTER = "Show all clauses, or those that are Found, Check this or Not found."
+FLAG_CHANGED = "The things to check changed since the page was shown; open the overview again."
+NO_PASSAGE_ATTACHED = "This point has no passage in the contract to show."
+NO_PASSAGE_SHOWN = "This is about something the contract does not say."
+NO_FLAGS = "Nothing on the list of things to check applies to this contract."
+NO_SAVED_TERMS = "The key facts of this contract have not been read yet."
+NO_REPORT = "There is no report of this contract yet; press Report first."
 NO_ROWS = "No clause has this status."
-NO_DEFINITIONS = "No defined terms were found."
-NO_DATES = "No dates could be read from the key terms."
-SECTIONS_LINE = "{count} {sections} · {seconds} s"
-TERMS_INTRO = (
-    "The values are copied word for word from the clauses found in this contract. "
-    "A value the language model gave that is not in a clause is shown as not verified. "
-    "A term the clauses do not state is shown as not stated."
+NO_DEFINITIONS = "The contract does not seem to define any terms."
+NO_DATES = "No dates could be read from the key facts."
+SUMMARY_MISMATCH = "{count} {quotes} did not match the contract word for word."
+COPIED_FROM = "Copied from: {names}"
+NOT_CONFIRMED = "not confirmed in the contract"
+DATES_INTRO = "Dates read from the key facts above, or worked out from them."
+DATE_UNREADABLE = "could not be read"
+DATE_STATED = "Stated as “{text}”"
+DATE_WORKED_OUT = "Worked out: {formula}"
+LESS_PRACTISED = "The assistant has less practice with this kind of clause."
+OTHER_TOPIC_NOTE = (
+    "The assistant has less practice with these, so it never marks them Found on its own."
 )
-TERM_SHEET_WITHHELD = "The term sheet is not shown because {reason}."
-DATES_INTRO = (
-    "The dates are read from the key terms. A computed date shows its formula. "
-    "The dates are only as good as the key terms above."
-)
-FLAG_WITHHELD = "The language model's note is not shown because {reason}."
-FLAG_META = (
-    "Written by the language model {model} from the quotes of the clauses. "
-    "It is not legal advice; read the passages."
-)
-REVIEW_INTRO = (
-    "These flags come from a rule file checked against the clauses found in this contract. "
-    "No language model is used. Each flag names the clauses it rests on. "
-    "\u201cNot validated on test data\u201d marks a flag that rests on one of the extra clause "
-    "types. Show passage opens a flag's passage in the document; check the passages yourself."
-)
-REPORT_BUILT = "Report built from the saved summary, key terms, obligations and overview."
+BASED_ON = "Based on: {clauses}"
+REPORT_BUILT = "Your report is ready."
 REPORT_MISSING = (
-    "Report built without {missing}. Make {them} in the Summary, Key terms and Obligations "
-    "tabs, then build the report again."
+    "Your report is ready, but it leaves out {missing}. "
+    "Once {them} in the overview, press Report again."
 )
-OBLIGATIONS_INTRO = (
-    "Who must, may or must not do what, read by the language model from the clauses found "
-    "in this contract. The party and the words of each entry are copied word for word from "
-    "the clause; entries that are not are dropped. Up to 16 clauses are read, the ones found "
-    "first. Show in document highlights the words in the contract."
-)
-OBLIGATIONS_DROPPED = (
-    "{count} entries of the language model were not in the clauses and were dropped."
-)
-OBLIGATIONS_WITHHELD = "The obligations are not shown because {reason}."
-NO_OBLIGATIONS = "None of the clauses found states an obligation the language model could read."
-NO_OBLIGATION_CLAUSES = (
-    "No clause was found in this contract, so there are no obligations to read."
-)
+REPORT_NO_AI = "Your report is ready. It leaves out {missing}, which need the local AI."
+REPORT_PARTS = {
+    "summary": "the summary",
+    "facts": "the key facts",
+    "duties": "who must do what",
+    "fulltext": "the overview of the whole text",
+}
+OBLIGATIONS_DROPPED = {
+    1: "1 entry could not be matched to the contract and was left out.",
+    None: "{count} entries could not be matched to the contract and were left out.",
+}
+NO_OBLIGATIONS = "None of the clauses found says who must do what."
+NO_OBLIGATION_CLAUSES = "No clause was found in this contract, so there is nobody to list."
+FULLTEXT_TITLE = "Overview of the whole text"
 FULLTEXT_INTRO = (
-    "An overview of the whole text, written section by section by the language model. "
-    "Each section's sentences are checked against that section, and the overview against the "
-    "section summaries. It covers what the clause types do not. A long contract takes a few "
-    "minutes; the section summaries are saved for next time."
+    "A longer overview that reads every section of the contract, not only the clauses; "
+    "a long contract takes a few minutes."
 )
+FULLTEXT_BUTTON = "Write the overview of the whole text"
+
+
+@dataclass(frozen=True)
+class OverviewSection:
+    """One section of the overview: its anchor id, title, line and the URL of its body."""
+
+    id: str
+    title: str
+    line: str
+    url: str
 
 
 @dataclass(frozen=True)
 class Source:
-    """A clause a generated text rests on, with the link that shows its passage."""
+    """A clause a summary rests on, with the link that shows its passage."""
 
     name: str
-    status: Status
-    unvalidated: bool
+    status: str
+    hint: str
     url: str
 
 
 @dataclass(frozen=True)
 class SummaryView:
-    """A summary as the tab shows it: its text and sources, or why it is withheld."""
+    """A summary as the section shows it: its text and sources, or why it is withheld."""
 
     text: str | None
-    meta: str = ""
     sources: tuple[Source, ...] = ()
-    note: str | None = None
     withheld: str | None = None
     mismatch: str | None = None
 
 
 @dataclass(frozen=True)
 class SectionView:
-    """One section of a full-text overview with the link that shows its span."""
+    """One section of the overview of the whole text with the link that shows its span."""
 
     number: int
     page: int | None
@@ -214,45 +238,46 @@ class SectionView:
 
 @dataclass(frozen=True)
 class FullTextView:
-    """A full-text overview: its text, or why it is withheld, and its sections."""
+    """The overview of the whole text: its text, or why it is withheld, and its sections."""
 
     text: str | None
     withheld: str | None
-    line: str
-    meta: str
     sections: tuple[SectionView, ...]
 
 
 @dataclass(frozen=True)
 class TermRow:
-    """One key term; kind is "value", "not_verified" or "not_stated"."""
+    """One key fact; kind is "value", "not_verified" or "not_stated"."""
 
     label: str
     value: str
     kind: str
-    clauses: str
-    page: str | None
+    source: str = ""
+    page: int | None = None
+    url: str | None = None
 
 
 @dataclass(frozen=True)
 class DateRow:
-    """One key date: when, what, and where it comes from and how."""
+    """One key date: what, when, how it was read and the clause it comes from."""
 
-    when: str
     label: str
-    source: str
+    when: str
+    readable: bool
     how: str
+    source: str
 
 
 @dataclass(frozen=True)
 class FlagView:
-    """A review flag as a card shows it."""
+    """A thing to check as a card shows it."""
 
     rule: str
     severity: str
+    label: str
     title: str
     note: str
-    clauses: str
+    basis: str
     url: str | None
     can_note: bool
 
@@ -279,22 +304,24 @@ class Party:
 
 @dataclass(frozen=True)
 class ClauseRow:
-    """One clause type of the checklist."""
+    """One clause type with what the assistant found and what the reader decided."""
 
     name: str
-    status: Status
-    conf: float | None
+    status: str
     page: int | None
     passage: str
     url: str | None
+    citation: Citation | None
+    rejected: bool
 
 
 @dataclass(frozen=True)
 class Topic:
-    """The checklist rows of one topic."""
+    """The clause rows of one topic."""
 
     name: str
     rows: tuple[ClauseRow, ...]
+    note: str | None = None
 
 
 @dataclass(frozen=True)
@@ -307,12 +334,68 @@ class DefinitionView:
     url: str
 
 
-# Summary and full-text overview
+# Overview
+
+
+@router.get("/documents/{doc_id}/overview", response_class=HTMLResponse)
+def overview(request: Request, doc_id: str, ws: Ws, tau: Tau):
+    """The overview: the section chips, what happened, then each section loading on its own."""
+    cache = ws.load(doc_id)
+    sections = [
+        OverviewSection(id, title, line, f"/documents/{cache.doc_id}/{SECTION_ROUTES[id]}")
+        for id, title, line in copy.SECTIONS
+    ]
+    return render(
+        request,
+        OVERVIEW,
+        cache=cache,
+        sections=sections,
+        loading=LOADING,
+        tau=tau,
+        **_happened(ws, cache, tau),
+    )
+
+
+@router.get("/documents/{doc_id}/overview/happened", response_class=HTMLResponse)
+def happened(request: Request, doc_id: str, ws: Ws, tau: Tau):
+    """The card at the top of the overview alone, for after a decision."""
+    cache = ws.load(doc_id)
+    return render(request, HAPPENED, cache=cache, **_happened(ws, cache, tau))
+
+
+def _happened(ws: Workspace, cache: DocumentCache, tau: Thresholds) -> dict:
+    """What the assistant did, counted from the same rows as All clauses at these thresholds."""
+    topics = _topics(cache, tau, ws.services.unvalidated, ws.decided(cache.doc_id))
+    counts = _counts(topics)
+    total = counts["found"] + counts["check"] + counts["not_found"]
+    confirmed = sum(row.status == "confirmed" for topic in topics for row in topic.rows)
+    check = counts["check"]
+    return {
+        "happened": copy.WHAT_HAPPENED.format(total=total, **counts),
+        "check_hint": CHECK_HINT if check else None,
+        "confirmed_line": (
+            CONFIRMED_LINE.format(count=confirmed, passages=_plural(confirmed, "passage"))
+            if confirmed
+            else None
+        ),
+        "show_to_check": (
+            SHOW_TO_CHECK.format(count=check, passages=_plural(check, "passage"))
+            if check
+            else None
+        ),
+    }
+
+
+def _plural(count: int, word: str) -> str:
+    return word if count == 1 else f"{word}s"
+
+
+# Summary and the overview of the whole text
 
 
 @router.get("/documents/{doc_id}/summary", response_class=HTMLResponse)
 def summary_tab(request: Request, doc_id: str, ws: Ws, tau: Tau, language: str = ENGLISH):
-    """The summary in a language, or the form that writes it, then the full-text overview."""
+    """The summary in a language, or the form that writes it, then the whole-text overview."""
     _check_language(language)
     cache = ws.load(doc_id)
     context = _summary_context(ws, cache, tau, language, saved_summary(ws, cache, tau, language))
@@ -327,7 +410,7 @@ def write_summary(
     tau: Tau,
     language: Annotated[str, Form()] = ENGLISH,
 ):
-    """Stream the summary as the model writes it, then the tab as it shows a saved one."""
+    """Stream the summary as the model writes it, then the section as it shows a saved one."""
     _check_language(language)
     cache = ws.load(doc_id)
     return stream(_cleared(_summary_frames(request, ws, cache, tau, language)))
@@ -358,46 +441,46 @@ def _summary_context(
         "body": SUMMARY,
     }
     if ws.gen_model is None:
-        return {**context, "notice": SUMMARIES_OFF}
+        return {**context, "notice": AI_NEEDED, "languages": ()}
     if summary is not None:
-        view = _summary_view(cache.doc_id, summary, ws.services.unvalidated)
+        view = _summary_view(ws, cache, summary)
         return {**context, "view": view, **_fulltext_context(ws, cache, tau)}
     if not summary_items(cache, ws.names, tau.low, tau.high, ws.services.unvalidated):
         return {**context, "notice": NOTHING_TO_SUMMARIZE, **_fulltext_context(ws, cache, tau)}
     return {**context, "pending": WRITING_SUMMARY}
 
 
-def _summary_view(doc_id: str, summary: Summary, unvalidated: Collection[str]) -> SummaryView:
+def _summary_view(ws: Workspace, cache: DocumentCache, summary: Summary) -> SummaryView:
     if summary.text is None:
         mismatch = None
         if summary.unfaithful_spans:
-            mismatch = SUMMARY_MISMATCH_TEXT.format(count=len(summary.unfaithful_spans))
+            count = len(summary.unfaithful_spans)
+            mismatch = SUMMARY_MISMATCH.format(count=count, quotes=_plural(count, "quote"))
         return SummaryView(
             text=None,
-            withheld=SUMMARY_WITHHELD_TEXT.format(reason=summary.reason),
+            withheld=copy.AI_WITHHELD.format(reason=summary.reason),
             mismatch=mismatch,
         )
-    meta = SUMMARY_META_TEXT.format(
-        model=summary.model,
-        count=len(summary.items),
-        seconds=round(summary.latency_ms / MS_PER_S),
-    )
-    if summary.language != ENGLISH:
-        meta += SUMMARY_LANGUAGE_TEXT.format(language=dict(LANGUAGE_CHOICES)[summary.language])
+    decided = ws.decided(cache.doc_id)
+    sources = []
     # A summary keeps only the items with a citation (summary.cited).
-    sources = tuple(
-        Source(
-            name=display_name(item.clause_type),
-            status=item.status,
-            unvalidated=item.clause_type in unvalidated,
-            url=view_url(doc_id, display_name(item.clause_type), item.citation, item.status),
+    for item in summary.items:
+        name = display_name(item.clause_type)
+        status = item.status
+        if _is_confirmed(decided.get(item.clause_type), item.citation):
+            status = "confirmed"
+        hint = copy.STATUS.get(status, status)
+        if item.clause_type in ws.services.unvalidated:
+            hint = f"{hint}. {LESS_PRACTISED}"
+        sources.append(
+            Source(
+                name=name,
+                status=status,
+                hint=hint,
+                url=view_url(cache.doc_id, name, item.citation, status),
+            )
         )
-        for item in summary.items
-    )
-    note = None
-    if any(source.unvalidated for source in sources):
-        note = f"{UNVALIDATED_MARK} {UNVALIDATED_TEXT}"
-    return SummaryView(text=summary.text, meta=meta, sources=sources, note=note)
+    return SummaryView(text=summary.text, sources=tuple(sources))
 
 
 def _check_language(language: str) -> None:
@@ -407,7 +490,7 @@ def _check_language(language: str) -> None:
 
 @router.get("/documents/{doc_id}/fulltext", response_class=HTMLResponse)
 def fulltext_block(request: Request, doc_id: str, ws: Ws, tau: Tau):
-    """The full-text overview block alone: the saved overview, or the button that writes it."""
+    """The whole-text overview alone: the saved overview, or the button that writes it."""
     cache = ws.load(doc_id)
     context = _fulltext_context(ws, cache, tau)
     return render(request, STACK, cache=cache, panel_id=FULLTEXT_PANEL, body=FULLTEXT, **context)
@@ -460,9 +543,14 @@ def _fulltext_context(
     tau: Thresholds,
     summary: FullTextSummary | None = None,
 ) -> dict:
-    context: dict = {"fulltext_panel": FULLTEXT_PANEL, "fulltext_intro": FULLTEXT_INTRO}
+    context: dict = {
+        "fulltext_panel": FULLTEXT_PANEL,
+        "fulltext_title": FULLTEXT_TITLE,
+        "fulltext_intro": FULLTEXT_INTRO,
+        "fulltext_button": FULLTEXT_BUTTON,
+    }
     if ws.gen_model is None:
-        return {**context, "fulltext_notice": SUMMARIES_OFF}
+        return {**context, "fulltext_notice": AI_NEEDED}
     if summary is None:
         summary = ws.fulltexts.load(cache.doc_id, ws.gen_model, tau.low, tau.high)
     if summary is None:
@@ -472,8 +560,6 @@ def _fulltext_context(
 
 
 def _fulltext_view(cache: DocumentCache, summary: FullTextSummary) -> FullTextView:
-    count = len(summary.sections)
-    seconds = round(summary.latency_ms / MS_PER_S)
     sections = []
     for number, section in enumerate(summary.sections, start=1):
         label = SECTION_LABEL.format(number=number)
@@ -486,7 +572,7 @@ def _fulltext_view(cache: DocumentCache, summary: FullTextSummary) -> FullTextVi
         )
         withheld = None
         if section.text is None:
-            withheld = SECTION_WITHHELD.format(reason=section.reason)
+            withheld = copy.AI_WITHHELD.format(reason=section.reason)
         sections.append(
             SectionView(
                 number=number,
@@ -498,24 +584,16 @@ def _fulltext_view(cache: DocumentCache, summary: FullTextSummary) -> FullTextVi
         )
     withheld = None
     if summary.text is None:
-        withheld = FULLTEXT_WITHHELD_TEXT.format(reason=summary.reason)
-    return FullTextView(
-        text=summary.text,
-        withheld=withheld,
-        line=SECTIONS_LINE.format(
-            count=count, sections="section" if count == 1 else "sections", seconds=seconds
-        ),
-        meta=FULLTEXT_META_TEXT.format(model=summary.model, count=count, seconds=seconds),
-        sections=tuple(sections),
-    )
+        withheld = copy.AI_WITHHELD.format(reason=summary.reason)
+    return FullTextView(text=summary.text, withheld=withheld, sections=tuple(sections))
 
 
-# Key terms
+# Key facts
 
 
 @router.get("/documents/{doc_id}/terms", response_class=HTMLResponse)
 def terms_tab(request: Request, doc_id: str, ws: Ws, tau: Tau):
-    """The key terms and key dates, or the form that extracts them."""
+    """The key facts and key dates, or the form that reads them."""
     cache = ws.load(doc_id)
     context = _terms_context(ws, cache, tau, saved_term_sheet(ws, cache, tau))
     return render(request, STACK, **context)
@@ -523,7 +601,7 @@ def terms_tab(request: Request, doc_id: str, ws: Ws, tau: Tau):
 
 @router.post("/documents/{doc_id}/terms")
 def extract_terms(request: Request, doc_id: str, ws: Ws, tau: Tau):
-    """Stream a status while the model extracts the key terms, then the tab."""
+    """Stream a status while the model reads the key facts, then the section."""
     cache = ws.load(doc_id)
     return stream(_cleared(_terms_frames(request, ws, cache, tau)))
 
@@ -540,7 +618,7 @@ def _terms_frames(
 
 @router.get("/documents/{doc_id}/terms.json")
 def terms_json(doc_id: str, ws: Ws, tau: Tau):
-    """The saved term sheet as a JSON file."""
+    """The saved key facts as a JSON file."""
     cache = ws.load(doc_id)
     sheet = saved_term_sheet(ws, cache, tau)
     if sheet is None:
@@ -552,76 +630,122 @@ def terms_json(doc_id: str, ws: Ws, tau: Tau):
 def _terms_context(
     ws: Workspace, cache: DocumentCache, tau: Thresholds, sheet: TermSheet | None
 ) -> dict:
-    context = {"cache": cache, "intro": TERMS_INTRO, "panel_id": TERMS_PANEL, "body": TERMS}
+    context = {
+        "cache": cache,
+        "panel_id": TERMS_PANEL,
+        "body": TERMS,
+        "not_confirmed": NOT_CONFIRMED,
+    }
     if ws.gen_model is None:
-        return {**context, "notice": SUMMARIES_OFF}
+        return {**context, "notice": AI_NEEDED}
     if sheet is None:
         if not term_sheet_items(cache, tau.low, tau.high, ws.services.unvalidated):
             return {**context, "notice": NO_TERM_CLAUSES}
         return {**context, "pending": EXTRACTING_TERMS}
-    rows = _term_rows(sheet)
+    rows = _term_rows(cache.doc_id, sheet)
     if sheet.reason is not None:
-        notice = TERM_SHEET_WITHHELD.format(reason=sheet.reason)
+        notice = copy.AI_WITHHELD.format(reason=sheet.reason)
         return {**context, "notice": notice, "terms": rows}
-    dates = [
-        DateRow(when=when, label=label, source=source, how=how)
-        for label, when, source, how in date_rows(key_dates(sheet))
-    ]
     return {
         **context,
         "terms": rows,
         "download": True,
-        "dates": dates,
+        "dates": [_date_row(item) for item in key_dates(sheet)],
         "dates_intro": DATES_INTRO,
         "no_dates": NO_DATES,
     }
 
 
-def _term_rows(sheet: TermSheet) -> list[TermRow]:
+def _term_rows(doc_id: str, sheet: TermSheet) -> list[TermRow]:
     rows = []
-    for field, (label, value, clauses, page) in zip(FIELDS, term_rows(sheet), strict=True):
-        kind = "value"
-        if not sheet.terms.get(field):
-            kind = "not_stated" if value == NOT_STATED else "not_verified"
-        rows.append(TermRow(label, value, kind, clauses, None if page == NO_PAGE else page))
+    for field in FIELDS:
+        label = LABELS[field]
+        values = sheet.terms.get(field, [])
+        rejected = sheet.rejected.get(field, [])
+        if not values:
+            if rejected:
+                rows.append(TermRow(label, ", ".join(rejected), "not_verified"))
+            else:
+                rows.append(TermRow(label, NOT_STATED, "not_stated"))
+            continue
+        first = values[0]
+        names = ", ".join(dict.fromkeys(display_name(value.clause_type) for value in values))
+        citation = Citation(
+            quote=first.value, page=first.page, conf=1.0, start=first.start, end=first.end
+        )
+        rows.append(
+            TermRow(
+                label=label,
+                value="; ".join(" ".join(value.value.split()) for value in values),
+                kind="value",
+                source=COPIED_FROM.format(names=names),
+                page=first.page,
+                # No status: the value is a slice of a passage, not a passage to decide on.
+                url=view_url(doc_id, display_name(first.clause_type), citation),
+            )
+        )
     return rows
 
 
-# Review
+def _date_row(item: KeyDate) -> DateRow:
+    how = DATE_STATED.format(text=" ".join(item.source.split()))
+    if item.formula:
+        how = DATE_WORKED_OUT.format(formula=item.formula)
+    source = ""
+    if item.clause_type:
+        source = COPIED_FROM.format(names=display_name(item.clause_type))
+    return DateRow(
+        label=item.label,
+        when=_long_date(item.date) if item.date else DATE_UNREADABLE,
+        readable=item.date is not None,
+        how=how,
+        source=source,
+    )
+
+
+def _long_date(day: date) -> str:
+    return f"{day.day} {day:%B %Y}"
+
+
+# Things to check
 
 
 @router.get("/documents/{doc_id}/review", response_class=HTMLResponse)
 def review_tab(request: Request, doc_id: str, ws: Ws, tau: Tau):
-    """The review flags at the thresholds of the request, most severe first."""
+    """The things to check at the thresholds of the request, most important first."""
     cache = ws.load(doc_id)
     can_note = ws.gen_model is not None
-    flags = [_flag_view(cache.doc_id, flag, can_note) for flag in ws.flags(cache, tau)]
+    unvalidated = ws.services.unvalidated
+    flags = [_flag_view(cache.doc_id, flag, can_note, unvalidated) for flag in ws.flags(cache, tau)]
     return render(
         request,
         REVIEW,
         cache=cache,
         flags=flags,
-        intro=REVIEW_INTRO,
         no_flags=NO_FLAGS,
-        no_passage=NO_PASSAGE_ATTACHED,
+        no_passage=NO_PASSAGE_SHOWN,
     )
 
 
-def _flag_view(doc_id: str, flag: Flag, can_note: bool) -> FlagView:
+def _flag_view(doc_id: str, flag: Flag, can_note: bool, unvalidated: Collection[str]) -> FlagView:
     cited = next((item for item in flag.items if item.citation), None)
     url = None
     if cited is not None:
         url = view_url(doc_id, display_name(cited.clause_type), cited.citation, cited.status)
     clauses = ", ".join(
-        f"{display_name(item.clause_type)} ({STATUS_LABELS[item.status].lower()})"
+        f"{display_name(item.clause_type)} ({copy.STATUS[item.status].lower()})"
         for item in flag.items
     )
+    basis = BASED_ON.format(clauses=clauses)
+    if flag.unvalidated or any(item.clause_type in unvalidated for item in flag.items):
+        basis = f"{basis}. {LESS_PRACTISED}"
     return FlagView(
         rule=flag.rule,
         severity=flag.severity,
-        title=flag_title(flag),
+        label=SEVERITY_TEXT[flag.severity],
+        title=flag.title,
         note=flag.note,
-        clauses=clauses,
+        basis=basis,
         url=url,
         can_note=can_note and cited is not None,
     )
@@ -636,7 +760,7 @@ def write_flag_note(
     tau: Tau,
     rule: Annotated[str | None, Form()] = None,
 ):
-    """Stream a short note on a flag, written from its quotes and checked against them."""
+    """Stream a short note on a point, written from its quotes and checked against them."""
     cache = ws.load(doc_id)
     flags = ws.flags(cache, tau)
     if not 0 <= index < len(flags) or rule not in (None, flags[index].rule):
@@ -656,22 +780,18 @@ def _note_frames(request: Request, ws: Workspace, flag: Flag) -> Iterator[str]:
         else:
             yield _live(request, step)
     if outcome.text is None:
-        context = {"withheld": FLAG_WITHHELD.format(reason=outcome.reason)}
+        context = {"withheld": copy.AI_WITHHELD.format(reason=outcome.reason)}
     else:
-        context = {
-            "title": flag.title,
-            "text": outcome.text,
-            "meta": FLAG_META.format(model=gen.model),
-        }
+        context = {"text": outcome.text}
     yield frame(render_string(request, NOTE, **context), done=True)
 
 
-# Obligations
+# Who must do what
 
 
 @router.get("/documents/{doc_id}/obligations", response_class=HTMLResponse)
 def obligations_tab(request: Request, doc_id: str, ws: Ws, tau: Tau):
-    """The obligations by party, or the form that reads them."""
+    """Who must do what, by party, or the form that reads it."""
     cache = ws.load(doc_id)
     context = _obligations_context(ws, cache, tau, saved_obligations(ws, cache, tau))
     return render(request, STACK, **context)
@@ -679,7 +799,7 @@ def obligations_tab(request: Request, doc_id: str, ws: Ws, tau: Tau):
 
 @router.post("/documents/{doc_id}/obligations")
 def read_obligations(request: Request, doc_id: str, ws: Ws, tau: Tau):
-    """Stream a status while the model reads the obligations, then the tab."""
+    """Stream a status while the model reads the obligations, then the section."""
     cache = ws.load(doc_id)
     return stream(_cleared(_obligation_frames(request, ws, cache, tau)))
 
@@ -726,22 +846,20 @@ def obligation_steps(
 def _obligations_context(
     ws: Workspace, cache: DocumentCache, tau: Thresholds, sheet: ObligationSheet | None
 ) -> dict:
-    context = {
-        "cache": cache,
-        "intro": OBLIGATIONS_INTRO,
-        "panel_id": OBLIGATIONS_PANEL,
-        "body": OBLIGATIONS,
-    }
+    context = {"cache": cache, "panel_id": OBLIGATIONS_PANEL, "body": OBLIGATIONS}
     if ws.gen_model is None:
-        return {**context, "notice": SUMMARIES_OFF}
+        return {**context, "notice": AI_NEEDED}
     if sheet is None:
         items = obligation_items(cache, ws.names, tau.low, tau.high, ws.services.unvalidated)
         if not items:
             return {**context, "notice": NO_OBLIGATION_CLAUSES}
         return {**context, "pending": WRITING_OBLIGATIONS}
     if sheet.reason is not None:
-        return {**context, "notice": OBLIGATIONS_WITHHELD.format(reason=sheet.reason)}
-    dropped = OBLIGATIONS_DROPPED.format(count=len(sheet.rejected)) if sheet.rejected else None
+        return {**context, "notice": copy.AI_WITHHELD.format(reason=sheet.reason)}
+    dropped = None
+    if sheet.rejected:
+        count = len(sheet.rejected)
+        dropped = OBLIGATIONS_DROPPED.get(count, OBLIGATIONS_DROPPED[None]).format(count=count)
     return {
         **context,
         "notice": None if sheet.obligations else NO_OBLIGATIONS,
@@ -764,6 +882,9 @@ def _parties(doc_id: str, sheet: ObligationSheet) -> list[Party]:
                 start=obligation.start,
                 end=obligation.end,
             )
+            # The words are a slice of the passage: a passage to check is decided on from
+            # All clauses, not from a slice of it, so its status is left out here.
+            status = statuses.get(obligation.clause_type)
             entries.append(
                 ObligationView(
                     modality=obligation.modality,
@@ -771,66 +892,124 @@ def _parties(doc_id: str, sheet: ObligationSheet) -> list[Party]:
                     action=" ".join(obligation.action.split()),
                     clause=name,
                     page=obligation.page,
-                    url=view_url(doc_id, name, citation, statuses.get(obligation.clause_type)),
+                    url=view_url(doc_id, name, citation, None if status == "check" else status),
                 )
             )
         parties.append(Party(party, tuple(entries)))
     return parties
 
 
-# Clauses and definitions
+# All clauses and defined terms
 
 
 @router.get("/documents/{doc_id}/checklist", response_class=HTMLResponse)
 def checklist(request: Request, doc_id: str, ws: Ws, tau: Tau, status: str = ALL_CLAUSES):
-    """Every clause type by topic with its status, optionally only those of one status."""
+    """Every clause type by topic with what was found, optionally only those of one status."""
     if status not in STATUS_FILTERS:
         raise WorkspaceError(UNKNOWN_FILTER)
     cache = ws.load(doc_id)
-    unvalidated = ws.services.unvalidated
-    wanted = None if status == ALL_CLAUSES else status
+    topics = _topics(cache, tau, ws.services.unvalidated, ws.decided(cache.doc_id))
+    counts = _counts(topics)
+    counts[ALL_CLAUSES] = sum(counts.values())
+    filters = [(value, label, counts[value]) for value, label in STATUS_FILTERS.items()]
     return render(
         request,
         CHECKLIST,
         cache=cache,
-        intro=checklist_intro(cache, unvalidated),
-        filters=STATUS_FILTERS,
+        filters=filters,
         status=status,
-        topics=_topics(cache, tau, wanted, unvalidated),
+        topics=_filtered(topics, None if status == ALL_CLAUSES else status),
         no_rows=NO_ROWS,
     )
 
 
 def _topics(
-    cache: DocumentCache, tau: Thresholds, wanted: str | None, unvalidated: Collection[str]
+    cache: DocumentCache,
+    tau: Thresholds,
+    unvalidated: Collection[str],
+    decided: dict[str, Decision],
 ) -> list[Topic]:
     groups = dict(CLAUSE_GROUPS)
     extra = tuple(name for name in cache.clauses if name in unvalidated)
     if extra:
         groups[OTHER_TOPIC] = extra
-    topics = []
-    for topic, names in groups.items():
-        rows = [_clause_row(cache, tau, name, name in unvalidated) for name in names]
-        rows = [row for row in rows if wanted is None or row.status == wanted]
+    return [
+        Topic(
+            name=topic,
+            rows=tuple(
+                _clause_row(cache, tau, name, name in unvalidated, decided.get(name))
+                for name in names
+            ),
+            note=OTHER_TOPIC_NOTE if topic == OTHER_TOPIC else None,
+        )
+        for topic, names in groups.items()
+    ]
+
+
+def _filtered(topics: list[Topic], wanted: str | None) -> list[Topic]:
+    if wanted is None:
+        return [topic for topic in topics if topic.rows]
+    shown = []
+    for topic in topics:
+        rows = tuple(row for row in topic.rows if _filter_of(row.status) == wanted)
         if rows:
-            topics.append(Topic(topic, tuple(rows)))
-    return topics
+            shown.append(Topic(topic.name, rows, topic.note))
+    return shown
 
 
-def _clause_row(cache: DocumentCache, tau: Thresholds, name: str, capped: bool) -> ClauseRow:
+def _filter_of(status: str) -> str:
+    """The filter a status falls under: a passage the reader confirmed counts as found."""
+    return "found" if status in FOUND_STATUSES else status
+
+
+def _counts(topics: list[Topic]) -> dict[str, int]:
+    counts = {"found": 0, "check": 0, "not_found": 0}
+    for topic in topics:
+        for row in topic.rows:
+            counts[_filter_of(row.status)] += 1
+    return counts
+
+
+def _clause_row(
+    cache: DocumentCache,
+    tau: Thresholds,
+    name: str,
+    capped: bool,
+    decision: Decision | None,
+) -> ClauseRow:
+    label = display_name(name)
+    rejected = decision is not None and decision.verdict == "rejected"
     citation = top_citation(cache, name)
     if citation is None:
-        return ClauseRow(display_name(name), "not_found", None, None, "", None)
-    status = tier(citation.conf, tau.low, tau.high)
-    if capped and status == "found":
-        status = "check"
+        return ClauseRow(label, "not_found", None, "", None, None, rejected)
+    if _is_confirmed(decision, citation):
+        # Confirmed by the reader: found, even for a clause type capped at Check this.
+        status = "confirmed"
+    else:
+        status = tier(citation.conf, tau.low, tau.high)
+        if capped and status == "found":
+            status = "check"
+    if status == "not_found":
+        # The top candidate is below the Check this threshold: no passage to show.
+        return ClauseRow(label, status, None, "", None, None, rejected)
     return ClauseRow(
-        name=display_name(name),
+        name=label,
         status=status,
-        conf=citation.conf,
         page=citation.page,
         passage=shorten(citation.quote),
-        url=view_url(cache.doc_id, display_name(name), citation, status),
+        url=view_url(cache.doc_id, label, citation, status),
+        citation=citation,
+        rejected=rejected,
+    )
+
+
+def _is_confirmed(decision: Decision | None, citation: Citation | None) -> bool:
+    """Whether the passage shown is the one the reader confirmed."""
+    return (
+        decision is not None
+        and decision.verdict == "confirmed"
+        and citation is not None
+        and (citation.start, citation.end) == (decision.start, decision.end)
     )
 
 
@@ -871,13 +1050,13 @@ def build_report_files(request: Request, doc_id: str, ws: Ws, tau: Tau):
         fulltext = ws.fulltexts.load(*keys)
     missing = []
     if summary is None or summary.text is None:
-        missing.append("the summary")
+        missing.append(REPORT_PARTS["summary"])
     if sheet is None:
-        missing.append("the key terms")
+        missing.append(REPORT_PARTS["facts"])
     if obligations is None:
-        missing.append("the obligations")
+        missing.append(REPORT_PARTS["duties"])
     if fulltext is None or fulltext.text is None:
-        missing.append("the full-text overview")
+        missing.append(REPORT_PARTS["fulltext"])
     report = build_report(
         cache,
         document_name(cache.source.filename),
@@ -896,10 +1075,11 @@ def build_report_files(request: Request, doc_id: str, ws: Ws, tau: Tau):
     )
     write_report(report, ws.settings.cache_dir / REPORTS_DIR, _report_stem(cache.doc_id, tau))
     status = REPORT_BUILT
-    if missing:
-        status = REPORT_MISSING.format(
-            missing=_listed(missing), them="it" if len(missing) == 1 else "them"
-        )
+    if missing and model is None:
+        status = REPORT_NO_AI.format(missing=_listed(missing))
+    elif missing:
+        them = "it appears" if len(missing) == 1 else "they appear"
+        status = REPORT_MISSING.format(missing=_listed(missing), them=them)
     return render(request, REPORT, cache=cache, status=status)
 
 
@@ -937,12 +1117,13 @@ def _listed(parts: list[str]) -> str:
 
 
 def _live(request: Request, step: Step) -> str:
-    """Return the frame that shows the status and the text written so far."""
-    return frame(render_string(request, LIVE, status=step.status, text=step.text))
+    """Return the frame that shows what is being written and the text so far, without timings."""
+    status = RETRYING if step.previous_reason else step.what
+    return frame(render_string(request, LIVE, status=status, text=step.text))
 
 
 def _final(request: Request, context: dict) -> str:
-    """Return the last frame: the tab's panel as the GET renders it once saved."""
+    """Return the last frame: the section's panel as the GET renders it once saved."""
     html = render_string(request, context["body"], **context)
     return frame(oob={context["panel_id"]: html}, done=True)
 

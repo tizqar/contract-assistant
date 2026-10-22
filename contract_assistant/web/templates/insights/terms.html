@@ -1,11 +1,5 @@
 {% import "components.html" as c %}
-{# The Key terms tab: values copied from the clauses, then the dates they give. #}
-<div class="tab-head">
-  <h2 class="h2">Key terms</h2>
-  <span class="grow"></span>
-  {% if download %}<a class="btn btn-sm" href="/documents/{{ cache.doc_id }}/terms.json" download data-thresholds>Download JSON</a>{% endif %}
-</div>
-<p class="muted small">{{ intro }}</p>
+{# The Key facts section: values copied from the clauses, then the dates they give. #}
 {% if notice %}{{ c.notice(notice) }}{% endif %}
 {% if pending %}
 <form class="stream-form" data-stream data-autosubmit data-target="#terms-live"
@@ -19,30 +13,33 @@
 {% if terms %}
 <div class="rows">
   {% for t in terms %}
-  <div class="kv kv-3 term-row">
+  <div class="kv kv-3 term-row"{% if t.source %} title="{{ t.source }}"{% endif %}>
     <span class="key">{{ t.label }}</span>
-    {% if t.kind == "value" %}<span class="serif">{{ t.value }}</span>{% elif t.kind == "not_stated" %}<em class="muted">{{ t.value }}</em>{% else %}<span>{{ t.value }}</span>{% endif %}
-    <span class="muted small">{% if t.clauses %}from {{ t.clauses }}{% endif %}{% if t.page %}{% if t.clauses %} · {% endif %}Page {{ t.page }}{% endif %}</span>
+    {% if t.kind == "value" %}<span class="serif">{{ t.value }}</span>
+    {%- elif t.kind == "not_stated" %}<em class="muted">{{ t.value }}</em>
+    {%- else %}<span class="term-unverified"><span>{{ t.value }}</span><span class="muted small">{{ not_confirmed }}</span></span>{% endif %}
+    <span class="term-where small">{% if t.url %}{{ c.view_link(t.url, copy.PAGE.format(page=t.page) if t.page else copy.SHOW_IN_DOCUMENT) }}{% endif %}</span>
   </div>
   {% endfor %}
 </div>
 {% endif %}
 {% if dates is defined %}
-<h3 class="h2">Key dates</h3>
-<p class="muted small">{{ dates_intro }}</p>
-{% if dates %}
-<div class="rows">
-  {% for d in dates %}
-  <div class="date-row">
-    <span class="date-when">{{ d.when }}</span>
-    <span class="date-label">
+<div class="dates">
+  <h3 class="sub-title">Key dates</h3>
+  <p class="muted small">{{ dates_intro }}</p>
+  {% if dates %}
+  <div class="rows">
+    {% for d in dates %}
+    <div class="kv kv-3 term-row"{% if d.source %} title="{{ d.source }}"{% endif %}>
       <span class="key">{{ d.label }}</span>
-      <span class="muted small">{{ d.source }} · {{ d.how }}</span>
-    </span>
+      {% if d.readable %}<span class="serif">{{ d.when }}</span>{% else %}<em class="muted">{{ d.when }}</em>{% endif %}
+      <span class="muted small">{{ d.how }}</span>
+    </div>
+    {% endfor %}
   </div>
-  {% endfor %}
+  {% else %}
+  {{ c.notice(no_dates) }}
+  {% endif %}
 </div>
-{% else %}
-{{ c.notice(no_dates) }}
 {% endif %}
-{% endif %}
+{% if download %}<a class="link small" href="/documents/{{ cache.doc_id }}/terms.json" download data-thresholds>Download the key facts as JSON</a>{% endif %}

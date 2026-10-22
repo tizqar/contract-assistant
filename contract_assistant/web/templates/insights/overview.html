@@ -1,0 +1,21 @@
+{% import "components.html" as c %}
+{# The overview: chips that jump to each section, what happened, then the six sections, each loading its own body. #}
+<div class="overview" data-overview data-tau="{{ '%g' % tau.low }}-{{ '%g' % tau.high }}">
+  <nav class="section-chips" aria-label="Jump to a section">
+    {% for s in sections %}
+    <a class="chip section-chip" href="#sec-{{ s.id }}">{{ s.title }}</a>
+    {% endfor %}
+  </nav>
+  <div id="what-happened">{% include "insights/happened.html" %}</div>
+  {% for s in sections %}
+  <section class="overview-section" id="sec-{{ s.id }}" aria-labelledby="sec-{{ s.id }}-title">
+    <header class="section-head">
+      <h2 class="section-title" id="sec-{{ s.id }}-title">{{ s.title }}</h2>
+      <p class="muted small">{{ s.line }}</p>
+    </header>
+    <div class="section-body" id="sec-{{ s.id }}-body" hx-get="{{ s.url }}" hx-trigger="load" hx-swap="innerHTML">
+      {{ c.status_line(loading) }}
+    </div>
+  </section>
+  {% endfor %}
+</div>

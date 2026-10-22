@@ -1,42 +1,45 @@
 {% import "components.html" as c %}
-{# The full-text overview: written section by section, each section checked against its text. #}
-<div class="tab-head">
-  <h2 class="h2">Full-text overview</h2>
-  {% if fulltext and fulltext.text %}<span class="badge badge-generated badge-sm">Generated</span>{% endif %}
-  {% if fulltext %}<span class="muted small">{{ fulltext.line }}</span>{% endif %}
-</div>
-{% if fulltext_notice %}{{ c.notice(fulltext_notice) }}{% endif %}
-{% if fulltext %}
-  {% if fulltext.text %}
-  <div class="generated-text">{{ fulltext.text }}</div>
-  {{ c.generated_note(fulltext.meta) }}
-  {% else %}
-  {{ c.notice(fulltext.withheld) }}
-  {% endif %}
-  {% if fulltext.sections %}
-  <div class="rows">
-    {% for s in fulltext.sections %}
-    <div class="section-item">
-      <div class="row gap wrap">
-        <strong>Section {{ s.number }}</strong>
-        {% if s.page %}<span class="muted small">Page {{ s.page }}</span>{% endif %}
-        <span class="grow"></span>
-        {{ c.view_link(s.url, "Show in document") }}
+{# The overview of the whole text: written section by section, each section checked against its text. #}
+<div class="fulltext">
+  <div class="row gap wrap">
+    <h3 class="sub-title">{{ fulltext_title }}</h3>
+    {% if fulltext and fulltext.text %}{{ c.ai() }}{% endif %}
+  </div>
+  {% if fulltext_notice %}{{ c.notice(fulltext_notice) }}{% endif %}
+  {% if fulltext %}
+    {% if fulltext.text %}
+    <div class="generated-text">{{ fulltext.text }}</div>
+    {% else %}
+    {{ c.notice(fulltext.withheld) }}
+    {% endif %}
+    {% if fulltext.sections %}
+    <details class="fulltext-sections">
+      <summary>Section by section · {{ fulltext.sections|length }}</summary>
+      <div class="rows">
+        {% for s in fulltext.sections %}
+        <div class="section-item">
+          <div class="row gap wrap">
+            <strong>Section {{ s.number }}</strong>
+            {% if s.page %}<span class="muted small">{{ copy.PAGE.format(page=s.page) }}</span>{% endif %}
+            <span class="grow"></span>
+            {{ c.view_link(s.url, copy.SHOW_IN_DOCUMENT) }}
+          </div>
+          {% if s.text %}<p class="serif">{{ s.text }}</p>{% else %}<p class="muted small">{{ s.withheld }}</p>{% endif %}
+        </div>
+        {% endfor %}
       </div>
-      {% if s.text %}<p class="serif">{{ s.text }}</p>{% else %}<p class="muted small">{{ s.withheld }}</p>{% endif %}
-    </div>
-    {% endfor %}
-  </div>
+    </details>
+    {% endif %}
   {% endif %}
-{% endif %}
-{% if not fulltext_notice and not fulltext_saved %}
-<p class="muted small">{{ fulltext_intro }}</p>
-<form class="stream-form" data-stream data-target="#fulltext-live"
-      action="/documents/{{ cache.doc_id }}/fulltext" method="post">
-  <div class="row gap">
-    <button type="submit" class="btn btn-sm">Write the full-text overview</button>
-    <button type="button" class="btn btn-stop btn-sm" data-stop hidden>Stop</button>
-  </div>
-  <div id="fulltext-live" class="live"></div>
-</form>
-{% endif %}
+  {% if not fulltext_notice and not fulltext_saved %}
+  <p class="muted small">{{ fulltext_intro }}</p>
+  <form class="stream-form" data-stream data-target="#fulltext-live"
+        action="/documents/{{ cache.doc_id }}/fulltext" method="post">
+    <div class="row gap">
+      <button type="submit" class="btn btn-sm">{{ fulltext_button }}</button>
+      <button type="button" class="btn btn-stop btn-sm" data-stop hidden>Stop</button>
+    </div>
+    <div id="fulltext-live" class="live"></div>
+  </form>
+  {% endif %}
+</div>

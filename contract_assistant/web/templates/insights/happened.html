@@ -1,0 +1,9 @@
+{# What the assistant did, at the top of the overview; reloaded on its own after a decision. #}
+<div class="card happened" data-refresh="/documents/{{ cache.doc_id }}/overview/happened">
+  <p class="happened-line">{{ happened }}</p>
+  {% if check_hint %}<p class="muted small">{{ check_hint }}</p>{% endif %}
+  {% if confirmed_line %}<p class="small happened-confirmed">{{ confirmed_line }}</p>{% endif %}
+  {% if show_to_check %}
+  <a class="link small" href="#sec-clauses" hx-get="/documents/{{ cache.doc_id }}/checklist?status=check" hx-target="#sec-clauses-body" hx-swap="innerHTML">{{ show_to_check }}</a>
+  {% endif %}
+</div>

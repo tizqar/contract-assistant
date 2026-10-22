@@ -1,18 +1,14 @@
 {% import "components.html" as c %}
-{# The Definitions tab: each defined term with the sentence that defines it. #}
-<div class="tab-head">
-  <h2 class="h2">Defined terms</h2>
-  <span class="muted small">Found by pattern in the text. No model.</span>
-</div>
+{# The Defined terms section: each defined term with the sentence that defines it. #}
 {% if not definitions %}{{ c.notice(no_definitions) }}{% endif %}
 {% for d in definitions %}
 <article class="card">
   <div class="row gap wrap">
-    <span class="badge badge-definition badge-sm">Definition</span>
+    <span class="badge badge-definition badge-sm">{{ copy.STATUS.definition }}</span>
     <strong>{{ d.term }}</strong>
-    {% if d.page %}<span class="muted small">Page {{ d.page }}</span>{% endif %}
+    {% if d.page %}<span class="muted small">{{ copy.PAGE.format(page=d.page) }}</span>{% endif %}
     <span class="grow"></span>
-    {{ c.view_link(d.url, "Show in document") }}
+    {{ c.view_link(d.url, copy.SHOW_IN_DOCUMENT) }}
   </div>
   <p class="serif">{{ d.quote }}</p>
 </article>
