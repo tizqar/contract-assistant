@@ -9,18 +9,46 @@
 </select>
 {% endblock %}
 {% block actions %}
-<button type="button" class="btn btn-primary" hx-post="/documents/{{ cache.doc_id }}/report" hx-target="#report-result" hx-swap="innerHTML">Build report</button>
+<button type="button" class="btn" hx-post="/documents/{{ cache.doc_id }}/report" hx-target="#report-result" hx-swap="innerHTML" title="Write a DOCX and a Markdown report from what is saved">{{ copy.REPORT }}</button>
 {% endblock %}
 {% block main %}
 <div class="workspace">
-  <aside class="rail">
-    {% include "library/rail.html" %}
+  <aside class="drawer" id="drawer" aria-label="{{ copy.CONTRACTS }}">
+    <div id="rail" class="rail" hx-get="/documents/{{ cache.doc_id }}/rail" hx-trigger="refresh" hx-swap="innerHTML">
+      {% include "library/rail.html" %}
+    </div>
   </aside>
-  <main class="pane pane-document" id="document-pane" aria-label="Document"
-        hx-get="/documents/{{ cache.doc_id }}/view" hx-trigger="load" hx-swap="innerHTML">
+  <main class="centre" id="centre">
+    <div class="centre-bar">
+      <div class="seg" role="tablist" aria-label="Show">
+        <button type="button" class="seg-item seg-item-active" role="tab" data-centre="overview" aria-selected="true">{{ copy.OVERVIEW }}</button>
+        <button type="button" class="seg-item" role="tab" data-centre="document" aria-selected="false">{{ copy.DOCUMENT }}</button>
+      </div>
+      <div id="report-result" class="report-result"></div>
+    </div>
+    <section id="overview-pane" class="pane pane-overview" role="tabpanel" aria-label="{{ copy.OVERVIEW }}"
+             hx-get="/documents/{{ cache.doc_id }}/overview" hx-trigger="load, refresh" hx-swap="innerHTML"></section>
+    <section id="document-pane" class="pane pane-document" role="tabpanel" aria-label="{{ copy.DOCUMENT }}" hidden
+             hx-get="/documents/{{ cache.doc_id }}/view" hx-trigger="load" hx-swap="innerHTML"></section>
   </main>
-  <section class="pane pane-insights" id="insights" aria-label="Insights">
-    {% include "insights/panel.html" %}
+  <section class="chat-pane" aria-label="Chat">
+    <div id="chat-body" class="chat-body" hx-get="/documents/{{ cache.doc_id }}/chat" hx-trigger="load" hx-swap="innerHTML"></div>
+    <footer class="composer">
+      <div class="chips-row" aria-label="Suggested questions">
+        {% for text in suggestions %}
+        <button type="button" class="chip" data-fill="{{ text }}">{{ text }}</button>
+        {% endfor %}
+      </div>
+      <form class="ask" data-stream data-target="#chat-body" data-reset
+            action="/documents/{{ cache.doc_id }}/ask" method="post">
+        <label class="sr-only" for="question">Ask about this contract</label>
+        <input id="question" name="question" class="input" autocomplete="off"
+               placeholder="Ask about this contract">
+        <button class="btn btn-primary" type="submit">Ask</button>
+        <button class="btn btn-stop" type="button" data-stop hidden>Stop</button>
+      </form>
+      <p class="ai-notice">{{ copy.AI_NOTICE }}</p>
+    </footer>
   </section>
 </div>
 {% endblock %}

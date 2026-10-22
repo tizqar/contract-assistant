@@ -53,7 +53,7 @@
     if (window.htmx) window.htmx.process(target);
     const chat = target.classList.contains("chat-list") ? target : target.querySelector(".chat-list");
     if (chat) {
-      const body = chat.closest(".insight-body") || chat;
+      const body = chat.closest(".chat-body") || chat.closest(".insight-body") || chat;
       body.scrollTop = body.scrollHeight;
     }
     const mark = target.querySelector("mark.highlight");
@@ -84,7 +84,7 @@
   }
 
   async function streamForm(form) {
-    const target = document.querySelector(form.dataset.target || "#insight-body");
+    const target = document.querySelector(form.dataset.target || "#chat-body");
     const previous = streams.get(form);
     if (previous) previous.abort();
     const controller = new AbortController();
@@ -157,6 +157,46 @@
     });
   }
 
+  const DRAWER_KEY = "contract-assistant.drawer";
+
+  function setDrawer(open) {
+    document.body.classList.toggle("drawer-open", open);
+    const toggle = document.querySelector("[data-drawer-toggle]");
+    if (toggle) toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    try {
+      localStorage.setItem(DRAWER_KEY, open ? "1" : "0");
+    } catch (error) {
+      /* private mode: the drawer state is not remembered */
+    }
+  }
+
+  const scrollOf = { overview: 0, document: 0 };
+
+  function showCentre(name) {
+    const overview = document.getElementById("overview-pane");
+    const documentPane = document.getElementById("document-pane");
+    if (!overview || !documentPane) return;
+    const current = overview.hidden ? "document" : "overview";
+    if (current !== name) scrollOf[current] = window.scrollY;
+    overview.hidden = name !== "overview";
+    documentPane.hidden = name !== "document";
+    if (current !== name) window.scrollTo(0, scrollOf[name] || 0);
+    document.querySelectorAll("[data-centre]").forEach((button) => {
+      const active = button.dataset.centre === name;
+      button.classList.toggle("seg-item-active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    if (name === "document") {
+      const mark = documentPane.querySelector("mark.highlight");
+      if (mark) mark.scrollIntoView({ block: "center" });
+    }
+  }
+
+  function refresh(id) {
+    const el = document.getElementById(id);
+    if (el && window.htmx) window.htmx.trigger(el, "refresh");
+  }
+
   function setThreshold(which, value) {
     const input = document.getElementById(which === "low" ? "tau-low" : "tau-high");
     const output = document.getElementById(which === "low" ? "tau-low-out" : "tau-high-out");
@@ -167,9 +207,9 @@
   }
 
   function thresholdsChanged() {
-    const active = document.querySelector(".tab.tab-active");
-    if (active && window.htmx) window.htmx.trigger(active, "click");
+    // The overview and the rail follow the event; the document pane has no thresholds.
     document.body.dispatchEvent(new CustomEvent("thresholds-changed", { bubbles: true }));
+    refresh("rail");
   }
 
   document.addEventListener("submit", (event) => {
@@ -191,6 +231,16 @@
     if (link) {
       // A plain link is not an htmx request, so the thresholds are added here.
       link.href = withThresholds(link.getAttribute("href"));
+      return;
+    }
+    const drawerToggle = event.target.closest("[data-drawer-toggle]");
+    if (drawerToggle) {
+      setDrawer(!document.body.classList.contains("drawer-open"));
+      return;
+    }
+    const centre = event.target.closest("[data-centre]");
+    if (centre) {
+      showCentre(centre.dataset.centre);
       return;
     }
     const chip = event.target.closest("[data-fill]");
@@ -252,12 +302,37 @@
   });
 
   document.addEventListener("htmx:afterSwap", (event) => {
-    settle(event.detail.target);
+    const target = event.detail.target;
+    settle(target);
+    // Something other than the pane itself put content into the document pane: show it.
+    // htmx sets detail.elt to the target here; the requester is in requestConfig.
+    const config = event.detail.requestConfig;
+    const requester = config ? config.elt : null;
+    if (target && target.id === "document-pane" && requester && requester !== target) {
+      showCentre("document");
+    }
+  });
+
+  document.addEventListener("htmx:afterRequest", (event) => {
+    const path = event.detail.pathInfo ? event.detail.pathInfo.requestPath : "";
+    if (path && path.indexOf("/decide") >= 0 && event.detail.successful) {
+      refresh("overview-pane");
+      refresh("rail");
+    }
   });
 
   document.addEventListener("DOMContentLoaded", () => {
     autosubmit(document);
+    let remembered = null;
+    try {
+      remembered = localStorage.getItem(DRAWER_KEY);
+    } catch (error) {
+      remembered = null;
+    }
+    if (document.getElementById("drawer")) setDrawer(remembered === "1");
   });
 
-  window.contractAssistant = { toast, activateTab, withThresholds, streamForm, abortWithin };
+  window.contractAssistant = {
+    toast, activateTab, withThresholds, streamForm, abortWithin, showCentre, setDrawer, refresh,
+  };
 })();

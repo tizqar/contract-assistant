@@ -1,11 +1,15 @@
 {# Macros every template uses, so that badges, quotes and notices look the same everywhere. #}
 
 {% macro badge(status) -%}
-<span class="badge badge-{{ status }}">{{ status|status_label }}</span>
+<span class="badge badge-{{ status }}" title="{{ copy.STATUS_HELP.get(status, '') }}">{{ status|status_label }}</span>
 {%- endmacro %}
 
 {% macro tag(kind, text) -%}
 <span class="badge badge-{{ kind }}">{{ text }}</span>
+{%- endmacro %}
+
+{% macro ai() -%}
+<span class="badge badge-generated" title="Written by a language model on this computer from the quotes; it can be wrong">{{ copy.AI_BADGE }}</span>
 {%- endmacro %}
 
 {% macro quote(text) -%}
@@ -26,4 +30,22 @@
 
 {% macro generated_note(text) -%}
 <p class="meta">{{ text }}</p>
+{%- endmacro %}
+
+{# The reader's decision on a passage: Confirm / Not this while it is to check, Undo after. #}
+{% macro decide(doc_id, label, citation, status) -%}
+{% if status == 'check' and citation %}
+<form class="inline-form decide" hx-post="/documents/{{ doc_id }}/decide" hx-target="#document-pane" hx-swap="innerHTML">
+  <input type="hidden" name="clause_type" value="{{ label }}">
+  <input type="hidden" name="start" value="{{ citation.start }}">
+  <input type="hidden" name="end" value="{{ citation.end }}">
+  <button type="submit" class="btn btn-sm btn-confirm" name="verdict" value="confirmed" title="{{ copy.STATUS_HELP.confirmed }}">{{ copy.CONFIRM }}</button>
+  <button type="submit" class="btn btn-sm" name="verdict" value="rejected" title="{{ copy.STATUS_HELP.rejected }}">{{ copy.REJECT }}</button>
+</form>
+{% elif status in ('confirmed', 'rejected') %}
+<form class="inline-form decide" hx-post="/documents/{{ doc_id }}/decide/undo" hx-target="#document-pane" hx-swap="innerHTML">
+  <input type="hidden" name="clause_type" value="{{ label }}">
+  <button type="submit" class="btn btn-sm">{{ copy.UNDO }}</button>
+</form>
+{% endif %}
 {%- endmacro %}

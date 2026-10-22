@@ -19,12 +19,14 @@ def test_home_opens_the_short_demo_contract(client):
     assert response.headers["location"] == f"/documents/{SHORT_DOC_ID}"
 
 
-def test_the_workspace_page_lists_the_contracts_and_the_tabs(client):
+def test_the_workspace_page_has_the_drawer_the_centre_switch_and_the_chat(client):
     page = client.get(f"/documents/{SHORT_DOC_ID}").text
     assert "Short supply agreement" in page
     assert "Long outsourcing agreement" in page
-    for tab in ("Chat", "Summary", "Key terms", "Review", "Obligations", "Clauses", "Definitions"):
-        assert f">{tab}<" in page
+    assert 'id="drawer"' in page and 'data-drawer-toggle' in page
+    assert 'data-centre="overview"' in page and 'data-centre="document"' in page
+    assert 'id="overview-pane"' in page and 'id="document-pane"' in page
+    assert 'id="chat-body"' in page and 'class="ai-notice"' in page
     assert 'id="tau-low"' in page and 'value="0.06"' in page
 
 
@@ -35,7 +37,6 @@ def test_an_unknown_contract_is_not_found(client):
 def test_the_thresholds_come_from_the_query_and_default_to_the_settings(client):
     page = client.get(f"/documents/{SHORT_DOC_ID}?low=0.2&high=0.8").text
     assert 'value="0.2"' in page and 'value="0.8"' in page
-    assert "Found from 0.8 · Verify from 0.2" in page
 
 
 def test_bad_thresholds_are_a_plain_notice(client):
@@ -83,6 +84,62 @@ def test_the_document_pane_highlights_a_span(client):
     url = f"/documents/{SHORT_DOC_ID}/view?label=Governing+Law&start={top.start}&end={top.end}"
     html = client.get(url).text
     assert f'<mark class="highlight" data-label="Governing Law">{top.text}</mark>' in html
+
+
+def test_a_confirmed_passage_counts_as_found_everywhere(client):
+    ws = client.app.state.workspace
+    cache = ws.load(SHORT_DOC_ID)
+    name = next(
+        name
+        for name in ws.names
+        if cache.clauses.get(name) and 0.06 <= cache.clauses[name][0].conf < 0.91
+    )
+    top = cache.clauses[name][0]
+    before = next(e for e in ws.documents() if e.doc_id == SHORT_DOC_ID)
+    response = client.post(
+        f"/documents/{SHORT_DOC_ID}/decide",
+        data={"clause_type": name, "verdict": "confirmed", "start": top.start, "end": top.end},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert "status=confirmed" in response.headers["location"]
+    assert ws.load(SHORT_DOC_ID).clauses[name][0].conf == 1.0
+    after = next(e for e in ws.documents() if e.doc_id == SHORT_DOC_ID)
+    assert (after.found, after.check) == (before.found + 1, before.check - 1)
+    pane = client.get(response.headers["location"]).text
+    assert "Confirmed by you" in pane and ">Undo<" in pane
+    undone = client.post(
+        f"/documents/{SHORT_DOC_ID}/decide/undo", data={"clause_type": name}, follow_redirects=False
+    )
+    assert "status=check" in undone.headers["location"]
+    assert ws.load(SHORT_DOC_ID).clauses[name][0].conf == top.conf
+
+
+def test_a_rejected_passage_is_dropped(client):
+    ws = client.app.state.workspace
+    cache = ws.load(SHORT_DOC_ID)
+    top = cache.clauses["Governing Law"][0]
+    response = client.post(
+        f"/documents/{SHORT_DOC_ID}/decide",
+        data={"clause_type": "Governing Law", "verdict": "rejected", "start": top.start, "end": top.end},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    remaining = ws.load(SHORT_DOC_ID).clauses["Governing Law"]
+    assert all((c.start, c.end) != (top.start, top.end) for c in remaining)
+
+
+def test_a_decision_on_an_unknown_clause_or_span_is_refused(client):
+    bad_clause = client.post(
+        f"/documents/{SHORT_DOC_ID}/decide",
+        data={"clause_type": "Nope", "verdict": "confirmed", "start": 0, "end": 5},
+    )
+    assert bad_clause.status_code == 400
+    bad_span = client.post(
+        f"/documents/{SHORT_DOC_ID}/decide",
+        data={"clause_type": "Governing Law", "verdict": "confirmed", "start": 5, "end": 10**9},
+    )
+    assert bad_span.status_code == 400
 
 
 def test_static_files_are_served(client):

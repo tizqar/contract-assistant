@@ -7,6 +7,7 @@ import json
 import logging
 import re
 import sys
+import tempfile
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -176,6 +177,7 @@ DEFINITIONS_HEADER = ("| Term | Defined as | Page |", "| --- | --- | --- |")
 ELLIPSIS = "…"
 PRECOMPUTE_NOTICE = "precomputing summaries and key terms in the background"
 WEB_UI = "web"
+FRESH_NOTICE = "fresh start: an empty cache in {path}; the sample contracts are on the first page"
 GRADIO_UI = "gradio"
 UI_CHOICES = (WEB_UI, GRADIO_UI)
 SHARE_NOTICE = (
@@ -1371,9 +1373,18 @@ def _cmd_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def fresh_settings(settings: Settings) -> Settings:
+    """Return the settings with an empty cache folder and no demo caches: a start from scratch."""
+    cache_dir = Path(tempfile.mkdtemp(prefix="contract-assistant-fresh-"))
+    return replace(settings, cache_dir=cache_dir, demo_cache_dir=cache_dir / "demo")
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     logging.basicConfig(level=logging.INFO)
     settings = load_settings()
+    if args.fresh:
+        settings = fresh_settings(settings)
+        print(FRESH_NOTICE.format(path=settings.cache_dir), file=sys.stderr)
     app_types = app_clause_types(settings)
     router = build_router(settings, app_types)
     store = Store(settings.cache_dir, settings.demo_cache_dir)
@@ -1406,7 +1417,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         fulltexts=fulltext_store,
         rules=load_rules(known_types=[clause.name for clause in app_types]),
     )
-    if gen is not None and not args.no_precompute:
+    if gen is not None and not args.no_precompute and not args.fresh:
         print(PRECOMPUTE_NOTICE, file=sys.stderr)
         names = [clause.name for clause in app_types]
         run_in_background(
@@ -1619,6 +1630,11 @@ def _parser() -> argparse.ArgumentParser:
         "--ui", choices=UI_CHOICES, default=WEB_UI, help="the web app, or the older Gradio app"
     )
     serve.add_argument("--host", default=DEFAULT_HOST, help="address to listen on")
+    serve.add_argument(
+        "--fresh",
+        action="store_true",
+        help="start with an empty cache and no demo contracts, to go through the whole flow",
+    )
     serve.add_argument("--share", action="store_true", help="create a public Gradio link")
     serve.add_argument("--port", type=int, help="port to listen on")
     serve.add_argument(

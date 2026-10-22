@@ -15,3 +15,5 @@ against ground truth live. The PDFs with real page numbers are in CUAD's full re
 (`CUAD_v1.zip` → `full_contract_pdf/`, same titles); the `.txt` files here are the exact
 text the model was evaluated on. Pre-extracted caches for the three ship in `demo/cache/`
 once M1 is done, so the demo never waits on extraction.
+
+`short_supply_agreement.pdf` is the short supply agreement laid out as a five-page PDF, so the page view and the sample flow of the web app can be tried without another file.

@@ -400,7 +400,9 @@ def _row_status(candidates: list, tau_low: float, tau_high: float, capped: bool)
     if not candidates:
         return "not_found"
     status = tier(candidates[0].conf, tau_low, tau_high)
-    return "check" if capped and status == "found" else status
+    if capped and status == "found" and not candidates[0].confirmed:
+        return "check"
+    return status
 
 
 def _row(topic: str, name: str, status: Status, candidates: list) -> list[str]:

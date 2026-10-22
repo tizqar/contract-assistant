@@ -95,3 +95,14 @@ def test_serve_gives_the_obligation_store_to_the_precompute(served):
     cli.main(["serve"])
     services = served["launched"]["services"]
     assert served["background"][0][1][7] is services.obligations
+
+
+def test_serve_fresh_starts_with_an_empty_cache_and_no_demo_contracts(served, capsys):
+    assert cli.main(["serve", "--fresh"]) == 0
+    services = served["launched"]["services"]
+    assert services.settings.cache_dir.is_dir()
+    assert "contract-assistant-fresh-" in services.settings.cache_dir.name
+    assert not services.settings.demo_cache_dir.exists()
+    assert services.store.list() == []
+    assert served["background"] == [], "nothing to prepare on a fresh start"
+    assert "fresh start" in capsys.readouterr().err

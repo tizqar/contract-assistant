@@ -36,6 +36,8 @@ class CachedCandidate(BaseModel):
     end: int
     page: int | None
     conf: float
+    # Set by the reader's confirmation, never by the model: such a candidate is never capped.
+    confirmed: bool = False
 
 
 class ModelInfo(BaseModel):

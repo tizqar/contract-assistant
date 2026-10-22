@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from contract_assistant.background import warm
 from contract_assistant.services import Services
-from contract_assistant.web import chat, insights, library
+from contract_assistant.web import chat, decide, insights, library
 from contract_assistant.web.core import KEEP_WARM_S, STATIC_DIR, Workspace, WorkspaceError
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,7 @@ def create_app(services: Services, keep_warm: bool = False) -> FastAPI:
     app.include_router(library.router)
     app.include_router(chat.router)
     app.include_router(insights.router)
+    app.include_router(decide.router)
 
     @app.exception_handler(WorkspaceError)
     async def workspace_error(request: Request, error: WorkspaceError):

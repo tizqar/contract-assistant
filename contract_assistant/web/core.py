@@ -23,6 +23,8 @@ from fastapi.templating import Jinja2Templates
 from starlette.concurrency import iterate_in_threadpool
 
 from contract_assistant.answer import Answer, Citation, Definition, tier
+from contract_assistant.decisions import DECISIONS_DIR, Decision, DecisionStore
+from contract_assistant.decisions import apply as apply_decisions
 from contract_assistant.definitions import find_definitions
 from contract_assistant.fulltext import FULLTEXT_DIR, FullTextStore
 from contract_assistant.obligations import OBLIGATIONS_DIR, ObligationStore
@@ -35,15 +37,12 @@ from contract_assistant.store import (
     CacheIntegrityError,
     CacheMismatchError,
     DocumentCache,
+    Store,
 )
 from contract_assistant.summary import SUMMARY_DIR, SummaryStore
 from contract_assistant.term_sheet import TERM_SHEET_DIR, TermSheetStore
-from contract_assistant.ui.views import (
-    SEVERITY_LABELS,
-    STATUS_LABELS,
-    display_name,
-    document_name,
-)
+from contract_assistant.ui.views import SEVERITY_LABELS, display_name, document_name
+from contract_assistant.web import copy
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +145,34 @@ class DocumentEntry:
     size: str
     found: int
     check: int
+    not_found: int = 0
+
+
+class DecidedStore:
+    """The store as the reader's decisions make it: every cache it loads has them applied."""
+
+    def __init__(self, store: Store, decisions: DecisionStore):
+        self.store = store
+        self.decisions = decisions
+
+    def list(self) -> list[CacheEntry]:
+        return self.store.list()
+
+    def find(self, doc_id: str) -> Path | None:
+        return self.store.find(doc_id)
+
+    def save(self, cache: DocumentCache) -> Path:
+        return self.store.save(cache)
+
+    def load(self, doc_id: str, settings) -> DocumentCache | None:
+        cache = self.store.load(doc_id, settings)
+        if cache is None:
+            return None
+        return apply_decisions(cache, self.decisions.load(cache.doc_id))
+
+    def load_path(self, path: Path, settings) -> DocumentCache:
+        cache = self.store.load_path(path, settings)
+        return apply_decisions(cache, self.decisions.load(cache.doc_id))
 
 
 class Workspace:
@@ -156,6 +183,8 @@ class Workspace:
         settings = services.settings
         self.names = [clause_type.name for clause_type in services.clause_types]
         self.clause_by_name = {display_name(name): name for name in self.names}
+        self.decisions = DecisionStore(settings.cache_dir / DECISIONS_DIR)
+        self.store = DecidedStore(services.store, self.decisions)
         self.summaries = {
             ENGLISH: services.summaries or SummaryStore(settings.cache_dir / SUMMARY_DIR),
             SERBIAN: SummaryStore(settings.cache_dir / SUMMARY_DIR, SERBIAN),
@@ -190,12 +219,14 @@ class Workspace:
     def documents(self) -> list[DocumentEntry]:
         """Return every cached contract once, uploads first, then the demo contracts."""
         entries: dict[str, DocumentEntry] = {}
-        for cached in self.services.store.list():
+        for cached in self.store.list():
             entries.setdefault(cached.doc_id, self._entry(cached))
         return list(entries.values())
 
     def _entry(self, cached: CacheEntry) -> DocumentEntry:
-        key = (cached.path, cached.path.stat().st_mtime)
+        decided = self.decisions.path_of(cached.doc_id)
+        decided_at = decided.stat().st_mtime if decided.is_file() else 0.0
+        key = (cached.path, cached.path.stat().st_mtime + decided_at)
         entry = self._entries.get(key)
         if entry is None:
             entry = self._build_entry(cached)
@@ -204,10 +235,10 @@ class Workspace:
 
     def _build_entry(self, cached: CacheEntry) -> DocumentEntry:
         settings = self.settings
-        found = check = 0
+        found = check = not_found = 0
         size = f"{cached.source.n_pages} pages"
         try:
-            cache = self.services.store.load_path(cached.path, settings)
+            cache = self.store.load_path(cached.path, settings)
         except (CacheIntegrityError, CacheMismatchError):
             cache = None
         if cache is not None:
@@ -215,13 +246,15 @@ class Workspace:
                 size = f"{len(cache.text.split()):,} words"
             for name in self.names:
                 candidates = cache.clauses.get(name, [])
-                if not candidates:
-                    continue
-                status = tier(candidates[0].conf, settings.tau_low, settings.tau_high)
-                if name in self.services.unvalidated and status == "found":
-                    status = "check"
+                status = "not_found"
+                if candidates:
+                    status = tier(candidates[0].conf, settings.tau_low, settings.tau_high)
+                    capped = name in self.services.unvalidated and not candidates[0].confirmed
+                    if capped and status == "found":
+                        status = "check"
                 found += status == "found"
                 check += status == "check"
+                not_found += status == "not_found"
         return DocumentEntry(
             doc_id=cached.doc_id,
             name=document_name(cached.source.filename),
@@ -229,6 +262,7 @@ class Workspace:
             size=size,
             found=found,
             check=check,
+            not_found=not_found,
         )
 
     def entry(self, doc_id: str) -> DocumentEntry | None:
@@ -246,7 +280,7 @@ class Workspace:
     def load(self, doc_id: str) -> DocumentCache:
         """Load a cached contract; 404 when unknown, a notice when its analysis is damaged."""
         try:
-            cache = self.services.store.load(doc_id, self.settings)
+            cache = self.store.load(doc_id, self.settings)
         except (CacheIntegrityError, CacheMismatchError) as error:
             logger.warning("cannot load %s: %s", doc_id, error)
             raise WorkspaceError(DAMAGED_ANALYSIS) from error
@@ -282,6 +316,19 @@ class Workspace:
     def clause_type_of(self, label: str) -> str:
         """Return the clause type shown under a label; another label is returned as is."""
         return self.clause_by_name.get(label, label)
+
+    def decided(self, doc_id: str) -> dict[str, Decision]:
+        """Return the reader's decisions on a contract by clause type."""
+        return self.decisions.load(doc_id)
+
+    def decided_status(self, doc_id: str, clause_type: str, status: str) -> str:
+        """Return the status to show: the reader's verdict when the top passage is theirs."""
+        decision = self.decided(doc_id).get(clause_type)
+        if decision is None:
+            return status
+        if decision.verdict == "confirmed" and status == "found":
+            return "confirmed"
+        return status
 
     def summary_store(self, language: str) -> SummaryStore:
         """Return the store of the summaries written in a language."""
@@ -407,7 +454,7 @@ def _percent(conf: float) -> str:
     return f"{conf:.0%}"
 
 
-BADGE_LABELS = {**STATUS_LABELS, "definition": DEFINITION_LABEL, "related": "Related"}
+BADGE_LABELS = copy.STATUS
 
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 templates.env.filters.update(
@@ -421,6 +468,7 @@ templates.env.filters.update(
 )
 templates.env.globals.update(
     view_url=view_url,
+    copy=copy,
     DEFINITION_LABEL=DEFINITION_LABEL,
     RELATED_LABEL=RELATED_LABEL,
 )

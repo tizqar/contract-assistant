@@ -129,7 +129,7 @@ def _item(
         return AnswerItem(clause_type=name, status="not_found", best_conf=0.0, citation=None)
     top = candidates[0]
     status = tier(top.conf, tau_low, tau_high)
-    if capped and status == "found":
+    if capped and status == "found" and not top.confirmed:
         status = "check"
     citation = None
     if status != "not_found":
