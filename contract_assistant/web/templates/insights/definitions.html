@@ -1,4 +1,4 @@
-{% import "components.html" as c %}
+{% import "components.html" as c with context %}
 {# The Defined terms section: each defined term with the sentence that defines it. #}
 {% if not definitions %}{{ c.notice(no_definitions) }}{% endif %}
 {% for d in definitions %}

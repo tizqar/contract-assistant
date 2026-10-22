@@ -1,4 +1,4 @@
-{% import "components.html" as c %}
+{% import "components.html" as c with context %}
 {# The parts of an answer: a card per passage and the row of actions under it. #}
 
 {% macro card(card, doc_id, status, explain, thumbs=none) -%}

@@ -1,4 +1,4 @@
-{% import "components.html" as c %}
+{% import "components.html" as c with context %}
 {# The overview: chips that jump to each section, what happened, then the six sections, each loading its own body. #}
 <div class="overview" data-overview data-tau="{{ '%g' % tau.low }}-{{ '%g' % tau.high }}">
   <nav class="section-chips" aria-label="Jump to a section">

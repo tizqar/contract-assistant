@@ -1,4 +1,4 @@
-{% import "components.html" as c %}
+{% import "components.html" as c with context %}
 {# The Who must do what section: what each party must, may or must not do, in the contract's words. #}
 {% if notice %}{{ c.notice(notice) }}{% endif %}
 {% if pending %}

@@ -1,4 +1,4 @@
-{% import "components.html" as c %}
+{% import "components.html" as c with context %}
 {# The All clauses section: every clause by topic with what was found; a passage to check has Confirm and Not this. #}
 <div class="clauses" data-refresh="/documents/{{ cache.doc_id }}/checklist?status={{ status }}">
 <div class="chips" role="group" aria-label="Show the clauses by status">

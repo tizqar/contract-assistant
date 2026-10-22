@@ -1,4 +1,4 @@
-{% import "components.html" as c %}
+{% import "components.html" as c with context %}
 {# The found, to check and not found counts of one contract. #}
 {{ c.tag('found', found ~ ' ' ~ copy.STATUS.found|lower) }}
 {{ c.tag('check', check ~ ' to check') }}

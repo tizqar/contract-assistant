@@ -10,6 +10,7 @@ from pathlib import Path
 import pdfplumber
 
 from contract_assistant.store import DOC_ID_PREFIX
+from contract_assistant.textsearch import pattern_of
 
 DOCUMENTS_DIR = "documents"
 RESOLUTION = 110
@@ -55,17 +56,28 @@ def find_quote(page: pdfplumber.page.Page, quote: str) -> list[dict]:
     return []
 
 
-def page_image(pdf_path: Path, page_number: int, quote: str | None = None) -> bytes:
-    """Render one page as PNG bytes, marking the quote when it is found on the page."""
+def find_all(page: pdfplumber.page.Page, term: str) -> list[dict]:
+    """Return the boxes of every occurrence of a term on the page, whatever its case."""
+    pattern = pattern_of(term)
+    if pattern is None:
+        return []
+    return page.search(pattern.pattern, regex=True, case=False)
+
+
+def page_image(
+    pdf_path: Path, page_number: int, quote: str | None = None, term: str | None = None
+) -> bytes:
+    """Render one page as PNG bytes, marking the quote and every occurrence of the term."""
     with pdfplumber.open(pdf_path) as pdf:
         if not 1 <= page_number <= len(pdf.pages):
             raise PageError(f"page {page_number} is not in {pdf_path.name}")
         page = pdf.pages[page_number - 1]
         image = page.to_image(resolution=RESOLUTION)
-        if quote:
-            boxes = find_quote(page, quote)
-            if boxes:
-                image.draw_rects(boxes, fill=FILL, stroke=STROKE, stroke_width=STROKE_WIDTH)
+        boxes = find_quote(page, quote) if quote else []
+        if term:
+            boxes = [*boxes, *find_all(page, term)]
+        if boxes:
+            image.draw_rects(boxes, fill=FILL, stroke=STROKE, stroke_width=STROKE_WIDTH)
         buffer = io.BytesIO()
         image.save(buffer, format="PNG")
         return buffer.getvalue()

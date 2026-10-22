@@ -1,4 +1,4 @@
-{% import "components.html" as c %}
+{% import "components.html" as c with context %}
 {# The Summary section: the summary in the chosen language, then the overview of the whole text. #}
 {% if languages or pending or (view and view.text) %}
 <div class="section-tools">

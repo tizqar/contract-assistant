@@ -61,6 +61,8 @@ class SourceInfo(BaseModel):
     kind: Literal["pdf", "txt"]
     n_chars: int
     n_pages: int | None
+    # The pages read with OCR, 1-based; empty for text layers and for older caches.
+    ocr_pages: list[int] = []
 
 
 class DocumentCache(BaseModel):

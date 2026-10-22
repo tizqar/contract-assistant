@@ -1,5 +1,5 @@
-{% import "components.html" as c %}
-{% import "chat/macros.html" as m %}
+{% import "components.html" as c with context %}
+{% import "chat/macros.html" as m with context %}
 {# The reply to a question: the assistant's text from the passages, a card per passage, or the
    topics the assistant knows. The thumbs sit at the right of the last row of actions. #}
 {% set thumbs %}{% include "chat/feedback.html" %}{% endset %}

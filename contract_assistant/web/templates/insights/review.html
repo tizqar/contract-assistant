@@ -1,4 +1,4 @@
-{% import "components.html" as c %}
+{% import "components.html" as c with context %}
 {# The Things to check section: points from a fixed rule list, each with its passage and a note on request. #}
 <div class="checks" data-refresh="/documents/{{ cache.doc_id }}/review">
 {% if not flags %}{{ c.notice(no_flags) }}{% endif %}

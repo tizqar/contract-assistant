@@ -9,7 +9,7 @@
 {%- endmacro %}
 
 {% macro ai() -%}
-<span class="badge badge-generated" title="Written by a language model on this computer from the quotes; it can be wrong">{{ copy.AI_BADGE }}</span>
+<span class="badge badge-generated" title="{{ _('Written by a language model on this computer from the quotes; it can be wrong') }}">{{ copy.AI_BADGE }}</span>
 {%- endmacro %}
 
 {% macro quote(text) -%}

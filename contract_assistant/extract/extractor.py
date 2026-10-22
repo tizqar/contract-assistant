@@ -91,6 +91,7 @@ class Extractor:
                 kind=doc.kind,
                 n_chars=len(doc.text),
                 n_pages=len(doc.page_starts) or None,
+                ocr_pages=list(doc.ocr_pages),
             ),
             model=ModelInfo(
                 **self.settings.decode_settings(),

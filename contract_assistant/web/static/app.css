@@ -173,6 +173,8 @@ select.input { appearance: auto; }
 .help-labels { display: flex; flex-wrap: wrap; gap: 6px; }
 .help-item { display: flex; flex-direction: column; gap: 2px; }
 .help .menu-body { width: min(400px, calc(100vw - 32px)); }
+.lang-switch { margin: 0; }
+.lang-switch .seg-item { min-height: 32px; padding: 4px 10px; font-size: 12px; }
 
 /* Cards, quotes, notices */
 .card {

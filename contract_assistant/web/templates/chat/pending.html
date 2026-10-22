@@ -1,4 +1,4 @@
-{% import "components.html" as c %}
+{% import "components.html" as c with context %}
 {# The question and the reply being written: a status line, then the text so far. #}
 <div class="bubble bubble-user">{{ user|safe }}</div>
 <div class="bubble bubble-assistant bubble-pending" aria-busy="true">

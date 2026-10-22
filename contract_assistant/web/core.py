@@ -20,6 +20,7 @@ from urllib.parse import urlencode
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
+from jinja2 import pass_context
 from starlette.concurrency import iterate_in_threadpool
 
 from contract_assistant.answer import Answer, Citation, Definition, tier
@@ -43,6 +44,7 @@ from contract_assistant.summary import SUMMARY_DIR, SummaryStore
 from contract_assistant.term_sheet import TERM_SHEET_DIR, TermSheetStore
 from contract_assistant.ui.views import SEVERITY_LABELS, display_name, document_name
 from contract_assistant.web import copy
+from contract_assistant.web.i18n import copy_for, language_of, translate
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +148,8 @@ class DocumentEntry:
     found: int
     check: int
     not_found: int = 0
+    # Pages that were scans and were read with OCR.
+    scanned: int = 0
 
 
 class DecidedStore:
@@ -263,6 +267,7 @@ class Workspace:
             found=found,
             check=check,
             not_found=not_found,
+            scanned=len(cached.source.ocr_pages),
         )
 
     def entry(self, doc_id: str) -> DocumentEntry | None:
@@ -456,12 +461,19 @@ def _percent(conf: float) -> str:
 
 BADGE_LABELS = copy.STATUS
 
+
+@pass_context
+def _status_label(context, status: str) -> str:
+    """The badge text of a status in the language of the page being rendered."""
+    return copy_for(context.get("lang", "en")).STATUS.get(status, status)
+
+
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 templates.env.filters.update(
     display_name=display_name,
     document_name=document_name,
     percent=_percent,
-    status_label=lambda status: BADGE_LABELS.get(status, status),
+    status_label=_status_label,
     severity_label=lambda severity: SEVERITY_LABELS.get(severity, severity),
     shorten=shorten,
     squash=lambda text: " ".join(str(text).split()),
@@ -474,14 +486,29 @@ templates.env.globals.update(
 )
 
 
-def render(request: Request, name: str, status_code: int = 200, **context) -> HTMLResponse:
-    """Render a template as the response; the workspace is in the context as `ws`."""
+def language(request: Request) -> str:
+    """Return the interface language of a request."""
+    lang = getattr(request.state, "lang", None)
+    return lang or language_of(request)
+
+
+def _language_context(request: Request, context: dict) -> dict:
+    lang = language(request)
     context.setdefault("ws", get_workspace(request))
+    context.setdefault("lang", lang)
+    context.setdefault("copy", copy_for(lang))
+    context.setdefault("_", lambda text: translate(text, lang))
+    return context
+
+
+def render(request: Request, name: str, status_code: int = 200, **context) -> HTMLResponse:
+    """Render a template as the response; the workspace is `ws`, the words `copy` and `_`."""
+    context = _language_context(request, context)
     return templates.TemplateResponse(request, name, context, status_code=status_code)
 
 
 def render_string(request: Request, name: str, **context) -> str:
     """Render a template to a string, for a frame or an out-of-band update."""
-    context.setdefault("ws", get_workspace(request))
+    context = _language_context(request, context)
     context.setdefault("request", request)
     return templates.get_template(name).render(context)

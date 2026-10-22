@@ -1,4 +1,4 @@
-{% import "components.html" as c %}
+{% import "components.html" as c with context %}
 {# The Key facts section: values copied from the clauses, then the dates they give. #}
 {% if notice %}{{ c.notice(notice) }}{% endif %}
 {% if pending %}

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -30,19 +30,24 @@
   {% endif %}
   <a class="brand" href="/">
     <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="2" y="2" width="24" height="24" rx="6" fill="currentColor"></rect><path d="M9 9h10M9 14h10M9 19h6" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path></svg>
-    <span>Contract Assistant</span>
+    <span>{{ _("Contract Assistant") }}</span>
   </a>
   {% block switcher %}{% endblock %}
   <div class="grow"></div>
   <nav class="topnav" aria-label="Main">
     {% if ws.gen_model %}
-    <span class="pill pill-ok" title="{{ ws.gen_model }} through Ollama, on this computer"><span class="dot"></span>{{ copy.AI_READY }}</span>
+    <span class="pill pill-ok" title="{{ _('{model} through Ollama, on this computer').format(model=ws.gen_model) }}"><span class="dot"></span>{{ copy.AI_READY }}</span>
     {% else %}
-    <span class="pill pill-off" title="No local language model: summaries and explanations are off"><span class="dot"></span>{{ copy.AI_OFF }}</span>
+    <span class="pill pill-off" title="{{ _('No local language model: summaries and explanations are off') }}"><span class="dot"></span>{{ copy.AI_OFF }}</span>
     {% endif %}
-    <a class="btn" href="/compare{% if cache is defined and cache %}?left={{ cache.doc_id }}{% endif %}">Compare</a>
-    <a class="btn" href="/portfolio">Portfolio</a>
+    <a class="btn" href="/compare{% if cache is defined and cache %}?left={{ cache.doc_id }}{% endif %}">{{ _("Compare") }}</a>
+    <a class="btn" href="/portfolio">{{ _("Portfolio") }}</a>
     {% block actions %}{% endblock %}
+    <form class="seg lang-switch" method="post" action="/language" aria-label="{{ _('Language') }}">
+      <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+      <button type="submit" name="lang" value="en" class="seg-item{% if lang == 'en' %} seg-item-active{% endif %}" aria-pressed="{{ 'true' if lang == 'en' else 'false' }}" title="English">EN</button>
+      <button type="submit" name="lang" value="sr" class="seg-item{% if lang == 'sr' %} seg-item-active{% endif %}" aria-pressed="{{ 'true' if lang == 'sr' else 'false' }}" title="Srpski">SR</button>
+    </form>
     <details class="menu help" id="help-menu">
       <summary class="btn btn-icon" aria-label="{{ copy.HELP_TITLE }}" title="{{ copy.HELP_TITLE }}">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg>
@@ -62,23 +67,23 @@
       </div>
     </details>
     <details class="menu" id="settings-menu">
-      <summary class="btn btn-icon" aria-label="Advanced settings" title="Advanced">
+      <summary class="btn btn-icon" aria-label="{{ _('Advanced settings') }}" title="{{ _('Advanced') }}">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg>
       </summary>
       <div class="menu-body">
-        <h3 class="menu-title">Advanced</h3>
-        <p class="muted small">How sure the assistant must be before it marks a passage. Above the first value a passage is Found; between the two it is Check this; below the second the clause counts as not found. The defaults were chosen on validation data; most readers never change them.</p>
+        <h3 class="menu-title">{{ _("Advanced") }}</h3>
+        <p class="muted small">{{ _("How sure the assistant must be before it marks a passage. Above the first value a passage is Found; between the two it is Check this; below the second the clause counts as not found. The defaults were chosen on validation data; most readers never change them.") }}</p>
         <label class="range-row">
-          <span>Found from <output id="tau-high-out">{{ '%g' % tau.high }}</output></span>
-          <input type="range" min="0" max="1" step="0.01" value="{{ '%g' % tau.high }}" data-threshold="high" aria-label="Found threshold">
+          <span>{{ _("Found from") }} <output id="tau-high-out">{{ '%g' % tau.high }}</output></span>
+          <input type="range" min="0" max="1" step="0.01" value="{{ '%g' % tau.high }}" data-threshold="high" aria-label="{{ _('Found from') }}">
         </label>
         <label class="range-row">
-          <span>Check this from <output id="tau-low-out">{{ '%g' % tau.low }}</output></span>
-          <input type="range" min="0" max="1" step="0.01" value="{{ '%g' % tau.low }}" data-threshold="low" aria-label="Check this threshold">
+          <span>{{ _("Check this from") }} <output id="tau-low-out">{{ '%g' % tau.low }}</output></span>
+          <input type="range" min="0" max="1" step="0.01" value="{{ '%g' % tau.low }}" data-threshold="low" aria-label="{{ _('Check this from') }}">
         </label>
         <div class="row gap">
-          <button type="button" class="btn btn-sm" data-threshold-reset>Reset to defaults</button>
-          <button type="button" class="btn btn-sm" hx-get="/technical" hx-target="#technical" hx-swap="innerHTML">Technical details</button>
+          <button type="button" class="btn btn-sm" data-threshold-reset>{{ _("Reset to defaults") }}</button>
+          <button type="button" class="btn btn-sm" hx-get="/technical" hx-target="#technical" hx-swap="innerHTML">{{ _("Technical details") }}</button>
         </div>
         <div id="technical" class="technical"></div>
       </div>
