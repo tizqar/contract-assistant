@@ -1,11 +1,21 @@
-/* Chat: the reply being written, the cards inside an answer and their small actions. */
+/* Chat: the reply being written, the cards of an answer and the row of actions under each. */
 
 /* The pending place holds the question and the reply being written as items of the list. */
 .chat-pending { display: contents; }
-.chat-card { gap: 6px; }
-.bubble-assistant .chat-card .quote:not(.quote-plain) { background: var(--quote-bg); }
+.chat-empty p { margin: 0; }
 .chat-tools { display: flex; justify-content: flex-end; }
-.chat-topics { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+
+/* A card: the badge, the clause name and the page on one line, then the quote. */
+.chat-card { gap: 6px; padding: 10px 12px; }
+.chat-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chat-page { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.bubble-assistant .chat-card .quote:not(.quote-plain) { background: var(--quote-bg); }
+.chat-card-rejected .quote { opacity: 0.6; }
+
+/* The actions under a card; the thumbs sit at its right end. */
+.chat-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 12px; }
+.chat-actions .decide { gap: 6px; }
+.chat-actions .decide .btn-sm { min-height: 28px; padding: 2px 10px; }
 .chat-explain { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
 .chat-action {
   border: 0; background: none; padding: 0; min-height: 24px;
@@ -14,9 +24,30 @@
 .chat-action:hover { color: var(--primary-2); text-decoration: underline; }
 .chat-action:disabled { color: var(--muted); cursor: default; text-decoration: none; }
 .chat-action:focus-visible, .feedback button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.feedback button { display: inline-flex; align-items: center; min-height: 28px; }
-.feedback-done { color: var(--muted); font-size: 12px; }
-.chat-based-on { line-height: 1.9; }
-.chat-source { white-space: nowrap; }
-.chat-source .badge { font-size: 11px; padding: 0 6px; }
+.chat-actions .feedback { margin-left: auto; gap: 0; }
+.chat-actions .feedback button {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; min-height: 24px; padding: 0 3px; border-color: transparent; background: none;
+}
+.chat-actions .feedback button:hover { background: var(--surface); border-color: var(--border); }
+.feedback-done { margin-left: auto; color: var(--muted); font-size: 12px; }
+
+/* AI text: the badge leads the text it marks. */
+.chat-ai-text .badge { margin-right: 8px; padding: 0 7px; font-size: 11px; font-family: var(--font); vertical-align: 2px; }
+.chat-withheld { color: var(--ink-2); }
+
+/* "Based on" under a summary: the clause names as chips with a coloured dot. */
+.chat-sources { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 12px; color: var(--muted); }
+.chat-source {
+  display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; white-space: nowrap;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--ink-2);
+}
+.chat-source .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--found); flex: 0 0 auto; }
+.chat-source-check .dot { background: var(--check); }
+
+/* The reply to a question outside the clauses: the topics, then two example questions. */
+.chat-topics { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.chat-topics li > span { display: block; }
+.chat-examples { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
 .chat-stopped { color: var(--muted); font-size: 13px; }

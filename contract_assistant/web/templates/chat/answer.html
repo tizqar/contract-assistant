@@ -1,35 +1,30 @@
 {% import "components.html" as c %}
 {% import "chat/macros.html" as m %}
-{# The reply to a question: the generated answer, a card per passage, or the clause list. #}
-{% if generated and generated.text is not none %}
-<div class="card chat-card">
-  <div class="bubble-head">{{ c.tag("generated", "Generated") }}<strong>Answer from the passages</strong></div>
-  <p class="generated-text">{{ generated.text }}</p>
-  {{ c.generated_note(generated_note) }}
-</div>
-{% elif generated %}
-{{ c.generated_note(generated_note) }}
+{# The reply to a question: the assistant's text from the passages, a card per passage, or the
+   topics the assistant knows. The thumbs sit at the right of the last row of actions. #}
+{% set thumbs %}{% include "chat/feedback.html" %}{% endset %}
+{% if generated %}
+<p class="generated-text chat-ai-text">{{ c.ai() }}{{ generated }}</p>
+{% elif withheld %}
+<p class="chat-withheld">{{ withheld }}</p>
 {% endif %}
 {% if intro %}<p>{{ intro }}</p>{% endif %}
 {% for card in cards %}
-{{ m.card(card, cache.doc_id, ws.gen_model) }}
+{{ m.card(card, cache.doc_id, status_of(card.shown, card.kind), ws.gen_model is not none, thumbs if loop.last else none) }}
 {% endfor %}
 {% if topics %}
-<p>{{ empty_text }}</p>
-<p>I can answer questions about:</p>
+<p>{{ no_match }}</p>
+<p>{{ topics_text }}</p>
 <ul class="chat-topics">
   {% for topic, names in topics %}
-  <li><strong>{{ topic }}:</strong> {{ names }}</li>
+  <li><strong>{{ topic }}</strong><span class="muted small">{{ names }}</span></li>
   {% endfor %}
 </ul>
-<div class="row gap wrap">
-  <span class="muted small">For example:</span>
+<div class="chat-examples">
+  <span class="muted small">{{ examples_text }}</span>
   {% for question in examples %}
   <button type="button" class="chip" data-fill="{{ question }}">{{ question }}</button>
   {% endfor %}
 </div>
 {% endif %}
-<div class="bubble-actions">
-  {% if note %}<span class="muted">{{ note }}</span>{% endif %}
-  {% include "chat/feedback.html" %}
-</div>
+{% if not cards %}<div class="chat-actions">{{ thumbs }}</div>{% endif %}

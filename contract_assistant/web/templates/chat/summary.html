@@ -1,15 +1,16 @@
 {% import "components.html" as c %}
-{# The summary of the contract asked for in the chat, or why it is not shown. #}
+{# The summary of the contract asked for in the chat, or why it is held back. "Based on" names
+   the first clauses it was written from, with a dot for found (green) or to check (amber). #}
 {% if withheld %}
-<p>{{ withheld }}</p>
-{% if mismatch %}<p class="meta">{{ mismatch }}</p>{% endif %}
+<p class="chat-withheld">{{ withheld }}</p>
 {% else %}
-<div class="bubble-head">{{ c.tag("generated", "Generated") }}<strong>Summary</strong></div>
+<div class="bubble-head">{{ c.ai() }}<strong>{{ heading }}</strong></div>
 <p class="generated-text">{{ text }}</p>
-{{ c.generated_note(meta) }}
-<p class="meta chat-based-on">{{ based_on_text }}
-  {%- for name, status, unvalidated in based_on %}
-  <span class="chat-source">{{ name }} {{ c.badge(status) }}{% if unvalidated %}{{ mark }}{% endif %}</span>{% if not loop.last %},{% endif %}
-  {%- endfor %}
-  {%- if unvalidated_note %} · {{ mark }} {{ unvalidated_note }}{% endif %}</p>
+<div class="chat-sources">
+  <span>{{ based_on_text }}</span>
+  {% for name, status in based_on %}
+  <span class="chat-source chat-source-{{ status }}" title="{{ status|status_label }}"><span class="dot" aria-hidden="true"></span>{{ name }}<span class="sr-only"> ({{ status|status_label }})</span></span>
+  {% endfor %}
+  {% if based_on_more %}<span>{{ based_on_more }}</span>{% endif %}
+</div>
 {% endif %}

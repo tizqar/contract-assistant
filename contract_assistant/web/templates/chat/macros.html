@@ -1,36 +1,47 @@
 {% import "components.html" as c %}
-{# The parts of an answer: a card per passage and the actions under it. #}
+{# The parts of an answer: a card per passage and the row of actions under it. #}
 
-{% macro card(card, doc_id, explain) -%}
-<div class="card chat-card">
-  <div class="bubble-head">{{ c.tag(card.kind, card.tag) }}<strong>{{ card.title }}</strong></div>
+{% macro card(card, doc_id, status, explain, thumbs=none) -%}
+<div class="card chat-card chat-card-{{ status }}">
+  <div class="chat-card-head">
+    {{ c.badge(status) }}
+    {%- if card.title %}<strong>{{ card.title }}</strong>{% endif %}
+    {%- if card.page %}<span class="chat-page">{{ copy.PAGE.format(page=card.page) }}</span>{% endif %}
+  </div>
   {%- if card.quote %}
-  <blockquote class="quote{% if card.plain %} quote-plain{% endif %}">{{ card.quote }}</blockquote>
+  <blockquote class="quote{% if card.kind == 'definition' %} quote-plain{% endif %}">{{ card.quote }}</blockquote>
   {%- endif %}
   {%- if card.text %}
   <p>{{ card.text }}</p>
   {%- endif %}
-  {%- if card.meta %}
-  <p class="meta">{{ card.meta }}</p>
-  {%- endif %}
-  {%- if card.shown %}
-  {{ actions(card.shown, doc_id, explain) }}
-  {%- endif %}
 </div>
+{%- if card.shown or thumbs %}
+<div class="chat-actions">
+  {%- if card.shown %}{{ actions(card, doc_id, status, explain) }}{% endif %}
+  {%- if thumbs %}{{ thumbs }}{% endif %}
+</div>
+{%- endif %}
 {%- endmacro %}
 
-{% macro actions(shown, doc_id, explain) -%}
-<div class="bubble-actions">
-  {{ c.view_link(shown.view(doc_id), "Show in document") }}
-  {%- if explain %}
-  {{ explain_form(shown, doc_id, "en", "Explain") }}
-  {{ explain_form(shown, doc_id, "sr", "Explain in Serbian") }}
-  {%- endif %}
-</div>
+{# Show in document, then Explain (a closest passage has none, a defined term no Serbian), then
+   Confirm / Not this for a passage to check, or Undo once the reader decided. #}
+{% macro actions(card, doc_id, status, explain) -%}
+{%- set shown = card.shown %}
+{%- set view = shown.view(doc_id, status) %}
+{%- if view %}
+{{ c.view_link(view, copy.SHOW_IN_DOCUMENT) }}
+{%- endif %}
+{%- if explain and card.kind != 'related' %}
+{{ explain_form(shown, doc_id, "en", copy.EXPLAIN) }}
+{%- if card.kind != 'definition' %}
+{{ explain_form(shown, doc_id, "sr", copy.EXPLAIN_SR) }}
+{%- endif %}
+{%- endif %}
+{{ c.decide(doc_id, shown.label, shown.citation, status) }}
 {%- endmacro %}
 
 {% macro explain_form(shown, doc_id, language, text) -%}
-<form class="chat-explain" data-stream data-target="#insight-body" data-activate="chat" action="/documents/{{ doc_id }}/explain" method="post">
+<form class="chat-explain" data-stream data-target="#chat-body" action="/documents/{{ doc_id }}/explain" method="post">
   <input type="hidden" name="label" value="{{ shown.label }}">
   <input type="hidden" name="quote" value="{{ shown.quote }}">
   <input type="hidden" name="language" value="{{ language }}">

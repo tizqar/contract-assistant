@@ -1,18 +1,20 @@
-{# The chat about a contract: the messages oldest first, the reply being written, Clear chat. #}
+{# The chat about a contract: the messages oldest first, the reply being written, Clear chat.
+   `follow`, sent once at the end of a reply, is the passage chat.js moves the document pane to. #}
 <div class="chat-list" id="chat-messages">
-  {% if not conversation.messages and not pending %}
+  {% if not messages and not pending %}
   <div class="chat-empty">
-    <strong>Ask a question about this contract</strong>
-    <p class="muted">Ask, for example, who the parties are, which law governs or whether either side may terminate. Each answer is marked Found, Verify or Not found.</p>
+    <strong>{{ empty_title }}</strong>
+    <p class="muted">{{ empty_text }}</p>
   </div>
   {% endif %}
-  {% for m in conversation.messages %}
+  {% for m in messages %}
   <div class="bubble bubble-{{ m.role }}">{{ m.html|safe }}</div>
   {% endfor %}
   <div class="chat-pending" id="chat-pending">{% if pending %}{{ pending|safe }}{% endif %}</div>
 </div>
-{% if conversation.messages and not pending %}
+{% if messages and not pending %}
 <div class="chat-tools">
-  <button type="button" class="btn btn-sm" hx-post="/documents/{{ cache.doc_id }}/chat/clear" hx-target="#insight-body" hx-swap="innerHTML">Clear chat</button>
+  <button type="button" class="btn btn-sm" hx-post="/documents/{{ cache.doc_id }}/chat/clear" hx-target="#chat-body" hx-swap="innerHTML">Clear chat</button>
 </div>
 {% endif %}
+{% if follow %}<span hidden data-follow="{{ follow }}"></span>{% endif %}

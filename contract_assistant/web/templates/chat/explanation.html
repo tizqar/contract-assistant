@@ -1,13 +1,12 @@
 {% import "components.html" as c %}
-{# A plain-language restatement of a passage, or why it is not shown. #}
+{# A plain-language restatement of a passage, or why it is held back. #}
 {% if withheld %}
-<p>{{ withheld }}</p>
+<p class="chat-withheld">{{ withheld }}</p>
 {% else %}
-<div class="bubble-head">{{ c.tag("generated", "Generated") }}<span><strong>{{ title }}</strong> · in plain {{ language }}</span></div>
+<div class="bubble-head">{{ c.ai() }}<strong>{{ heading }}</strong></div>
 <p class="generated-text">{{ text }}</p>
-{{ c.generated_note(meta) }}
 {% endif %}
-{% set view = shown.view(cache.doc_id) %}
+{% set view = shown.view(cache.doc_id, status_of(shown, shown.status)) %}
 {% if view %}
-<div class="bubble-actions">{{ c.view_link(view, "Show in document") }}</div>
+<div class="chat-actions">{{ c.view_link(view, copy.SHOW_IN_DOCUMENT) }}</div>
 {% endif %}
