@@ -25,7 +25,7 @@
       </select>
       <span class="meta">{{ 'PDF' if chosen.kind == 'pdf' else 'Text' }} · {{ chosen.size }} · <a class="link" href="/documents/{{ chosen.doc_id }}">Open</a></span>
       <div class="counts" id="{{ side }}-counts">
-        {% with found=chosen.found, check=chosen.check, not_found=total - chosen.found - chosen.check %}{% include "library/counts.html" %}{% endwith %}
+        {% with found=chosen.found, check=chosen.check, not_found=chosen.not_found %}{% include "library/counts.html" %}{% endwith %}
       </div>
     </div>
     {% if loop.first %}

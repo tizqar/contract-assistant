@@ -1,10 +1,10 @@
 {% import "components.html" as c %}
-{# The comparison: key terms and review flags on the left, the clause checklist on the right. #}
+{# The comparison: key terms and the things to check on the left, the clauses on the right. #}
 {% set left, right = sides %}
 <section class="column" aria-labelledby="terms-heading">
   <div class="tab-head">
     <h2 class="h2" id="terms-heading">Key terms</h2>
-    {% if terms %}<span class="muted small">Rows with a coloured edge differ.</span>{% endif %}
+    {% if terms %}<span class="legend-chip legend-diff">Differs</span>{% endif %}
   </div>
   {% if terms %}
   <div class="rows compare-terms">
@@ -25,21 +25,23 @@
   {{ c.notice(terms_note) }}
   {% endif %}
 
+  {% for key, title, line in copy.SECTIONS if key == 'checks' %}
   <div class="tab-head flags-head">
-    <h2 class="h2">Review flags</h2>
-    <span class="muted small">From the rule file. No model.</span>
+    <h2 class="h2">{{ title }}</h2>
+    <span class="muted small">{{ line }}</span>
   </div>
+  {% endfor %}
   <div class="flag-cards">
     {% for side in sides %}
     <div class="card side-card side-{{ side.key }}">
       <strong>{{ side.entry.name }}</strong>
       <div class="counts">
-        {% for level, count in side.severities %}{{ c.tag(level, count ~ ' ' ~ level) }}{% else %}<span class="muted small">No flags</span>{% endfor %}
+        {% for level, count in side.severities %}{{ c.tag(level, count ~ ' ' ~ level) }}{% else %}<span class="muted small">None</span>{% endfor %}
       </div>
       <p class="muted small">
         {%- if side.high %}<strong class="ink-high">High:</strong> {{ side.high|join('; ') }}
         {%- elif side.titles %}{{ side.titles|join('. ') }}
-        {%- else %}No review rule applies to this contract.{% endif -%}
+        {%- else %}None of the rules applies to this contract.{% endif -%}
       </p>
     </div>
     {% endfor %}
@@ -49,9 +51,9 @@
 <section class="column" aria-labelledby="clauses-heading">
   {% set show = 'diff' if differ else 'all' %}
   <div class="tab-head">
-    <h2 class="h2" id="clauses-heading">Clause checklist</h2>
+    <h2 class="h2" id="clauses-heading">Clauses</h2>
     <span class="grow"></span>
-    <div class="seg" role="group" aria-label="Show clause types" data-checklist-filter="#checklist">
+    <div class="seg" role="group" aria-label="Show clauses" data-checklist-filter="#checklist">
       {% for value, text in (('all', 'All ' ~ total), ('diff', 'Differences ' ~ differ), ('same', 'Same ' ~ (total - differ))) %}
       <button type="button" class="seg-item{% if value == show %} seg-item-active{% endif %}" data-show="{{ value }}" aria-pressed="{{ 'true' if value == show else 'false' }}">{{ text }}</button>
       {% endfor %}
@@ -62,7 +64,7 @@
     <div class="card group" data-kind="{{ group.kind }}">
       <div class="group-head">
         <span class="group-name">{{ group.title }}</span>
-        <span class="muted small">{{ group.rows|length }} type{{ 's' if group.rows|length != 1 }}{% if group.note %} · {{ group.note }}{% endif %}</span>
+        <span class="muted small">{{ group.rows|length }} clause{{ 's' if group.rows|length != 1 }}{% if group.note %} · {{ group.note }}{% endif %}</span>
       </div>
       <div class="group-grid">
         {% for row in group.rows %}
@@ -79,5 +81,4 @@
     </div>
     {% endfor %}
   </div>
-  <p class="meta">Found means the confidence is {{ '%g' % tau.high }} or above; Verify means {{ '%g' % tau.low }} to {{ '%g' % tau.high }} and the passage should be read.</p>
 </section>

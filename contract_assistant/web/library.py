@@ -1,4 +1,4 @@
-"""The contracts: the workspace page, the document pane, uploads, comparison and portfolio."""
+"""The contracts: first page, drawer, document pane, uploads, samples, compare and portfolio."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import tempfile
 import time
 from collections.abc import Callable, Generator, Iterator
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
@@ -20,7 +21,9 @@ from markupsafe import Markup, escape
 from contract_assistant.answer import Citation, Status
 from contract_assistant.background import precompute, precompute_obligations, run_in_background
 from contract_assistant.compare import ChecklistRow, compare_checklists, compare_terms
+from contract_assistant.config import ROOT
 from contract_assistant.dates import key_dates
+from contract_assistant.decisions import apply as apply_decisions
 from contract_assistant.extract.extractor import ProgressCallback
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
 from contract_assistant.pdf_view import (
@@ -82,58 +85,100 @@ BLANK_LINES = re.compile(r"\n[ \t]*\n(?:[ \t]*\n)+")
 CODE = re.compile(r"`(.+?)`")
 
 CHOOSE_FILE = "Choose a PDF or TXT file first."
-READING_FILE = "Reading {name}"
-CHECKING = "Checking {name} · {elapsed} s ({done}/{total})"
-SAVING = "Saving the analysis"
-ALREADY_ANALYSED = "{name}: already analysed"
-ANALYSIS_UPDATED = "Analysis updated"
-ANALYSIS_COMPLETE = "Analysis complete"
+# The steps of reading a contract, shown one at a time; no clause names, no model names.
+READING_FILE = "Reading the file"
+FINDING = "Finding the clauses · {done} of {total} · {elapsed} s"
+SAVING = "Saving"
+ALREADY_ANALYSED = "{name} was read before; opening it"
+ANALYSIS_UPDATED = "Read again for the clauses added since; opening it"
+ANALYSIS_COMPLETE = "Done; opening the contract"
 NO_MODEL = (
-    "This contract cannot be analysed on this computer yet: "
-    "the analysis model is not installed. See the README."
+    "New contracts cannot be read on this computer yet: the model that reads them is not "
+    "installed. The README says how to add it."
 )
+SAMPLES_NEED_MODEL = "The samples need that model too."
+UNKNOWN_SAMPLE = "There is no sample contract by that name."
 NO_PAGE_IMAGE = "No page image: the PDF of this contract is not kept on this computer."
 NO_SUCH_PAGE = "This page is not in the PDF."
 NO_ANALYSIS_FILE = "The analysis file of this contract was not found."
 COMPARING = "Comparing the clauses"
-EXTRACTING_TERMS = "Extracting the key terms of {name}"
+EXTRACTING_TERMS = "Reading the key terms of {name}"
 CHOOSE_OTHER = "Choose a contract to compare with."
 CHOOSE_DIFFERENT = "Choose two different contracts: the same one is on both sides."
 OTHER_UNAVAILABLE = "The other contract has not been analysed, or its analysis is damaged."
 ADD_SECOND = "Add a second contract to compare it with the first."
 TERMS_SKIPPED = "The key terms are not compared: {reason}."
-TERMS_NEED_MODEL = "they need the language model, which is off"
+TERMS_NEED_MODEL = "they need the local AI, which is off"
 TERMS_NEED_CLAUSES = "no clause they are read from was found in {name}"
-TERMS_FAILED = "the language model did not answer"
+TERMS_FAILED = "the local AI did not answer"
 TERMS_WITHHELD = "The key terms of {name} are not shown because {reason}."
+
+SAMPLES_DIR = ROOT / "demo"
+# The sample contracts the first page and the drawer offer: the allow-list of the samples route.
+SAMPLE_FILES = (
+    "short_supply_agreement.pdf",
+    "short_supply_agreement.txt",
+    "medium_sponsorship_agreement.txt",
+    "long_outsourcing_agreement.txt",
+)
+SAMPLE_ERRORS = (UnsupportedFileError, EmptyDocumentError)
 
 ProgressItem = tuple[int, int, str]
 
 
+@dataclass(frozen=True)
+class Sample:
+    """A sample contract as the first page and the drawer offer it."""
+
+    name: str
+    title: str
+    kind: str
+    size: str
+    doc_id: str
+
+
+# Each sample file is read once per version, to know its id and its size.
+_samples_read: dict[tuple[Path, int], Sample] = {}
+
+
 @router.get("/", response_class=HTMLResponse)
 def home(request: Request, ws: Ws, tau: Tau):
-    """Open the default contract, or the page that asks for the first one."""
+    """Open the default contract, or the first-run page: an upload and the sample contracts."""
     doc_id = ws.default_doc_id()
     if doc_id is None:
-        return render(request, "home.html", documents=[], tau=tau)
+        return render(
+            request,
+            "home.html",
+            samples=_samples([]),
+            can_read=ws.services.extractor is not None,
+            no_model=NO_MODEL,
+            samples_need_model=SAMPLES_NEED_MODEL,
+            tau=tau,
+        )
     return RedirectResponse(f"/documents/{doc_id}", status_code=303)
 
 
 @router.get("/documents/{doc_id}", response_class=HTMLResponse)
 def workspace_page(request: Request, doc_id: str, ws: Ws, tau: Tau):
-    """The workspace of one contract: the contracts rail, the document and the insights."""
+    """The workspace of one contract: the contracts drawer, the overview or document, the chat."""
     cache = ws.load(doc_id)
     documents = ws.documents()
     entry = next((d for d in documents if d.doc_id == cache.doc_id), None)
     return render(
         request,
         "workspace.html",
-        cache=cache,
         entry=entry,
-        documents=documents,
         suggestions=SUGGESTED_QUESTIONS,
         tau=tau,
+        **_rail(ws, cache, documents),
     )
+
+
+@router.get("/documents/{doc_id}/rail", response_class=HTMLResponse)
+def rail(request: Request, doc_id: str, ws: Ws):
+    """The contracts drawer alone, to refresh its counts after a decision or an upload."""
+    cache = ws.load(doc_id)
+    return render(request, "library/rail.html", **_rail(ws, cache, ws.documents()))
 
 
 @router.get("/documents/{doc_id}/view", response_class=HTMLResponse)
@@ -237,7 +282,7 @@ def page_png(
 def analysis_json(doc_id: str, ws: Ws):
     """The saved analysis of a contract: the clause candidates the encoder located."""
     cache = ws.load(doc_id)
-    path = ws.services.store.find(cache.doc_id)
+    path = ws.store.find(cache.doc_id)
     if path is None:
         raise HTTPException(status_code=404, detail=NO_ANALYSIS_FILE)
     filename = f"{Path(cache.source.filename).stem}.analysis.json"
@@ -252,6 +297,14 @@ def upload(
     name = Path(file.filename or "").name if file is not None else ""
     data = file.file.read() if file is not None and name else b""
     return stream(_upload_frames(request, ws, name, data))
+
+
+@router.post("/samples/{name}")
+def sample(request: Request, name: str, ws: Ws):
+    """Analyse a sample contract the way an upload is, unless it was analysed before."""
+    if name not in SAMPLE_FILES:
+        raise WorkspaceError(UNKNOWN_SAMPLE, status_code=404)
+    return stream(_sample_frames(request, ws, SAMPLES_DIR / name))
 
 
 @router.get("/compare", response_class=HTMLResponse)
@@ -376,49 +429,69 @@ def _upload_frames(request: Request, ws: Ws, name: str, data: bytes) -> Iterator
     if not name:
         yield frame("", notice=CHOOSE_FILE, done=True)
         return
-    yield frame(_status(request, READING_FILE.format(name=name)))
+    yield frame(_status(request, READING_FILE))
     # The file keeps its name: the analysis records it and the lists show it.
     with tempfile.TemporaryDirectory(prefix="contract-upload-") as directory:
         path = Path(directory) / name
         path.write_bytes(data)
-        try:
-            doc = load_document(path)
-            doc_id = doc_id_of(doc.text)
-            cached = _cached(ws, doc_id)
-        except UPLOAD_ERRORS as error:
-            yield frame("", notice=str(error), done=True)
+        yield from _analyse(request, ws, path)
+
+
+def _sample_frames(request: Request, ws: Ws, path: Path) -> Iterator[str]:
+    yield frame(_status(request, READING_FILE))
+    yield from _analyse(request, ws, path)
+
+
+def _analyse(request: Request, ws: Ws, path: Path) -> Iterator[str]:
+    """Read a contract file, find its clauses unless that was done before, then open it."""
+    try:
+        doc = load_document(path)
+        cached = _cached(ws, doc_id_of(doc.text))
+    except UPLOAD_ERRORS as error:
+        yield frame("", notice=str(error), done=True)
+        return
+    if cached is not None:
+        yield from _reopen(request, ws, path, cached)
+        return
+    extractor = ws.services.extractor
+    if extractor is None:
+        yield frame("", notice=NO_MODEL, done=True)
+        return
+    analysed = yield from _with_progress(request, lambda report: extractor.extract(doc, report))
+    yield frame(_status(request, SAVING))
+    _save(ws, path, analysed)
+    yield _redirect(request, analysed.doc_id, ANALYSIS_COMPLETE)
+
+
+def _reopen(request: Request, ws: Ws, path: Path, cached: DocumentCache) -> Iterator[str]:
+    """Open a contract analysed before, after finding the clauses added since, if any."""
+    extractor = ws.services.extractor
+    if extractor is not None:
+        extended = yield from _with_progress(
+            request, lambda report: extractor.extend(cached, report)
+        )
+        if extended is not cached:
+            yield frame(_status(request, SAVING))
+            _save(ws, path, extended)
+            yield _redirect(request, cached.doc_id, ANALYSIS_UPDATED)
             return
-        store, extractor = ws.services.store, ws.services.extractor
-        if cached is not None and extractor is not None:
-            extended = yield from _with_progress(
-                request, lambda report: extractor.extend(cached, report)
-            )
-            if extended is not cached:
-                store.save(extended)
-                _keep_pdf(ws, path, doc_id)
-                _precompute(ws, extended)
-                yield _redirect(request, doc_id, ANALYSIS_UPDATED)
-                return
-        if cached is not None:
-            if not copy_path(ws.settings.cache_dir / DOCUMENTS_DIR, doc_id).exists():
-                _keep_pdf(ws, path, doc_id)
-            yield _redirect(request, doc_id, ALREADY_ANALYSED.format(name=document_name(name)))
-            return
-        if extractor is None:
-            yield frame("", notice=NO_MODEL, done=True)
-            return
-        analysed = yield from _with_progress(request, lambda report: extractor.extract(doc, report))
-        yield frame(_status(request, SAVING))
-        store.save(analysed)
-        _keep_pdf(ws, path, doc_id)
-        _precompute(ws, analysed)
-        yield _redirect(request, doc_id, ANALYSIS_COMPLETE)
+    if not copy_path(ws.settings.cache_dir / DOCUMENTS_DIR, cached.doc_id).exists():
+        _keep_pdf(ws, path, cached.doc_id)
+    name = document_name(path.name)
+    yield _redirect(request, cached.doc_id, ALREADY_ANALYSED.format(name=name))
+
+
+def _save(ws: Workspace, path: Path, cache: DocumentCache) -> None:
+    """Save an analysis, keep the PDF to show its pages, and start writing ahead of time."""
+    ws.store.save(cache)
+    _keep_pdf(ws, path, cache.doc_id)
+    _precompute(ws, apply_decisions(cache, ws.decided(cache.doc_id)))
 
 
 def _with_progress(
     request: Request, work: Callable[[ProgressCallback], DocumentCache]
 ) -> Generator[str, None, DocumentCache]:
-    """Run the extraction in a thread; yield a status frame per clause type it checks.
+    """Run the extraction in a thread; yield a status frame per clause it looks for.
 
     The extractor reports synchronously from inside its loop, so the frames come from a
     queue the callback fills. Returns the extraction's result.
@@ -430,14 +503,15 @@ def _with_progress(
     future.add_done_callback(lambda _: items.put(None))
     executor.shutdown(wait=False)
     while (item := items.get()) is not None:
-        done, total, name = item
+        done, total, _ = item
         elapsed = f"{time.perf_counter() - started:.0f}"
-        text = CHECKING.format(name=display_name(name), elapsed=elapsed, done=done, total=total)
-        yield frame(_status(request, text))
+        yield frame(_status(request, FINDING.format(done=done, total=total, elapsed=elapsed)))
     return future.result()
 
 
 def _cached(ws: Workspace, doc_id: str) -> DocumentCache | None:
+    # The analysis as saved, without the reader's decisions: an extension of it is saved back,
+    # and the decisions stay in their own file so that Undo still works.
     try:
         return ws.services.store.load(doc_id, ws.settings)
     except CacheMismatchError:
@@ -600,14 +674,14 @@ def _severities(flags: list[Flag]) -> list[tuple[str, int]]:
 
 
 def _groups(rows: list[ChecklistRow], left: dict, right: dict) -> list[dict]:
-    """Return the clause types grouped by how the two contracts differ, differences first."""
+    """Return the clauses grouped by how the two contracts differ, differences first."""
     left_name, right_name = left["entry"].name, right["entry"].name
     groups = [
         ("diff", f"Only in {right_name}", None,
          [row for row in rows if row.left == "not_found" and row.right != "not_found"]),
         ("diff", f"Only in {left_name}", None,
          [row for row in rows if row.right == "not_found" and row.left != "not_found"]),
-        ("diff", "In both, with a different confidence",
+        ("diff", "In both, found in one and to check in the other",
          f"{left_name} first, {right_name} second",
          [row for row in rows if row.differs and "not_found" not in (row.left, row.right)]),
         ("same", "Same in both", None, [row for row in rows if not row.differs]),
@@ -622,7 +696,7 @@ def _groups(rows: list[ChecklistRow], left: dict, right: dict) -> list[dict]:
 def _portfolio(ws: Ws) -> list[PortfolioRow]:
     """Tabulate every analysed contract and write the table as a CSV file."""
     rows = portfolio_rows(
-        ws.services.store,
+        ws.store,
         ws.settings,
         ws.names,
         ws.rules,
@@ -703,3 +777,42 @@ def _markup(line: str) -> Markup:
     html = str(escape(line.removeprefix("- ")))
     html = BOLD.sub(r"<strong>\1</strong>", html)
     return Markup(CODE.sub(r"<code>\1</code>", html))
+
+
+def _rail(ws: Workspace, cache: DocumentCache, documents: list[DocumentEntry]) -> dict:
+    """Return what the drawer shows, the same in the workspace page and in its refresh."""
+    can_read = ws.services.extractor is not None
+    return {
+        "cache": cache,
+        "documents": documents,
+        "can_read": can_read,
+        "samples": _samples(documents) if can_read else [],
+    }
+
+
+def _samples(documents: list[DocumentEntry]) -> list[Sample]:
+    """Return the sample contracts that are not among the analysed ones."""
+    analysed = {entry.doc_id for entry in documents}
+    samples = [_sample(name) for name in SAMPLE_FILES]
+    return [item for item in samples if item is not None and item.doc_id not in analysed]
+
+
+def _sample(name: str) -> Sample | None:
+    """Describe a sample contract; None when its file is missing or unreadable."""
+    path = SAMPLES_DIR / name
+    try:
+        key = (path, path.stat().st_mtime_ns)
+    except OSError:
+        return None
+    known = _samples_read.get(key)
+    if known is not None:
+        return known
+    try:
+        doc = load_document(path)
+    except SAMPLE_ERRORS:
+        return None
+    pdf = doc.kind == "pdf"
+    size = f"{len(doc.page_starts)} pages" if pdf else f"{len(doc.text.split()):,} words"
+    known = Sample(name, document_name(name), "PDF" if pdf else "Text", size, doc_id_of(doc.text))
+    _samples_read[key] = known
+    return known

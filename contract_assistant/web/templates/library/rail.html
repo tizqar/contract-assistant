@@ -1,31 +1,29 @@
-{# The contracts rail: the list of contracts, the upload and how answers are made. #}
+{# The contracts drawer: the list, adding a contract or a sample, and the analysis file. The workspace page includes it and GET /documents/{id}/rail renders it alone, from the same context. #}
 <div class="rail-head">
-  <span class="eyebrow">Contracts</span>
+  <span class="eyebrow">{{ copy.CONTRACTS }}</span>
   <a class="link small" href="/portfolio">Portfolio</a>
 </div>
-<nav class="doc-list" aria-label="Contracts">
+<nav class="doc-list" aria-label="{{ copy.CONTRACTS }}">
   {% for d in documents %}
-  <a class="doc-item {% if d.doc_id == cache.doc_id %}doc-item-active{% endif %}" href="/documents/{{ d.doc_id }}"
-     {% if d.doc_id == cache.doc_id %}aria-current="page"{% endif %}>
+  {% set active = d.doc_id == cache.doc_id %}
+  <a class="doc-item{% if active %} doc-item-active{% endif %}" href="/documents/{{ d.doc_id }}"{% if active %} aria-current="page"{% endif %}>
     <span class="doc-name">{{ d.name }}</span>
-    <span class="doc-meta">{{ 'PDF' if d.kind == 'pdf' else 'Text' }} · {{ d.size }} · {{ d.found }} found, {{ d.check }} to verify</span>
+    <span class="doc-meta"><span>{{ 'PDF' if d.kind == 'pdf' else 'Text' }} · {{ d.size }}</span><span class="doc-meta-sep"> · </span><span class="doc-counts">{{ d.found }} {{ copy.STATUS.found|lower }} · {% if d.check %}{{ d.check }} to check{% else %}nothing to check{% endif %}</span></span>
   </a>
   {% endfor %}
 </nav>
-<a class="link small rail-link" href="/documents/{{ cache.doc_id }}/analysis.json" download>Download this analysis (JSON)</a>
 <details class="add-contract">
   <summary class="btn btn-dashed">
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
-    Add a contract
+    {{ copy.ADD_CONTRACT }}
   </summary>
   <div class="add-body">
     {% include "library/upload.html" %}
   </div>
 </details>
-<div id="report-result" class="report-result"></div>
+{% if can_read %}{% include "library/samples.html" %}{% endif %}
 <div class="grow"></div>
-<div class="rail-note">
-  <strong>How answers are made</strong>
-  A fine-tuned encoder found the clauses once. Every quote is checked word for word. Text marked generated was written by the local model from those quotes and checked against them.
-  <span class="block">Found from {{ '%g' % tau.high }} · Verify from {{ '%g' % tau.low }}</span>
-</div>
+<details class="rail-more">
+  <summary class="link small">More</summary>
+  <a class="link small" href="/documents/{{ cache.doc_id }}/analysis.json" download>Download what the assistant found (JSON)</a>
+</details>

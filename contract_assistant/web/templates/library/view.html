@@ -1,5 +1,5 @@
 {% import "components.html" as c %}
-{# The document pane: the PDF page with the passage boxed, or the text with the passage highlighted, then the passage card. #}
+{# The document pane: the PDF page with the passage boxed, or the text with the passage highlighted, then the passage card with the reader's decision and the actions. #}
 <div class="doc-toolbar">
   {% if has_copy %}
   <div class="seg" role="group" aria-label="Show the contract as">
@@ -27,6 +27,38 @@
   {% endif %}
   {% if mode == 'text' and heading != 'Page %d' % page %}<span class="doc-heading">{{ heading }}</span>{% endif %}
 </div>
+{% if not citation %}
+<p class="doc-hint">Pick a passage in the overview or ask a question to see it here.</p>
+{% endif %}
+{% if citation %}
+<div class="card passage-card">
+  <div class="passage-head">
+    {% if status %}{{ c.badge(status) }}{% endif %}
+    {% if label != RELATED_LABEL %}<strong class="passage-label">{{ label }}</strong>{% endif %}
+    {% if citation.page %}<span class="muted small">{{ copy.PAGE.format(page=citation.page) }}</span>{% endif %}
+  </div>
+  {{ c.quote(citation.quote) }}
+  <div class="passage-actions">
+    {{ c.decide(cache.doc_id, label, citation, status) }}
+    <span class="grow"></span>
+    {% for language, text in (('en', copy.EXPLAIN), ('sr', copy.EXPLAIN_SR)) %}
+    <form class="inline-form" data-stream data-target="#chat-body"
+          action="/documents/{{ cache.doc_id }}/explain" method="post" enctype="multipart/form-data">
+      <input type="hidden" name="label" value="{{ label }}">
+      <input type="hidden" name="quote" value="{{ citation.quote }}">
+      <input type="hidden" name="language" value="{{ language }}">
+      <input type="hidden" name="start" value="{{ citation.start }}">
+      <input type="hidden" name="end" value="{{ citation.end }}">
+      <input type="hidden" name="conf" value="{{ '%g' % citation.conf }}">
+      {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+      <button type="submit" class="btn btn-sm">{{ text }}</button>
+      <button type="button" class="btn btn-stop btn-sm" data-stop hidden>Stop</button>
+    </form>
+    {% endfor %}
+    <button type="button" class="btn btn-sm" data-copy="{{ citation.quote }}">{{ copy.COPY_QUOTE }}</button>
+  </div>
+</div>
+{% endif %}
 {% if mode == 'page' %}
 <img class="doc-page" src="{{ image }}" alt="Page {{ page }} of the contract{% if citation and page == citation.page %} with the {{ label }} passage boxed{% endif %}">
 {% else %}
@@ -35,26 +67,4 @@
     {%- if mark %}<mark class="highlight" data-label="{{ mark }}">{{ text }}</mark>{% else %}{{ text }}{% endif -%}
   {%- endfor -%}
 </article>
-{% endif %}
-{% if citation %}
-<div class="card passage-card">
-  <div class="passage-head">
-    {% if status in ('found', 'check', 'not_found') %}{{ c.badge(status) }}{% elif status %}{{ c.tag(status, status|capitalize) }}{% endif %}
-    <strong>{{ label }}</strong>
-    <span class="muted small">{% if citation.page %}Page {{ citation.page }} · {% endif %}{{ citation.conf|percent }} confidence</span>
-    <span class="grow"></span>
-    {% for language, text in (('en', 'Explain'), ('sr', 'Explain in Serbian')) %}
-    <form class="inline-form" data-stream data-target="#insight-body" data-activate="chat"
-          action="/documents/{{ cache.doc_id }}/explain" method="post" enctype="multipart/form-data">
-      <input type="hidden" name="label" value="{{ label }}">
-      <input type="hidden" name="quote" value="{{ citation.quote }}">
-      <input type="hidden" name="language" value="{{ language }}">
-      <button type="submit" class="btn btn-sm">{{ text }}</button>
-      <button type="button" class="btn btn-stop btn-sm" data-stop hidden>Stop</button>
-    </form>
-    {% endfor %}
-    <button type="button" class="btn btn-sm" data-copy="{{ citation.quote }}">Copy quote</button>
-  </div>
-  {{ c.quote(citation.quote) }}
-</div>
 {% endif %}

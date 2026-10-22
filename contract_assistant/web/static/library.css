@@ -1,4 +1,5 @@
-/* The contracts: the document pane, the comparison and the portfolio. Tokens come from app.css. */
+/* The contracts: the first page, the drawer, the document pane, the comparison and the portfolio.
+ * Tokens come from app.css. */
 
 :root {
   --right: #7C3AED;
@@ -6,15 +7,64 @@
   --swatch-edge: #CDD3DA;
 }
 
-/* Rail */
-.rail-link { padding: 0 8px; }
+/* First page */
+.first-run { align-items: flex-start; padding-top: max(40px, 8vh); }
+.welcome { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 18px; }
+.welcome-title { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.welcome-lead { font-size: 16px; line-height: 1.55; color: var(--ink-2); }
+.welcome-card { max-width: none; }
+
+/* Sample contracts, in the drawer and on the first page */
+.samples { display: flex; flex-direction: column; gap: 8px; }
+.samples-title {
+  margin: 0; padding: 0 8px; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+}
+.sample-list { display: flex; flex-direction: column; gap: 6px; }
+.sample { display: flex; gap: 6px; align-items: stretch; margin: 0; }
+.sample-btn {
+  flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 8px 12px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+  font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+}
+.sample-btn:hover:not(:disabled) { border-color: var(--primary); background: var(--primary-soft); }
+.sample-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sample-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.sample-name { font-weight: 600; }
+.sample-meta { font-size: 12px; color: var(--muted); }
+.samples-wide { gap: 10px; }
+.samples-wide .samples-title {
+  padding: 0; font-size: 14px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink);
+}
+.samples-wide .sample-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.samples-wide .sample-btn { min-height: 64px; padding: 12px 14px; }
+
+/* Drawer */
+/* The counts of a contract on a line of their own, so that a wrap never splits them. */
+.doc-meta-sep { display: none; }
+.doc-counts { display: block; }
+.upload-status:empty { display: none; }
+.rail-more { padding: 0 8px; font-size: 12px; }
+.rail-more summary { list-style: none; color: var(--muted); }
+.rail-more summary::-webkit-details-marker { display: none; }
+.rail-more[open] summary { margin-bottom: 6px; }
 
 /* Document pane */
 .pager { display: inline-flex; align-items: center; gap: 8px; }
 .pager-label { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .icon-btn:hover:not(:disabled) { background: var(--surface-2); }
 .icon-btn:disabled { opacity: 0.4; cursor: default; }
+.doc-hint {
+  max-width: 760px; width: 100%; align-self: center; padding: 10px 14px;
+  border: 1px dashed var(--border); border-radius: var(--radius); background: var(--surface); color: var(--muted);
+}
+/* The passage card stays in view while the text or the page scrolls under it. */
+.passage-card { position: sticky; top: calc(var(--topbar-h) + 8px); z-index: 5; box-shadow: var(--shadow); gap: 10px; }
+.passage-card .quote { max-height: 9.5em; overflow-y: auto; }
 .passage-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.passage-label { font-size: 15px; }
+.passage-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .inline-form { display: inline-flex; align-items: center; gap: 4px; margin: 0; }
 
 /* Full pages */
@@ -52,6 +102,11 @@
 .compare-terms .kv { padding-left: 11px; }
 .compare-terms .kv-head { padding-left: 14px; }
 .flags-head { margin-top: 8px; }
+.legend-chip {
+  display: inline-flex; align-items: center; padding: 2px 10px 2px 8px;
+  border: 1px solid var(--border); border-left: 3px solid var(--check); border-radius: 6px;
+  background: var(--surface); font-size: 12px; font-weight: 600; color: var(--ink-2);
+}
 .flag-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .checklist { display: flex; flex-direction: column; gap: 12px; }
 .checklist[data-show="diff"] [data-kind="same"],
@@ -89,6 +144,8 @@
 .swatch-none { background: var(--border-2); border: 1px solid var(--swatch-edge); }
 
 @media (max-width: 760px) {
+  .passage-card { position: static; }
+  .welcome-title { font-size: 24px; }
   .compare-top .swap { transform: rotate(90deg); }
   .compare-tile { flex-basis: 100%; }
 }

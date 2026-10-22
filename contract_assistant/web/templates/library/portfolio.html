@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% import "components.html" as c %}
-{# The portfolio: totals, then one row per analysed contract; a row opens its workspace. #}
+{# The portfolio: totals, then one row per contract read; a row opens its workspace. #}
 {% block title %}Portfolio · Contract Assistant{% endblock %}
 {% block switcher %}
 <nav class="crumbs" aria-label="Breadcrumb">
@@ -15,7 +15,7 @@
 {% block main %}
 <main class="page" aria-label="Portfolio">
   {% if not contracts %}
-  {{ c.notice("No contract has been analysed yet. Open the workspace to add one.") }}
+  <p class="notice">No contracts yet. <a class="link" href="/">Add one or try a sample</a>.</p>
   {% else %}
   <div class="stats">
     <div class="stat">
@@ -26,15 +26,15 @@
     <div class="stat">
       <span class="stat-label">Clauses found</span>
       <span class="stat-value ink-found">{{ found }}</span>
-      <span class="muted small">of {{ contracts|length * total }} checks across {{ total }} types</span>
+      <span class="muted small">of {{ total }} looked for in each contract</span>
     </div>
     <div class="stat">
-      <span class="stat-label">Passages to verify</span>
+      <span class="stat-label">Passages to check</span>
       <span class="stat-value ink-check">{{ check }}</span>
-      <span class="muted small">a reader should confirm each</span>
+      <span class="muted small">read each, then confirm or reject it</span>
     </div>
     <div class="stat">
-      <span class="stat-label">High review flags</span>
+      <span class="stat-label">High-priority points</span>
       <span class="stat-value ink-high">{{ flags_high }}</span>
       <span class="muted small">{{ flags_medium }} medium, {{ flags_low }} low</span>
     </div>
@@ -53,12 +53,12 @@
            placeholder="Search by name, party or governing law" data-row-search="#portfolio-rows">
     <div class="chips" role="group" aria-label="Filter the contracts" data-row-filters="#portfolio-rows">
       <button type="button" class="chip chip-active" data-row-filter="" aria-pressed="true">All</button>
-      <button type="button" class="chip" data-row-filter="high" aria-pressed="false">With high flags</button>
+      <button type="button" class="chip" data-row-filter="high" aria-pressed="false">With high-priority points</button>
       <button type="button" class="chip" data-row-filter="renews" aria-pressed="false">With a renewal term</button>
       <button type="button" class="chip" data-row-filter="nolaw" aria-pressed="false">No governing law</button>
     </div>
     <span class="grow"></span>
-    <span class="meta">{% if ws.gen_model %}Every key term is a verbatim slice of a clause.{% else %}The key terms need the language model, which is off.{% endif %}</span>
+    <span class="meta">{% if ws.gen_model %}Key terms are copied word for word from the contract.{% else %}The key terms need the local AI, which is off.{% endif %}</span>
   </div>
 
   <div class="table-scroll">
@@ -66,11 +66,11 @@
       <thead>
         <tr>
           <th scope="col">Contract</th>
-          <th scope="col">Coverage of {{ total }} types</th>
+          <th scope="col">Clauses found, of {{ total }}</th>
           <th scope="col">Governing law</th>
           <th scope="col">Notice period</th>
           <th scope="col">Renewal</th>
-          <th scope="col">Review flags</th>
+          <th scope="col">{% for key, title, line in copy.SECTIONS if key == 'checks' %}{{ title }}{% endfor %}</th>
         </tr>
       </thead>
       <tbody id="portfolio-rows">
@@ -84,7 +84,7 @@
           </td>
           <td>
             <span class="coverage" aria-hidden="true"><span class="found" style="width: {{ item.found_width }}%"></span><span class="check" style="width: {{ item.check_width }}%"></span></span>
-            <span class="block meta">{{ row.found }} found · {{ row.check }} verify · {{ row.not_found }} not found</span>
+            <span class="block meta">{{ row.found }} {{ copy.STATUS.found|lower }} · {{ row.check }} to check · {{ row.not_found }} {{ copy.STATUS.not_found|lower }}</span>
           </td>
           {% for field in ('governing_law', 'notice_period', 'renewal_term') %}
           {% set value, stated = item.terms[field] %}
@@ -101,10 +101,10 @@
   <p class="muted small" id="portfolio-empty" hidden>No contract matches the search.</p>
 
   <div class="legend">
-    <span class="legend-item"><span class="swatch swatch-found"></span>Found, confidence {{ '%g' % ws.settings.tau_high }} or above</span>
-    <span class="legend-item"><span class="swatch swatch-check"></span>Verify, a passage to read</span>
-    <span class="legend-item"><span class="swatch swatch-none"></span>Not found</span>
-    <span>Open a row to work on that contract. The counts use the default thresholds.</span>
+    <span class="legend-item" title="{{ copy.STATUS_HELP.found }}"><span class="swatch swatch-found"></span>{{ copy.STATUS.found }}</span>
+    <span class="legend-item" title="{{ copy.STATUS_HELP.check }}"><span class="swatch swatch-check"></span>{{ copy.STATUS.check }}</span>
+    <span class="legend-item" title="{{ copy.STATUS_HELP.not_found }}"><span class="swatch swatch-none"></span>{{ copy.STATUS.not_found }}</span>
+    <span>Open a row to work on that contract.</span>
   </div>
   {% endif %}
 </main>
