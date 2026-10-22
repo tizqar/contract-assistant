@@ -13,12 +13,16 @@ from contract_assistant.store import DOC_ID_PREFIX
 from contract_assistant.textsearch import pattern_of
 
 DOCUMENTS_DIR = "documents"
-RESOLUTION = 110
-# The first words of a quote are enough to find it on the page; fewer when the line wraps oddly.
+RESOLUTION = 170
+# The whole quote is looked for first; when the text layer differs from the extracted text,
+# its opening words are enough to find it, fewer when the line wraps oddly.
 SEARCH_WORDS = (14, 8, 4)
-FILL = (255, 221, 0, 90)
-STROKE = (217, 119, 6)
-STROKE_WIDTH = 2
+# A translucent marker over each line, with no frame: the page reads as highlighted.
+FILL = (255, 225, 0, 115)
+STROKE = (255, 225, 0, 0)
+STROKE_WIDTH = 0
+LINE_TOLERANCE = 2.5
+PADDING = 1.5
 
 
 class PageError(ValueError):
@@ -46,14 +50,39 @@ def page_count(pdf_path: Path) -> int:
 
 
 def find_quote(page: pdfplumber.page.Page, quote: str) -> list[dict]:
-    """Return the boxes of the first match of the quote's opening words on the page."""
+    """Return the boxes of the quote on the page, one per line of text, else nothing."""
     words = quote.split()
-    for count in SEARCH_WORDS:
+    counts = [len(words), *(count for count in SEARCH_WORDS if count < len(words))]
+    for count in counts:
         pattern = r"\s*".join(re.escape(word) for word in words[:count])
         matches = page.search(pattern, regex=True, case=True)
         if matches:
-            return [matches[0]]
+            return line_boxes(matches[0])
     return []
+
+
+def line_boxes(match: dict) -> list[dict]:
+    """Split one match into a box per line, so a passage reads as marked, not framed."""
+    chars = [char for char in match.get("chars", []) if char.get("text", "").strip()]
+    if not chars:
+        return [{key: match[key] for key in ("x0", "top", "x1", "bottom")}]
+    lines: list[dict] = []
+    for char in sorted(chars, key=lambda c: (round(c["top"]), c["x0"])):
+        line = lines[-1] if lines else None
+        if line is None or abs(char["top"] - line["top"]) > LINE_TOLERANCE:
+            lines.append(
+                {
+                    "x0": char["x0"] - PADDING,
+                    "top": char["top"] - PADDING,
+                    "x1": char["x1"] + PADDING,
+                    "bottom": char["bottom"] + PADDING,
+                }
+            )
+            continue
+        line["x0"] = min(line["x0"], char["x0"] - PADDING)
+        line["x1"] = max(line["x1"], char["x1"] + PADDING)
+        line["bottom"] = max(line["bottom"], char["bottom"] + PADDING)
+    return lines
 
 
 def find_all(page: pdfplumber.page.Page, term: str) -> list[dict]:
@@ -61,7 +90,8 @@ def find_all(page: pdfplumber.page.Page, term: str) -> list[dict]:
     pattern = pattern_of(term)
     if pattern is None:
         return []
-    return page.search(pattern.pattern, regex=True, case=False)
+    matches = page.search(pattern.pattern, regex=True, case=False)
+    return [box for match in matches for box in line_boxes(match)]
 
 
 def page_image(

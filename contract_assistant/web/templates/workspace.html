@@ -34,11 +34,14 @@
   <section class="chat-pane" aria-label="{{ _('Chat') }}">
     <div id="chat-body" class="chat-body" hx-get="/documents/{{ cache.doc_id }}/chat" hx-trigger="load" hx-swap="innerHTML"></div>
     <footer class="composer">
-      <div class="chips-row" aria-label="{{ _('Suggested questions') }}">
-        {% for text in suggestions %}
-        <button type="button" class="chip" data-fill="{{ _(text) }}">{{ _(text) }}</button>
-        {% endfor %}
-      </div>
+      <details class="suggest" id="suggest">
+        <summary aria-label="{{ _('Suggested questions') }}">{{ _("Suggested questions") }}<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></summary>
+        <div class="suggest-panel">
+          {% for text in suggestions %}
+          <button type="button" class="chip" data-fill="{{ _(text) }}">{{ _(text) }}</button>
+          {% endfor %}
+        </div>
+      </details>
       <form class="ask" data-stream data-target="#chat-body" data-reset
             action="/documents/{{ cache.doc_id }}/ask" method="post">
         <label class="sr-only" for="question">{{ _("Ask about this contract") }}</label>

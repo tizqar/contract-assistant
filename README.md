@@ -32,7 +32,7 @@ The web app is a FastAPI application with server-rendered pages (Jinja2 template
 a small script; no build step), written for readers who are not lawyers or developers. The
 workspace shows an overview of the contract (summary, key facts, things to check, who must
 do what, all clauses, defined terms) or the document itself with the cited passage
-highlighted (the page of the PDF with the passage boxed, for a PDF), next to a chat that is
+highlighted (the page of the PDF with the passage marked, for a PDF), next to a chat that is
 always open. The contracts live in a sidebar that slides in. A passage the assistant is not
 sure about is marked "Check this" and carries Confirm and Not this buttons: a confirmed
 passage counts as found everywhere, a rejected one is dropped, and the decision is kept per
@@ -152,7 +152,7 @@ own definition, with no router and no model; `--types` skips that lookup.
 contract-assistant page contract.pdf 3 --quote "governed by the laws"
 ```
 
-It writes a PNG with the quote boxed to `cache/pages/` (or to `--out`) and prints the path.
+It writes a PNG with the quote marked line by line to `cache/pages/` (or to `--out`) and prints the path.
 It needs the copy that `extract` keeps of the PDF; a text file has no pages.
 
 The evaluations use the 41 CUAD clause types only:
@@ -226,7 +226,7 @@ numbers (`p. n/a`); a PDF gives the page.
 The web app calls the same tiers Found, Check this and Not found, and explains them in a
 help popover (the question mark in the top bar). An answer in the chat is a card per clause
 with the quote and the page; the document pane opens at the passage, highlighted in the text
-or boxed on the page of the PDF (rendered from the copy kept under `cache/documents/` for a
+or marked on the page of the PDF (rendered from the copy kept under `cache/documents/` for a
 PDF uploaded through the app or analysed with `extract`; the demo text files show the
 excerpt). A passage marked Check this carries Confirm and Not this, in the chat, in the
 overview and under the document; Undo takes a decision back. The overview lists what the
@@ -243,7 +243,7 @@ saved parts.
 | ![The overview filling in](docs/screenshots/generating.png) | ![The overview of a contract](docs/screenshots/overview.png) |
 | Right after the analysis the summary and the key facts are written in front of the reader. | The overview: what the assistant did, the summary and the sections below it. |
 | ![All clauses with Confirm and Not this](docs/screenshots/clauses.png) | ![A passage confirmed by the reader](docs/screenshots/confirmed.png) |
-| All clauses: a passage to check carries Confirm and Not this. | After Confirm the passage counts as found and the document shows it boxed. |
+| All clauses: a passage to check carries Confirm and Not this. | After Confirm the passage counts as found and the document shows it marked. |
 | ![A found answer in the chat](docs/screenshots/chat.png) | ![A clause restated in plain English](docs/screenshots/explain.png) |
 | A question answered with the quote and its page; the document opens at the passage. | "explain that": a restatement with the AI badge. |
 | ![The closest passages for a question outside the clauses](docs/screenshots/passages.png) | ![The contracts sidebar](docs/screenshots/drawer.png) |
@@ -252,15 +252,15 @@ saved parts.
 | How to read the labels, in the reader's words. | Two contracts side by side: the key terms, the things to check and the clauses that differ. |
 | ![The portfolio](docs/screenshots/portfolio.png) | ![Search inside the document](docs/screenshots/search.png) |
 | Every analysed contract with its coverage, key terms and flags. | Search inside the document: every occurrence with its page. |
-| ![Every occurrence boxed on the page](docs/screenshots/occurrences.png) | ![The Serbian interface](docs/screenshots/serbian.png) |
-| One hit opened on the page, with every occurrence boxed and previous / next. | The same workspace in Serbian, with the summary written in Serbian. |
+| ![Every occurrence marked on the page](docs/screenshots/occurrences.png) | ![The Serbian interface](docs/screenshots/serbian.png) |
+| One hit opened on the page, with every occurrence marked and previous / next. | The same workspace in Serbian, with the summary written in Serbian. |
 | ![A scanned PDF read with OCR](docs/screenshots/scanned.png) | |
 | A scanned PDF: both pages read with Tesseract, opened in text mode with the OCR note. | |
 
 ### Search, scans and the Serbian interface
 
 The search box in the document pane lists every occurrence of a term with its page and a
-snippet; each one opens the document at that place with all the occurrences marked, boxed on
+snippet; each one opens the document at that place with all the occurrences marked on
 the page of a PDF or highlighted in the text. The Defined terms section offers the same for
 each term ("Show every occurrence"). The matching ignores case and line breaks and needs at
 least two characters.

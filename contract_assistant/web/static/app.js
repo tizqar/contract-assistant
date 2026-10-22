@@ -246,6 +246,8 @@
     const chip = event.target.closest("[data-fill]");
     if (chip) {
       const input = document.getElementById("question");
+      const panel = chip.closest("details.suggest");
+      if (panel) panel.open = false;
       if (input) {
         input.value = chip.dataset.fill;
         const form = input.closest("form");

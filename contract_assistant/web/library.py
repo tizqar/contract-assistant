@@ -12,6 +12,7 @@ import queue
 import re
 import tempfile
 import time
+from collections import OrderedDict
 from collections.abc import Callable, Generator, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -105,6 +106,9 @@ SEVERITIES = ("high", "medium", "low")
 BOLD = re.compile(r"\*\*(.+?)\*\*")
 # Page breaks of the demo texts are runs of blank lines; one blank line is enough on screen.
 BLANK_LINES = re.compile(r"\n[ \t]*\n(?:[ \t]*\n)+")
+# A line break inside a paragraph (PDF text and OCR text are wrapped by line); a blank line stays.
+LINE_BREAK = re.compile(r"(?<!\n)\n(?!\n)")
+RENDERED_PAGES = 12
 CODE = re.compile(r"`(.+?)`")
 # The marks of the text view: the passage shown, and every other occurrence of a searched term.
 HIGHLIGHT = "highlight"
@@ -253,6 +257,11 @@ SAMPLE_FILES = (
 SAMPLE_ERRORS = (UnsupportedFileError, EmptyDocumentError)
 
 ProgressItem = tuple[int, int, str]
+
+
+def _flowed(text: str) -> str:
+    """Return a piece of the text with its paragraphs flowing: one blank line between them."""
+    return LINE_BREAK.sub(" ", BLANK_LINES.sub("\n\n", text))
 Span = tuple[int, int]
 # A piece of the text view: its text, its mark (None, HIGHLIGHT or OCCURRENCE) and its label.
 Segment = tuple[str, str | None, str | None]
@@ -403,7 +412,7 @@ def document_pane(
         cache=cache,
         heading=heading,
         show_heading=mode == TEXT_MODE and own_page != shown,
-        segments=[(BLANK_LINES.sub("\n\n", text), mark, name) for text, mark, name in segments],
+        segments=[(_flowed(text), mark, name) for text, mark, name in segments],
         label=label or PASSAGE_LABEL,
         label_text=translate(label or PASSAGE_LABEL, lang),
         citation=citation,
@@ -485,15 +494,22 @@ def page_png(
     citation = _citation(cache, start, end, 1.0)
     term, _ = _term(q)
     key = (cache.doc_id, number, citation.quote if citation else None, term or None)
-    # Paging back and forth asks for the same image again; the last one is kept.
-    rendered = getattr(request.app.state, "rendered_page", None)
-    if rendered is None or rendered[0] != key:
+    # Paging back and forth asks for the same images again; the last few are kept.
+    state = request.app.state
+    rendered = getattr(state, "rendered_pages", None)
+    if rendered is None:
+        rendered = state.rendered_pages = OrderedDict()
+    image = rendered.get(key)
+    if image is None:
         try:
-            rendered = (key, page_image(copy, number, key[2], key[3]))
+            image = page_image(copy, number, key[2], key[3])
         except PageError as error:
             raise HTTPException(status_code=404, detail=_t(request, NO_SUCH_PAGE)) from error
-        request.app.state.rendered_page = rendered
-    return Response(rendered[1], media_type="image/png", headers=PAGE_CACHE_HEADERS)
+        rendered[key] = image
+        while len(rendered) > RENDERED_PAGES:
+            rendered.popitem(last=False)
+    rendered.move_to_end(key)
+    return Response(image, media_type="image/png", headers=PAGE_CACHE_HEADERS)
 
 
 @router.get("/documents/{doc_id}/analysis.json")

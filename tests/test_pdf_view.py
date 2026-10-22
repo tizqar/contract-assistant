@@ -4,6 +4,7 @@ from fpdf import FPDF
 
 from contract_assistant.pdf import load_document
 from contract_assistant.pdf_view import (
+    PADDING,
     PageError,
     copy_path,
     find_quote,
@@ -86,7 +87,8 @@ def test_first_match_is_the_upper_one(tmp_path):
     path = write_pdf(tmp_path / "twice.pdf", [f"{SENTENCE_ONE}\n{FILLER}\n{SENTENCE_ONE}"])
     with pdfplumber.open(path) as pdf:
         every = pdf.pages[0].search(SENTENCE_ONE)
-    assert boxes_on(path, 1, SENTENCE_ONE)[0]["top"] == min(box["top"] for box in every)
+    upper = min(box["top"] for box in every)
+    assert boxes_on(path, 1, SENTENCE_ONE)[0]["top"] == pytest.approx(upper - PADDING)
 
 
 def test_page_image_without_quote_is_a_png(pdf_path):
