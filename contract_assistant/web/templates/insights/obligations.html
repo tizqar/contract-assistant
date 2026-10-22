@@ -6,7 +6,7 @@
       action="/documents/{{ cache.doc_id }}/obligations" method="post">
   <div id="obligations-live" class="live">{{ c.status_line(pending) }}</div>
   <div class="row gap">
-    <button type="button" class="btn btn-stop btn-sm" data-stop hidden>Stop</button>
+    <button type="button" class="btn btn-stop btn-sm" data-stop data-stopped="{{ _('Stopped.') }}" hidden>{{ _("Stop") }}</button>
   </div>
 </form>
 {% endif %}
@@ -15,7 +15,7 @@
   <h3 class="group-title">{{ party.name }}</h3>
   <div class="rows">
     {% for o in party.entries %}
-    <div class="obligation" title="{{ o.clause }}">
+    <div class="obligation" title="{{ _(o.clause) }}">
       <div class="row gap wrap">
         <span class="badge badge-{{ o.css }} badge-sm">{{ o.modality }}</span>
         {% if o.page %}<span class="muted small">{{ copy.PAGE.format(page=o.page) }}</span>{% endif %}

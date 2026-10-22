@@ -6,7 +6,7 @@
       action="/documents/{{ cache.doc_id }}/terms" method="post">
   <div id="terms-live" class="live">{{ c.status_line(pending) }}</div>
   <div class="row gap">
-    <button type="button" class="btn btn-stop btn-sm" data-stop hidden>Stop</button>
+    <button type="button" class="btn btn-stop btn-sm" data-stop data-stopped="{{ _('Stopped.') }}" hidden>{{ _("Stop") }}</button>
   </div>
 </form>
 {% endif %}
@@ -25,7 +25,7 @@
 {% endif %}
 {% if dates is defined %}
 <div class="dates">
-  <h3 class="sub-title">Key dates</h3>
+  <h3 class="sub-title">{{ _("Key dates") }}</h3>
   <p class="muted small">{{ dates_intro }}</p>
   {% if dates %}
   <div class="rows">
@@ -42,4 +42,4 @@
   {% endif %}
 </div>
 {% endif %}
-{% if download %}<a class="link small" href="/documents/{{ cache.doc_id }}/terms.json" download data-thresholds>Download the key facts as JSON</a>{% endif %}
+{% if download %}<a class="link small" href="/documents/{{ cache.doc_id }}/terms.json" download data-thresholds>{{ _("Download the key facts as JSON") }}</a>{% endif %}

@@ -3,6 +3,7 @@
 (function () {
   "use strict";
 
+  // The page's word comes from the button (data-stopped, in the interface language).
   const STOPPED = "Stopped.";
   const PANE = "overview-pane";
   let spy = null;
@@ -16,7 +17,7 @@
     // The text written so far was never checked against the contract, so it is not kept.
     const note = document.createElement("p");
     note.className = "muted small";
-    note.textContent = STOPPED;
+    note.textContent = stop.dataset.stopped || STOPPED;
     live.replaceChildren(note);
   });
 

@@ -5,7 +5,7 @@
   {% if pending or (view and view.text) %}{{ c.ai() }}{% endif %}
   <span class="grow"></span>
   {% if languages %}
-  <div class="seg" role="group" aria-label="Language of the summary">
+  <div class="seg" role="group" aria-label="{{ _('Language of the summary') }}">
     {% for code, name in languages %}
     <button type="button" class="seg-item{% if code == language %} seg-item-active{% endif %}"
             aria-pressed="{{ 'true' if code == language else 'false' }}"
@@ -22,18 +22,18 @@
   <input type="hidden" name="language" value="{{ language }}">
   <div id="summary-live-{{ language }}" class="live">{{ c.status_line(pending) }}</div>
   <div class="row gap">
-    <button type="button" class="btn btn-stop btn-sm" data-stop hidden>Stop</button>
+    <button type="button" class="btn btn-stop btn-sm" data-stop data-stopped="{{ _('Stopped.') }}" hidden>{{ _("Stop") }}</button>
   </div>
 </form>
 {% elif view and view.text %}
 <div class="generated-text">{{ view.text }}</div>
 {% if view.sources %}
 <div class="sources">
-  <span class="eyebrow">Based on</span>
+  <span class="eyebrow">{{ _("Based on") }}</span>
   <div class="chips">
     {% for s in view.sources %}
     <a class="chip source-chip" href="#document-pane" hx-get="{{ s.url }}" hx-target="#document-pane" hx-swap="innerHTML"
-       title="{{ s.hint }}"><span class="source-dot source-dot-{{ s.status }}" aria-hidden="true"></span>{{ s.name }}<span class="sr-only"> ({{ s.status|status_label }})</span></a>
+       title="{{ s.hint }}"><span class="source-dot source-dot-{{ s.status }}" aria-hidden="true"></span>{{ _(s.name) }}<span class="sr-only"> ({{ s.status|status_label }})</span></a>
     {% endfor %}
   </div>
 </div>

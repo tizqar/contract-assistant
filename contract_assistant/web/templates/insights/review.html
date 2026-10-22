@@ -10,13 +10,13 @@
   </div>
   <p>{{ f.note }}</p>
   <div class="row gap wrap">
-    {% if f.url %}{{ c.view_link(f.url, "Show passage") }}{% else %}<span class="muted small">{{ no_passage }}</span>{% endif %}
+    {% if f.url %}{{ c.view_link(f.url, _("Show passage")) }}{% else %}<span class="muted small">{{ no_passage }}</span>{% endif %}
     {% if f.can_note %}
     <form class="stream-form row gap" data-stream data-target="#flag-note-{{ loop.index0 }}"
           action="/documents/{{ cache.doc_id }}/review/{{ loop.index0 }}/note" method="post">
       <input type="hidden" name="rule" value="{{ f.rule }}">
-      <button type="submit" class="btn btn-sm">Write a note</button>
-      <button type="button" class="btn btn-stop btn-sm" data-stop hidden>Stop</button>
+      <button type="submit" class="btn btn-sm">{{ _("Write a note") }}</button>
+      <button type="button" class="btn btn-stop btn-sm" data-stop data-stopped="{{ _('Stopped.') }}" hidden>{{ _("Stop") }}</button>
     </form>
     {% endif %}
   </div>

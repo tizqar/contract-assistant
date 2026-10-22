@@ -1,6 +1,6 @@
 {# The report, under the centre bar: what it was built from and its downloads. #}
 <p>{{ status }}</p>
 <div class="row gap wrap">
-  <a class="link" href="/documents/{{ cache.doc_id }}/report.docx" download data-thresholds>Download Word file</a>
-  <a class="link" href="/documents/{{ cache.doc_id }}/report.md" download data-thresholds>Download Markdown</a>
+  <a class="link" href="/documents/{{ cache.doc_id }}/report.docx" download data-thresholds>{{ _("Download Word file") }}</a>
+  <a class="link" href="/documents/{{ cache.doc_id }}/report.md" download data-thresholds>{{ _("Download Markdown") }}</a>
 </div>

@@ -6,6 +6,7 @@ import pytest
 from markupsafe import escape
 
 from contract_assistant.answer import tier
+from contract_assistant.review import load_rules
 from contract_assistant.term_sheet import NOT_STATED
 from contract_assistant.ui.views import definition_citation, display_name, top_citation
 from contract_assistant.web import copy
@@ -16,6 +17,7 @@ from contract_assistant.web.generate import (
     NOTHING_TO_SUMMARIZE,
     WRITING_SUMMARY,
 )
+from contract_assistant.web.i18n import copy_for, missing
 from contract_assistant.web.insights import (
     AI_NEEDED,
     CHECK_HINT,
@@ -29,6 +31,7 @@ from contract_assistant.web.insights import (
     UNKNOWN_LANGUAGE,
     WRITING_FLAG,
     WRITING_OBLIGATIONS,
+    occurrences_url,
 )
 from tests.support.caches import make_cache
 from tests.support.fakes import ITEM, EchoTextClient, FakeLLMClient
@@ -454,3 +457,120 @@ def test_the_report_without_a_language_model_names_every_missing_part(client):
     )
     assert client.get(f"{DOC}/report.md").status_code == 200
 
+
+
+def test_each_defined_term_links_to_every_occurrence(client):
+    ws = client.app.state.workspace
+    first = ws.definitions(ws.load(SHORT_DOC_ID))[0]
+    url = occurrences_url(SHORT_DOC_ID, first.term)
+    assert url.startswith(f"{DOC}/view?q=") and url.endswith("&mode=text")
+    page = client.get(f"{DOC}/definitions").text
+    assert html.escape(url) in page and "Show every occurrence" in page
+
+
+# The Serbian interface
+
+
+def serbian(client):
+    client.cookies.set("lang", "sr")
+    return client
+
+
+def test_the_overview_in_serbian_names_the_sections_and_the_counts(client):
+    page = serbian(client).get(f"{DOC}/overview").text
+    for _, title, line in copy_for("sr").SECTIONS:
+        assert f">{title}<" in page and str(escape(line)) in page
+    assert ">Sažetak<" in page and ">Ključne činjenice<" in page and ">Summary<" not in page
+    entry = client.app.state.workspace.entry(SHORT_DOC_ID)
+    total = entry.found + entry.check + entry.not_found
+    line = copy_for("sr").WHAT_HAPPENED.format(
+        total=total, found=entry.found, check=entry.check, not_found=entry.not_found
+    )
+    assert line in page and f"Prikaži odlomke za proveru ({entry.check})" in page
+    assert 'aria-label="Idi na odeljak"' in page and CHECK_HINT not in page
+
+
+def test_the_summary_follows_the_interface_language_unless_the_query_names_one(gen_client):
+    page = serbian(gen_client).get(f"{DOC}/summary").text
+    assert 'name="language" value="sr"' in page and "Pišem sažetak" in page
+    assert re.search(r'seg-item seg-item-active"\s+aria-pressed="true"[^>]*>Srpski<', page)
+    assert ">Engleski<" in page and 'aria-label="Jezik sažetka"' in page
+    english = gen_client.get(f"{DOC}/summary", params={"language": "en"}).text
+    assert 'name="language" value="en"' in english
+    lines = frames(gen_client, "POST", f"{DOC}/summary")
+    assert "Pišem sažetak" in lines[0]["html"]
+    panel = lines[-1]["oob"]["summary-panel-sr"]
+    assert "The contract states" in panel and "Na osnovu" in panel
+    saved = gen_client.get(f"{DOC}/summary").text
+    assert panel in saved and "data-autosubmit" not in saved
+    assert "Pregled celog teksta" in saved and "Napiši pregled celog teksta" in saved
+
+
+def test_all_clauses_in_serbian_keep_the_english_names_in_the_forms(client):
+    page = serbian(client).get(f"{DOC}/checklist").text
+    assert active_chip(page) == "Sve" and ">Osnovni podaci<" in page
+    start = page.index('<span class="clause-name">Ugovorne strane</span>')
+    row = page[start : page.find('<div class="clause-row', start)]
+    assert ">Proverite<" in row and ">Potvrdi<" in row and ">Nije to<" in row
+    assert f'name="clause_type" value="{TO_CHECK}"' in row
+    assert "Prikaži u dokumentu" in row and "Show in document" not in row
+    unknown = client.get(f"{DOC}/checklist", params={"status": "maybe"})
+    assert unknown.status_code == 400 and unknown.text.startswith("Prikažite sve klauzule")
+
+
+def test_the_things_to_check_in_serbian(gen_client):
+    page = serbian(gen_client).get(f"{DOC}/review").text
+    assert '<span class="badge badge-medium badge-sm">Vredi pogledati</span>' in page
+    assert "Nije pronađeno ograničenje odgovornosti" in page
+    assert 'title="Na osnovu: Ograničenje odgovornosti (nije pronađeno)"' in page
+    assert ">Napiši belešku<" in page and "Prikaži odlomak" in page
+    assert 'data-stopped="Zaustavljeno."' in page and ">Zaustavi<" in page
+    assert "No cap on liability found" not in page and "Write a note" not in page
+
+
+def test_every_thing_to_check_has_a_serbian_title_and_note():
+    rules = load_rules()
+    assert missing("sr", [text for rule in rules for text in (rule.title, rule.note)]) == []
+
+
+def test_the_key_facts_in_serbian(gen_client):
+    lines = frames(serbian(gen_client), "POST", f"{DOC}/terms")
+    assert "Izdvajam ključne činjenice" in lines[0]["html"]
+    panel = lines[-1]["oob"]["terms-panel"]
+    assert ">Datum ugovora<" in panel and '<em class="muted">nije navedeno</em>' in panel
+    assert 'title="Prepisano iz: Ugovorne strane"' in panel and "Ključni datumi" in panel
+    assert "nije moguće pročitati" in panel and "Preuzmi ključne činjenice kao JSON" in panel
+
+
+def test_a_withheld_text_says_why_in_serbian(make_client):
+    client = serbian(make_client(gen=FakeLLMClient(["no json", "still none"])))
+    panel = frames(client, "POST", f"{DOC}/terms")[-1]["oob"]["terms-panel"]
+    assert "Tekst asistenta je zadržan jer odgovor nije JSON objekat" in panel
+
+
+def test_the_whole_text_overview_streams_in_serbian(gen_client):
+    lines = frames(serbian(gen_client), "POST", f"{DOC}/fulltext")
+    statuses = [line["html"] for line in lines if "html" in line]
+    assert "Pišem pregled celog teksta: odeljak 1 od 4<" in statuses[0]
+    assert any("spajam odeljke" in status for status in statuses)
+    block = lines[-1]["oob"]["fulltext-block"]
+    assert "Odeljak po odeljak · 4" in block and ">Odeljak 1<" in block
+    assert "label=Section+1" in block
+
+
+def test_who_must_do_what_and_the_report_in_serbian(make_client):
+    client = serbian(make_client(gen=ObligationClient()))
+    panel = frames(client, "POST", f"{DOC}/obligations")[-1]["oob"]["obligations-panel"]
+    assert '<span class="badge badge-must badge-sm">mora</span>' in panel
+    assert "Jedna stavka nije pronađena u ugovoru, pa je izostavljena." in panel
+    report = client.post(f"{DOC}/report").text
+    assert (
+        "Izveštaj je spreman, ali ne sadrži sažetak, ključne činjenice i pregled celog "
+        "teksta. Kada se pojave u pregledu, ponovo pritisnite Izveštaj." in report
+    )
+    assert "Preuzmi Word datoteku" in report and "Preuzmi Markdown" in report
+
+
+def test_defined_terms_in_serbian(client):
+    page = serbian(client).get(f"{DOC}/definitions").text
+    assert "Prikaži sva pojavljivanja" in page and ">Definisan pojam<" in page

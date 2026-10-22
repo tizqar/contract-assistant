@@ -14,12 +14,12 @@
     {% endif %}
     {% if fulltext.sections %}
     <details class="fulltext-sections">
-      <summary>Section by section · {{ fulltext.sections|length }}</summary>
+      <summary>{{ _("Section by section · {count}").format(count=fulltext.sections|length) }}</summary>
       <div class="rows">
         {% for s in fulltext.sections %}
         <div class="section-item">
           <div class="row gap wrap">
-            <strong>Section {{ s.number }}</strong>
+            <strong>{{ _("Section {number}").format(number=s.number) }}</strong>
             {% if s.page %}<span class="muted small">{{ copy.PAGE.format(page=s.page) }}</span>{% endif %}
             <span class="grow"></span>
             {{ c.view_link(s.url, copy.SHOW_IN_DOCUMENT) }}
@@ -37,7 +37,7 @@
         action="/documents/{{ cache.doc_id }}/fulltext" method="post">
     <div class="row gap">
       <button type="submit" class="btn btn-sm">{{ fulltext_button }}</button>
-      <button type="button" class="btn btn-stop btn-sm" data-stop hidden>Stop</button>
+      <button type="button" class="btn btn-stop btn-sm" data-stop data-stopped="{{ _('Stopped.') }}" hidden>{{ _("Stop") }}</button>
     </div>
     <div id="fulltext-live" class="live"></div>
   </form>

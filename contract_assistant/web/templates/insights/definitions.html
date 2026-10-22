@@ -1,5 +1,5 @@
 {% import "components.html" as c with context %}
-{# The Defined terms section: each defined term with the sentence that defines it. #}
+{# The Defined terms section: each defined term with the sentence that defines it and a link that marks every place it occurs. #}
 {% if not definitions %}{{ c.notice(no_definitions) }}{% endif %}
 {% for d in definitions %}
 <article class="card">
@@ -9,6 +9,7 @@
     {% if d.page %}<span class="muted small">{{ copy.PAGE.format(page=d.page) }}</span>{% endif %}
     <span class="grow"></span>
     {{ c.view_link(d.url, copy.SHOW_IN_DOCUMENT) }}
+    {{ c.view_link(d.occurrences, _("Show every occurrence")) }}
   </div>
   <p class="serif">{{ d.quote }}</p>
 </article>
