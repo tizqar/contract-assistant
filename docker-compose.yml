@@ -1,0 +1,25 @@
+# The database of the web app. Start it with `make db-up`; the data lives in the named volume
+# `pgdata` and survives restarts and `docker compose down` (only `down -v` removes it).
+name: contract-assistant
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-contract_assistant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-contract_assistant}
+      POSTGRES_DB: ${POSTGRES_DB:-contract_assistant}
+    ports:
+      # Bound to this computer only; 5433 so another project's Postgres on 5432 can run too.
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:

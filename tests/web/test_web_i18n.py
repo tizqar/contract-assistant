@@ -1,9 +1,11 @@
 """The two interface languages: the catalogue covers every string, the cookie picks it."""
 
+import importlib
+import pkgutil
 import re
 from pathlib import Path
 
-from contract_assistant.web import chat, insights, library
+from contract_assistant import access, audit, web
 from contract_assistant.web.i18n import SERBIAN, copy_for, copy_strings, missing, translate
 from tests.web.conftest import SHORT_DOC_ID
 
@@ -20,12 +22,24 @@ def template_strings() -> list[str]:
     return found
 
 
+def registering_modules() -> list:
+    """Every web module, and the policy modules whose messages the pages show."""
+    names = [info.name for info in pkgutil.iter_modules(web.__path__) if not info.ispkg]
+    found = [importlib.import_module(f"{web.__name__}.{name}") for name in names]
+    return [*found, access, audit]
+
+
 def module_strings() -> list[str]:
     """The user-facing constants each area registers for translation."""
     found = []
-    for module in (chat, insights, library):
+    for module in registering_modules():
         found.extend(getattr(module, "TRANSLATED", ()))
     return found
+
+
+def test_the_areas_that_register_strings_are_all_checked():
+    names = {module.__name__.rsplit(".", 1)[-1] for module in registering_modules()}
+    assert {"chat", "insights", "library", "access", "audit"} <= names
 
 
 def test_every_word_of_the_vocabulary_has_a_serbian_version():

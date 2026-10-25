@@ -1,6 +1,7 @@
-.PHONY: test test-slow lint demo ui-dev web-dev import-demo router-eval e2e summary-eval term-sheet-eval passage-eval
+.PHONY: test test-slow test-pg lint db-up db-down db-psql db-backup db-restore demo ui-dev web-dev import-demo router-eval e2e summary-eval term-sheet-eval passage-eval
 test:        ; .venv/bin/python -m pytest -q -m "not slow"
 test-slow:   ; .venv/bin/python -m pytest -q -m slow
+test-pg:     db-up ; .venv/bin/python -m pytest -q -m pg
 lint:        ; .venv/bin/ruff check .
 demo:        ; .venv/bin/contract-assistant serve
 ui-dev:      ; PYTHONPATH=. .venv/bin/gradio tests/support/dev_app.py --watch-dirs contract_assistant
@@ -11,3 +12,11 @@ e2e:         ; .venv/bin/contract-assistant e2e-eval --router llm
 summary-eval: ; .venv/bin/contract-assistant summary-eval
 term-sheet-eval: ; .venv/bin/contract-assistant term-sheet-eval
 passage-eval: ; .venv/bin/contract-assistant passage-eval
+
+# The database of the web app (docker-compose.yml). Its data lives in the volume pgdata.
+BACKUPS ?= backups
+db-up:       ; docker compose up -d --wait db
+db-down:     ; docker compose stop db
+db-psql:     ; docker compose exec db psql -U contract_assistant contract_assistant
+db-backup:   ; mkdir -p $(BACKUPS) && docker compose exec -T db pg_dump -U contract_assistant -Fc contract_assistant > $(BACKUPS)/contract-assistant-$$(date +%Y%m%d-%H%M%S).dump && ls -t $(BACKUPS) | head -1
+db-restore:  ; test -n "$(FILE)" && docker compose exec -T db pg_restore -U contract_assistant -d contract_assistant --clean --if-exists < $(FILE)

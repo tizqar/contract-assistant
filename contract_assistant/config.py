@@ -7,6 +7,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# The database of docker-compose.yml; `make db-up` starts it.
+DEFAULT_DATABASE_URL = (
+    "postgresql+psycopg://contract_assistant:contract_assistant@127.0.0.1:5433/contract_assistant"
+)
 
 
 def _env(name: str, default: str | None = None) -> str | None:
@@ -65,6 +69,15 @@ class Settings:
 
     # Tesseract languages for scanned pages; the ones not installed are dropped.
     ocr_languages: str = field(default_factory=lambda: _env("OCR_LANGUAGES", "eng+srp_latn+srp"))
+
+    # The web app keeps accounts, contracts, decisions and the activity log in this database;
+    # the command line and the evaluations keep using the cache folder.
+    database_url: str = field(default_factory=lambda: _env("DATABASE_URL", DEFAULT_DATABASE_URL))
+    session_days: int = field(default_factory=lambda: int(_env("SESSION_DAYS", "14")))
+    # True when the app is served over HTTPS, so the sign-in cookie is never sent in clear.
+    cookie_secure: bool = field(
+        default_factory=lambda: (_env("COOKIE_SECURE", "false") or "").lower() == "true"
+    )
 
     cache_dir: Path = field(default_factory=lambda: _path("CACHE_DIR", "cache"))
     demo_cache_dir: Path = ROOT / "demo" / "cache"

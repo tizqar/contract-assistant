@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.support.db import drop_postgres_database, postgres_database, sqlite_database
+
 os.environ.setdefault("GRADIO_ANALYTICS_ENABLED", "False")
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -20,3 +22,19 @@ def parity_contracts() -> dict:
     """Contract texts of the parity fixture, keyed by CUAD title."""
     data = json.loads((FIXTURES / "parity_contracts.json").read_text())["data"]
     return {a["title"]: a["paragraphs"][0]["context"] for a in data}
+
+
+@pytest.fixture
+def database(tmp_path):
+    """An empty app database with every table, in SQLite, for one test."""
+    db = sqlite_database(tmp_path)
+    yield db
+    db.dispose()
+
+
+@pytest.fixture(scope="session")
+def pg_database():
+    """A Postgres database migrated with the real migrations, shared by the pg tests of a run."""
+    db = postgres_database()
+    yield db
+    drop_postgres_database(db)

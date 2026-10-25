@@ -21,6 +21,9 @@ dependencies = [
   "pytesseract>=0.3",
   "python-dotenv>=1.0",
   "python-docx>=1.1",
+  "sqlalchemy>=2.0.36,<2.1",
+  "psycopg[binary]>=3.2",
+  "alembic>=1.14",
 ]
 
 [project.optional-dependencies]
@@ -38,11 +41,20 @@ build-backend = "setuptools.build_meta"
 include = ["contract_assistant*"]
 
 [tool.setuptools.package-data]
-contract_assistant = ["web/templates/**/*.html", "web/static/*"]
+contract_assistant = [
+  "web/templates/**/*.html",
+  "web/static/*",
+  "db/migrations/*.py",
+  "db/migrations/*.mako",
+  "db/migrations/versions/*.py",
+]
 
 [tool.ruff]
 line-length = 96
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["slow: downloads a model and runs inference; run explicitly"]
+markers = [
+  "slow: downloads a model and runs inference; run explicitly",
+  "pg: needs the Postgres of docker-compose (make db-up); skipped when it is not reachable",
+]
