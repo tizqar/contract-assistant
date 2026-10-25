@@ -32,9 +32,9 @@ def database(tmp_path):
     db.dispose()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def pg_database():
-    """A Postgres database migrated with the real migrations, shared by the pg tests of a run."""
+    """An empty Postgres database of its own, migrated with the real migrations, for one test."""
     db = postgres_database()
     yield db
     drop_postgres_database(db)

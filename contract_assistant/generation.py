@@ -6,11 +6,13 @@ import hashlib
 import json
 import logging
 import os
+import re
 import tempfile
 import time
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 from pydantic import BaseModel, ValidationError
 
@@ -213,24 +215,99 @@ def complete_sentences(text: str) -> str:
     return text[: end + 1]
 
 
-class GeneratedStore[T: GeneratedRecord]:
-    """Records saved as JSON files, one per document, model, thresholds, kind and version."""
+class RecordBackend(Protocol):
+    """Where a GeneratedStore keeps its records: JSON text by kind and key."""
 
-    def __init__(self, directory: Path, kind: str, version: int, record_type: type[T]):
+    def read(self, kind: str, key: str) -> str | None:
+        """Return the record saved under kind and key, or None."""
+        ...
+
+    def write(self, kind: str, key: str, doc_id: str, payload: str) -> None:
+        """Save a record of doc_id under kind and key, replacing an earlier one."""
+        ...
+
+    def delete_doc(self, doc_id: str) -> int:
+        """Delete every record of doc_id; return how many there were."""
+        ...
+
+
+class FileRecords:
+    """Records as JSON files in one directory, named by key; the kind is part of the key."""
+
+    def __init__(self, directory: Path):
         self.directory = directory
+
+    def path(self, key: str) -> Path:
+        """Return the file of a key, whether or not it exists yet."""
+        return self.directory / f"{key}.json"
+
+    def read(self, kind: str, key: str) -> str | None:
+        path = self.path(key)
+        if not path.is_file():
+            return None
+        return path.read_text(encoding="utf-8")
+
+    def write(self, kind: str, key: str, doc_id: str, payload: str) -> None:
+        path = self.path(key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(payload)
+            os.replace(tmp_name, path)
+        except BaseException:
+            Path(tmp_name).unlink(missing_ok=True)
+            raise
+
+    def delete_doc(self, doc_id: str) -> int:
+        if not self.directory.is_dir():
+            return 0
+        stem = re.escape(doc_id.removeprefix(DOC_ID_PREFIX))
+        name = re.compile(rf"{stem}-[0-9a-f]{{{KEY_CHARS}}}\.json")
+        paths = [path for path in self.directory.glob("*.json") if name.fullmatch(path.name)]
+        for path in paths:
+            path.unlink(missing_ok=True)
+        return len(paths)
+
+
+class GeneratedStore[T: GeneratedRecord]:
+    """Records of one kind and version, one per document, model and thresholds.
+
+    They are JSON files in a directory when the location is a path, else rows of the backend
+    given, such as the database's. The key of a record is the same on every backend.
+    """
+
+    def __init__(
+        self, location: Path | RecordBackend, kind: str, version: int, record_type: type[T]
+    ):
+        if isinstance(location, str | os.PathLike):
+            location = FileRecords(Path(location))
+        self.records: RecordBackend = location
         self.kind = kind
         self.version = version
         self.record_type = record_type
 
+    @property
+    def directory(self) -> Path:
+        """The directory of the files; only a store on files has one."""
+        return self._files().directory
+
+    def key_of(self, doc_id: str, model: str, tau_low: float, tau_high: float) -> str:
+        """Return the key of a record: the doc id without its prefix, a digest of the rest."""
+        key = json.dumps([self.kind, model, tau_low, tau_high, self.version]).encode("utf-8")
+        digest = hashlib.sha256(key).hexdigest()[:KEY_CHARS]
+        return f"{doc_id.removeprefix(DOC_ID_PREFIX)}-{digest}"
+
     def load(self, doc_id: str, model: str, tau_low: float, tau_high: float) -> T | None:
         """Return the saved record for these keys, or None."""
-        path = self._path(doc_id, model, tau_low, tau_high)
-        if not path.is_file():
+        key = self.key_of(doc_id, model, tau_low, tau_high)
+        payload = self.records.read(self.kind, key)
+        if payload is None:
             return None
         try:
-            record = self.record_type.model_validate_json(path.read_text(encoding="utf-8"))
+            record = self.record_type.model_validate_json(payload)
         except ValidationError:
-            logger.warning("skipping invalid %s file: %s", self.kind, path)
+            logger.warning("skipping invalid %s %s", self.kind, self._where(key))
             return None
         keys = (record.doc_id, record.model, record.tau_low, record.tau_high)
         if keys != (doc_id, model, tau_low, tau_high):
@@ -239,23 +316,24 @@ class GeneratedStore[T: GeneratedRecord]:
 
     def path_of(self, record: T) -> Path:
         """Return the path the record is saved under, whether or not it exists yet."""
-        return self._path(record.doc_id, record.model, record.tau_low, record.tau_high)
+        return self._files().path(self._key(record))
 
-    def save(self, record: T) -> Path:
-        """Write the record atomically and return its path."""
-        path = self.path_of(record)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                handle.write(record.model_dump_json(indent=JSON_INDENT))
-            os.replace(tmp_name, path)
-        except BaseException:
-            Path(tmp_name).unlink(missing_ok=True)
-            raise
-        return path
+    def save(self, record: T) -> Path | None:
+        """Save the record, replacing an earlier one; return its path when it is a file."""
+        key = self._key(record)
+        payload = record.model_dump_json(indent=JSON_INDENT)
+        self.records.write(self.kind, key, record.doc_id, payload)
+        return self.records.path(key) if isinstance(self.records, FileRecords) else None
 
-    def _path(self, doc_id: str, model: str, tau_low: float, tau_high: float) -> Path:
-        key = json.dumps([self.kind, model, tau_low, tau_high, self.version]).encode("utf-8")
-        digest = hashlib.sha256(key).hexdigest()[:KEY_CHARS]
-        return self.directory / f"{doc_id.removeprefix(DOC_ID_PREFIX)}-{digest}.json"
+    def _key(self, record: T) -> str:
+        return self.key_of(record.doc_id, record.model, record.tau_low, record.tau_high)
+
+    def _files(self) -> FileRecords:
+        if not isinstance(self.records, FileRecords):
+            raise TypeError(f"the {self.kind} records are not kept in files")
+        return self.records
+
+    def _where(self, key: str) -> str:
+        if isinstance(self.records, FileRecords):
+            return f"file: {self.records.path(key)}"
+        return f"record: {key}"

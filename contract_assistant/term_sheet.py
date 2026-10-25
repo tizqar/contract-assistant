@@ -11,7 +11,12 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from contract_assistant.answer import AnswerItem
-from contract_assistant.generation import GeneratedRecord, GeneratedStore, generate
+from contract_assistant.generation import (
+    GeneratedRecord,
+    GeneratedStore,
+    RecordBackend,
+    generate,
+)
 from contract_assistant.router.clients import LLMClient
 from contract_assistant.store import DocumentCache
 from contract_assistant.summary import summary_items
@@ -275,5 +280,5 @@ def render_markdown(sheets: Sequence[tuple[str, TermSheet]]) -> str:
 class TermSheetStore(GeneratedStore[TermSheet]):
     """Term sheets saved per document, model, thresholds and prompt version."""
 
-    def __init__(self, directory: Path):
-        super().__init__(directory, KIND, PROMPT_VERSION, TermSheet)
+    def __init__(self, location: Path | RecordBackend):
+        super().__init__(location, KIND, PROMPT_VERSION, TermSheet)

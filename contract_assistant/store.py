@@ -119,9 +119,14 @@ def read_cache(path: Path, settings: Settings) -> DocumentCache:
         cache = DocumentCache.model_validate_json(path.read_text(encoding="utf-8"))
     except ValidationError as error:
         raise CacheIntegrityError(f"not a valid cache: {path.name}") from error
+    check_cache(cache, settings)
+    return cache
+
+
+def check_cache(cache: DocumentCache, settings: Settings) -> None:
+    """Check a cache against the settings and its own text; raise as read_cache does."""
     _check_settings(cache, settings)
     _check_integrity(cache)
-    return cache
 
 
 def _differing_keys(settings: Settings, actual: dict) -> list[str]:

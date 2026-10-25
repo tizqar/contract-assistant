@@ -12,6 +12,7 @@ from contract_assistant.generation import (
     GeneratedRecord,
     GeneratedStore,
     Generation,
+    RecordBackend,
     Request,
     faithful_check,
     run,
@@ -219,5 +220,5 @@ def render_markdown(summary: FullTextSummary) -> str:
 class FullTextStore(GeneratedStore[FullTextSummary]):
     """Full-text summaries saved per document, model, thresholds and prompt version."""
 
-    def __init__(self, directory: Path):
-        super().__init__(directory, KIND, PROMPT_VERSION, FullTextSummary)
+    def __init__(self, location: Path | RecordBackend):
+        super().__init__(location, KIND, PROMPT_VERSION, FullTextSummary)

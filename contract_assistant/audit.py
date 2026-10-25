@@ -139,7 +139,11 @@ def record(
 
 
 def _short(value: Any) -> Any:
-    if isinstance(value, str) and len(value) > MAX_DETAIL_CHARS:
+    if not isinstance(value, str):
+        return value
+    # Postgres keeps no NUL character in JSONB; a quote from a PDF can hold one.
+    value = value.replace("\x00", "")
+    if len(value) > MAX_DETAIL_CHARS:
         return value[: MAX_DETAIL_CHARS - 1] + "…"
     return value
 

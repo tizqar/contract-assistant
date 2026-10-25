@@ -16,6 +16,7 @@ from contract_assistant.generation import (
     GeneratedRecord,
     GeneratedStore,
     Generation,
+    RecordBackend,
     Request,
     run,
 )
@@ -287,5 +288,5 @@ def render_markdown(sheet: ObligationSheet) -> str:
 class ObligationStore(GeneratedStore[ObligationSheet]):
     """Obligation sheets saved per document, model, thresholds and prompt version."""
 
-    def __init__(self, directory: Path):
-        super().__init__(directory, KIND, PROMPT_VERSION, ObligationSheet)
+    def __init__(self, location: Path | RecordBackend):
+        super().__init__(location, KIND, PROMPT_VERSION, ObligationSheet)

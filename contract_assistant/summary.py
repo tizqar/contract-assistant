@@ -196,7 +196,9 @@ def render_markdown(summary: Summary) -> str:
 class SummaryStore(GeneratedStore[Summary]):
     """Summaries saved as JSON files, one per document, model, thresholds, language and version."""
 
-    def __init__(self, directory: Path, language: str = DEFAULT_LANGUAGE):
+    def __init__(
+        self, location: Path | generation.RecordBackend, language: str = DEFAULT_LANGUAGE
+    ):
         kind = KIND if language == DEFAULT_LANGUAGE else f"{KIND}-{language}"
-        super().__init__(directory, kind, PROMPT_VERSION, Summary)
+        super().__init__(location, kind, PROMPT_VERSION, Summary)
         self.language = language
