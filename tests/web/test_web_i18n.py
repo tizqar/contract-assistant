@@ -5,7 +5,7 @@ import pkgutil
 import re
 from pathlib import Path
 
-from contract_assistant import access, audit, web
+from contract_assistant import access, accounts, audit, files, web
 from contract_assistant.web.i18n import SERBIAN, copy_for, copy_strings, missing, translate
 from tests.web.conftest import SHORT_DOC_ID
 
@@ -23,10 +23,10 @@ def template_strings() -> list[str]:
 
 
 def registering_modules() -> list:
-    """Every web module, and the policy modules whose messages the pages show."""
+    """Every web module, and the modules outside it whose messages the pages show."""
     names = [info.name for info in pkgutil.iter_modules(web.__path__) if not info.ispkg]
     found = [importlib.import_module(f"{web.__name__}.{name}") for name in names]
-    return [*found, access, audit]
+    return [*found, access, accounts, audit, files]
 
 
 def module_strings() -> list[str]:
@@ -39,7 +39,7 @@ def module_strings() -> list[str]:
 
 def test_the_areas_that_register_strings_are_all_checked():
     names = {module.__name__.rsplit(".", 1)[-1] for module in registering_modules()}
-    assert {"chat", "insights", "library", "access", "audit"} <= names
+    assert {"chat", "insights", "library", "access", "accounts", "audit", "files"} <= names
 
 
 def test_every_word_of_the_vocabulary_has_a_serbian_version():
