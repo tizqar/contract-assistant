@@ -15,7 +15,18 @@ from contract_assistant.accounts import AccountError
 from contract_assistant.background import run_in_background, warm
 from contract_assistant.db.engine import Database
 from contract_assistant.services import Services
-from contract_assistant.web import auth, chat, decide, i18n, insights, library
+from contract_assistant.web import (
+    account,
+    admin,
+    auth,
+    chat,
+    decide,
+    folders,
+    i18n,
+    insights,
+    library,
+    review,
+)
 from contract_assistant.web.core import (
     KEEP_WARM_S,
     STATIC_DIR,
@@ -65,6 +76,10 @@ def create_app(
     app.include_router(insights.router)
     app.include_router(decide.router)
     app.include_router(i18n.router)
+    app.include_router(folders.router)
+    app.include_router(admin.router)
+    app.include_router(account.router)
+    app.include_router(review.router)
 
     # The middleware added last runs first: the language is known before the guard answers.
     app.middleware("http")(auth.guard)
