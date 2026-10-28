@@ -13,3 +13,20 @@
 .user-menu .user-role { display: inline-block; margin-top: 4px; }
 .user-menu .menu-links { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .decided-by { margin-left: 4px; }
+
+/* The top bar's links: buttons on a wide screen, one Menu on a narrow one. */
+.nav-links { display: contents; }
+.nav-menu { display: none; }
+.nav-menu summary { gap: 6px; }
+.nav-menu .menu-body { left: 0; right: auto; width: 220px; padding: 8px; gap: 2px; }
+.menu-link { display: block; padding: 8px 10px; border-radius: 8px; color: var(--ink); font-weight: 500; text-decoration: none; }
+.menu-link:hover, .menu-link:focus-visible { background: var(--surface-2); }
+@media (max-width: 1280px) {
+  .nav-links { display: none; }
+  .nav-menu { display: block; }
+  .topnav .pill .pill-label { display: none; }
+}
+@media (max-width: 760px) {
+  .user-menu summary { max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+  .brand span { display: none; }
+}

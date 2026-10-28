@@ -52,6 +52,7 @@ CATALOGUE = {
     "Sign out": "Odjava",
     # The top bar
     "Files": "Fajlovi",
+    "Menu": "Meni",
     "Admin": "Administracija",
     "Your account": "Vaš nalog",
     "Account": "Nalog",

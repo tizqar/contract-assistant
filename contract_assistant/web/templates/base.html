@@ -43,14 +43,29 @@
   <div class="grow"></div>
   <nav class="topnav" aria-label="Main">
     {% if ws.gen_model %}
-    <span class="pill pill-ok" title="{{ _('{model} through Ollama, on this computer').format(model=ws.gen_model) }}"><span class="dot"></span>{{ copy.AI_READY }}</span>
+    <span class="pill pill-ok" title="{{ _('{model} through Ollama, on this computer').format(model=ws.gen_model) }}"><span class="dot"></span><span class="pill-label">{{ copy.AI_READY }}</span></span>
     {% else %}
-    <span class="pill pill-off" title="{{ _('No local language model: summaries and explanations are off') }}"><span class="dot"></span>{{ copy.AI_OFF }}</span>
+    <span class="pill pill-off" title="{{ _('No local language model: summaries and explanations are off') }}"><span class="dot"></span><span class="pill-label">{{ copy.AI_OFF }}</span></span>
     {% endif %}
-    <a class="btn" href="/files">{{ _("Files") }}</a>
-    <a class="btn" href="/compare{% if cache is defined and cache %}?left={{ cache.doc_id }}{% endif %}">{{ _("Compare") }}</a>
-    <a class="btn" href="/portfolio">{{ _("Portfolio") }}</a>
-    {% if actor and actor.is_admin %}<a class="btn" href="/admin">{{ _("Admin") }}</a>{% endif %}
+    {# The same links twice: as buttons on a wide screen, in one menu on a narrow one. #}
+    {% set compare_url = "/compare" ~ ("?left=" ~ cache.doc_id if cache is defined and cache else "") %}
+    <details class="menu nav-menu" id="nav-menu">
+      <summary class="btn">{{ _("Menu") }}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+      </summary>
+      <div class="menu-body">
+        <a class="menu-link" href="/files">{{ _("Files") }}</a>
+        <a class="menu-link" href="{{ compare_url }}">{{ _("Compare") }}</a>
+        <a class="menu-link" href="/portfolio">{{ _("Portfolio") }}</a>
+        {% if actor and actor.is_admin %}<a class="menu-link" href="/admin">{{ _("Admin") }}</a>{% endif %}
+      </div>
+    </details>
+    <span class="nav-links">
+      <a class="btn" href="/files">{{ _("Files") }}</a>
+      <a class="btn" href="{{ compare_url }}">{{ _("Compare") }}</a>
+      <a class="btn" href="/portfolio">{{ _("Portfolio") }}</a>
+      {% if actor and actor.is_admin %}<a class="btn" href="/admin">{{ _("Admin") }}</a>{% endif %}
+    </span>
     {% block actions %}{% endblock %}
     <form class="seg lang-switch" method="post" action="/language" aria-label="{{ _('Language') }}">
       <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
