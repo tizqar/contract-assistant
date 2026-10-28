@@ -1,0 +1,11 @@
+{# A contract's history, the newest first: the first page as a list, an older page as more rows
+   that take the place of the Older button. #}
+{% if not first %}
+{% include "review/history_rows.html" %}
+{% elif rows %}
+<ol class="history-list">
+  {% include "review/history_rows.html" %}
+</ol>
+{% else %}
+<p class="muted">{{ _("Nothing has happened to this contract yet.") }}</p>
+{% endif %}

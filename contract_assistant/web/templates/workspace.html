@@ -19,6 +19,7 @@
     </div>
   </aside>
   <main class="centre" id="centre">
+    {% with review = review_bar(cache.doc_id) %}{% include "review/bar.html" %}{% endwith %}
     <div class="centre-bar">
       <div class="seg" role="tablist" aria-label="{{ _('Show') }}">
         <button type="button" class="seg-item seg-item-active" role="tab" data-centre="overview" aria-selected="true">{{ copy.OVERVIEW }}</button>
@@ -54,4 +55,5 @@
     </footer>
   </section>
 </div>
+{% include "review/panel.html" %}
 {% endblock %}

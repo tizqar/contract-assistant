@@ -1,0 +1,14 @@
+{% for row in rows %}
+<li class="history-row history-{{ row.group }}">
+  <span class="history-dot" aria-hidden="true"></span>
+  <div class="history-item">
+    <p class="history-sentence">{{ row.sentence }}</p>
+    <time class="muted small" datetime="{{ row.at.isoformat() }}">{{ row.when }}</time>
+  </div>
+</li>
+{% endfor %}
+{% if older %}
+<li class="history-more">
+  <button type="button" class="btn btn-sm" hx-get="/documents/{{ contract_id }}/history?before={{ older }}" hx-target="closest li" hx-swap="outerHTML">{{ _("Older") }}</button>
+</li>
+{% endif %}

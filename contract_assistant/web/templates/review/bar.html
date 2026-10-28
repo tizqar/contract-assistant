@@ -1,0 +1,60 @@
+{# The review bar of a contract: its status and what it means, who changed it last and when, the
+   note of a contract sent back, and only the steps the reader may take now (`review` is a
+   web.review.ReviewBar). Each step reloads the page; the server checks it again. #}
+{% set base = "/documents/" ~ review.contract_id ~ "/review/" %}
+<section class="review-bar review-{{ review.status }}" id="review-bar" aria-label="{{ _('Reviews and approval') }}">
+  <div class="review-line">
+    <span class="badge review-badge review-badge-{{ review.status }}" title="{{ review.help }}">{{ review.label }}</span>
+    <p class="review-text small">
+      {% if review.changed %}<span class="review-changed">{{ review.changed }}</span>{% endif %}
+      <span class="review-help muted" title="{{ review.help }}">{{ review.help }}</span>
+    </p>
+    <div class="review-actions">
+      {% if "submit" in review.steps %}
+      <details class="menu review-menu">
+        <summary class="btn btn-sm btn-primary">{{ _("Send for approval") }}</summary>
+        <form class="menu-body review-form" method="post" action="{{ base }}submit" hx-post="{{ base }}submit" hx-swap="none">
+          <p class="review-form-title">{{ _("Send it for approval?") }}</p>
+          <p class="muted small">{{ _("An administrator will approve it or send it back. Until then, passages cannot be confirmed or rejected.") }}</p>
+          <div class="row gap">
+            <button type="submit" class="btn btn-sm btn-primary">{{ _("Send for approval") }}</button>
+            <button type="button" class="btn btn-sm" data-review-cancel>{{ _("Cancel") }}</button>
+          </div>
+        </form>
+      </details>
+      {% endif %}
+      {% if "approve" in review.steps %}
+      <form class="inline-form" method="post" action="{{ base }}approve" hx-post="{{ base }}approve" hx-swap="none">
+        <button type="submit" class="btn btn-sm btn-confirm" title="{{ _('Approve the decisions as they are; they stay locked') }}">{{ _("Approve") }}</button>
+      </form>
+      {% endif %}
+      {% if "return" in review.steps %}
+      <details class="menu review-menu">
+        <summary class="btn btn-sm">{{ _("Send back") }}</summary>
+        <form class="menu-body review-form" method="post" action="{{ base }}return" hx-post="{{ base }}return" hx-swap="none">
+          <label class="review-form-title" for="review-note-{{ review.contract_id }}">{{ _("What should change?") }}</label>
+          <textarea id="review-note-{{ review.contract_id }}" name="note" class="input review-note-input" rows="4" maxlength="2000" required></textarea>
+          <p class="muted small">{{ _("Everyone who opens the contract sees this note.") }}</p>
+          <div class="row gap">
+            <button type="submit" class="btn btn-sm btn-primary">{{ _("Send back") }}</button>
+            <button type="button" class="btn btn-sm" data-review-cancel>{{ _("Cancel") }}</button>
+          </div>
+        </form>
+      </details>
+      {% endif %}
+      {% if "reopen" in review.steps %}
+      <form class="inline-form" method="post" action="{{ base }}reopen" hx-post="{{ base }}reopen" hx-swap="none">
+        <button type="submit" class="btn btn-sm" title="{{ _('Unlock the decisions so passages can be changed again') }}">{{ _("Reopen") }}</button>
+      </form>
+      {% endif %}
+      <button type="button" class="btn btn-sm btn-ghost review-history" data-history-open="/documents/{{ review.contract_id }}/history" aria-controls="history-dialog" title="{{ _('Everything done with this contract, the newest first.') }}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>{{ _("History") }}</button>
+    </div>
+  </div>
+  {% if review.note %}
+  <div class="review-note" role="note">
+    <span class="review-note-title">{{ _("What to change") }}</span>
+    <p class="review-note-text">{{ review.note }}</p>
+  </div>
+  {% endif %}
+</section>

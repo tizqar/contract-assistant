@@ -1,0 +1,16 @@
+{# The history panel: a side sheet the History button of the review bar opens (static/review.js)
+   and fills from /documents/{id}/history. #}
+<dialog class="history-dialog" id="history-dialog" aria-labelledby="history-title">
+  <header class="history-head">
+    <div class="history-heading">
+      <h2 class="history-title" id="history-title">{{ _("History") }}</h2>
+      <p class="muted small">{{ _("Everything done with this contract, the newest first.") }}</p>
+    </div>
+    <button type="button" class="btn btn-icon btn-ghost" data-history-close aria-label="{{ _('Close') }}" title="{{ _('Close') }}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+    </button>
+  </header>
+  <div class="history-body" id="history-body">
+    <div class="status-line"><span class="spinner" aria-hidden="true"></span><span>{{ _("Loading") }}</span></div>
+  </div>
+</dialog>
