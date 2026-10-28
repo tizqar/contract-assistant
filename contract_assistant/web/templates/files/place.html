@@ -1,0 +1,44 @@
+{% extends "files/page.html" %}
+{% import "files/macros.html" as f with context %}
+{# A place of a space, the top of one or a folder in it: where it is, the toolbar, then its folders and its contracts. While the reader's own space is empty, the welcome stands in for the list. #}
+{% block title %}{% if place.path %}{{ place.path[-1].name }}{% elif place.kind == "mine" %}{{ _("My files") }}{% else %}{{ place.owner_name }}{% endif %} · {{ _("Contract Assistant") }}{% endblock %}
+{% block view %}
+<header class="files-head">
+  <h1 class="files-crumbs" id="files-title">{{ f.crumbs(place) }}</h1>
+  {% if place.kind == "shared" %}
+  <p class="files-note">{{ _("Owner: {name}").format(name=place.owner_name) }} · {% if can(place.level, "add") %}{{ _("You can read and change the contracts here.") }}{% else %}{{ _("You can read the contracts here.") }}{% endif %}</p>
+  {% endif %}
+</header>
+{% if can_new_folder or (can_upload and not welcome) %}
+<div class="files-toolbar">
+  {% if can_upload and not welcome %}
+  <details class="files-add">
+    <summary class="btn btn-primary btn-sm">{{ f.plus_icon() }}{{ copy.ADD_CONTRACT }}</summary>
+    <div class="files-add-body">
+      {% if upload_folder %}{% set upload_note = _("It goes into {folder}.").format(folder=place.path[-1].name) %}{% endif %}
+      {% include "library/upload.html" %}
+      {% if can_read %}{% include "library/samples.html" %}{% endif %}
+    </div>
+  </details>
+  {% endif %}
+  {% if can_new_folder %}
+  <button type="button" class="btn btn-sm" hx-get="{{ new_folder_url }}" hx-target="#files-dialog-body" hx-swap="innerHTML">{{ f.folder_icon() }}{{ _("New folder") }}</button>
+  {% endif %}
+</div>
+{% endif %}
+{% if welcome %}
+{% include "files/welcome.html" %}
+{% elif folders or contracts %}
+<ul class="files-list" aria-labelledby="files-title">
+  <li class="files-item files-colhead" aria-hidden="true">
+    <span></span><span>{{ _("Name") }}</span>
+    <span class="files-meta"><span>{{ _("Review") }}</span><span>{{ _("What it is, what was found") }}</span><span>{{ _("Last change") }}</span></span>
+    <span></span>
+  </li>
+  {% for folder in folders %}{{ f.folder_row(folder) }}{% endfor %}
+  {% for row in contracts %}{{ f.contract_row(row) }}{% endfor %}
+</ul>
+{% else %}
+<p class="files-empty">{{ _("This folder is empty.") }}</p>
+{% endif %}
+{% endblock %}

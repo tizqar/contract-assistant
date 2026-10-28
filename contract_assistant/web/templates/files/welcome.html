@@ -1,0 +1,15 @@
+{% import "components.html" as c with context %}
+{# The welcome of a reader whose own space is still empty: what the assistant does, the upload and the sample contracts. #}
+<section class="welcome files-welcome" aria-labelledby="first-run-title">
+  <h2 class="welcome-title" id="first-run-title">{{ _("Read a contract with a local assistant") }}</h2>
+  <p class="welcome-lead">{{ _("Upload a contract. The assistant reads it once on this computer, finds the clauses a lawyer checks first, and then answers your questions with quotes.") }}</p>
+  {% if not can_read %}{{ c.notice(no_model) }}{% endif %}
+  <div class="card card-wide welcome-card">
+    <h3 class="h2">{{ copy.ADD_CONTRACT }}</h3>
+    {% include "library/upload.html" %}
+  </div>
+  {% with wide=True %}{% include "library/samples.html" %}{% endwith %}
+  {% if shared_count %}
+  <p class="notice">{{ _("Other people share folders with you.") }} <a class="link" href="/files/shared">{{ _("Open Shared with me") }}</a></p>
+  {% endif %}
+</section>

@@ -1,8 +1,10 @@
-{# The upload form. The route streams the steps of reading the contract, then opens it. #}
+{# The upload form. The route streams the steps of reading the contract, then opens it. With `upload_folder` the contract goes into that folder, else to the top of the reader's own space; `upload_note` says where. #}
 <form class="upload" data-stream data-target="#upload-status" action="/upload" method="post" enctype="multipart/form-data">
+  {% if upload_folder %}<input type="hidden" name="folder" value="{{ upload_folder }}">{% endif %}
   <label class="sr-only" for="upload-file">{{ _("PDF or text file") }}</label>
   <input id="upload-file" class="file" type="file" name="file" accept=".pdf,.txt" required>
   <p class="meta">{{ _("A PDF or a .txt file. Scanned pages are read with OCR, which takes longer. The file stays on this computer.") }}</p>
+  {% if upload_note %}<p class="meta upload-where">{{ upload_note }}</p>{% endif %}
   <div class="row gap">
     <button class="btn btn-primary btn-sm" type="submit">{{ _("Upload and read") }}</button>
     <button class="btn btn-stop btn-sm" type="button" data-stop hidden>{{ _("Stop") }}</button>

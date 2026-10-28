@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% import "files/macros.html" as f with context %}
+{# The frame of every file manager page: the side list of places, one view, and the dialog its rows and toolbar load into. A change triggers `files-changed`; the view then reloads itself from view_url. Its hx attributes are not inherited, so the rows' requests keep their own target and swap. #}
+{% block title %}{{ _("Files") }} · {{ _("Contract Assistant") }}{% endblock %}
+{% block main %}
+<div class="files-page">
+  <nav class="files-side" aria-label="{{ _('Places') }}">
+    {{ f.side_link("mine", "/files", _("My files"), section, f.folder_icon()) }}
+    {{ f.side_link("shared", "/files/shared", _("Shared with me"), section, f.shared_icon()) }}
+    {{ f.side_link("trash", "/files/trash", _("Trash"), section, f.trash_icon()) }}
+    {% if actor and actor.is_admin %}{{ f.side_link("spaces", "/files/spaces", _("All spaces"), section, f.spaces_icon()) }}{% endif %}
+  </nav>
+  <main class="files-main" aria-labelledby="files-title">
+    <div id="files-view" class="files-view" hx-get="{{ view_url }}" hx-trigger="files-changed from:body" hx-select="#files-view" hx-swap="outerHTML" hx-disinherit="*">
+      {% block view %}{% endblock %}
+    </div>
+  </main>
+</div>
+<dialog id="files-dialog" class="files-dialog" aria-labelledby="files-dialog-title">
+  <div id="files-dialog-body" class="files-dialog-body"></div>
+</dialog>
+{% endblock %}

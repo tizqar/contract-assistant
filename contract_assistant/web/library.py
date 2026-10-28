@@ -25,13 +25,15 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from markupsafe import Markup, escape
 
-from contract_assistant import audit
+from contract_assistant import audit, files
+from contract_assistant.access import Action, Level, allowed
 from contract_assistant.answer import Citation, Status
 from contract_assistant.background import precompute, precompute_obligations, run_in_background
 from contract_assistant.compare import ChecklistRow, compare_checklists, compare_terms
 from contract_assistant.config import ROOT
 from contract_assistant.dates import key_dates
 from contract_assistant.extract.extractor import ProgressCallback
+from contract_assistant.files import ContractView, FolderView, Listing
 from contract_assistant.pdf import EmptyDocumentError, UnsupportedFileError, load_document
 from contract_assistant.pdf_view import PageError, page_image
 from contract_assistant.portfolio import NOT_EXTRACTED, PortfolioRow, portfolio_rows, to_csv
@@ -91,6 +93,11 @@ router = APIRouter()
 
 PAGE_MODE = "page"
 TEXT_MODE = "text"
+FILES_PATH = "/files"
+# Whose space a place of the drawer and the file manager is in, see `Place`.
+MINE = "mine"
+SHARED = "shared"
+SPACE = "space"
 PORTFOLIO_CSV = "portfolio.csv"
 PAGE_CACHE_HEADERS = {"Cache-Control": "private, max-age=3600"}
 # The label of a highlighted span opened without one, so that the span is still marked.
@@ -297,21 +304,10 @@ def _t(request: Request, text: str) -> str:
     return translate(text, language(request))
 
 
-@router.get("/", response_class=HTMLResponse)
-def home(request: Request, ws: Ws, tau: Tau):
-    """Open the default contract, or the first-run page: an upload and the sample contracts."""
-    doc_id = ws.default_doc_id()
-    if doc_id is None:
-        return render(
-            request,
-            "home.html",
-            samples=_samples([]),
-            can_read=ws.services.extractor is not None,
-            no_model=_t(request, NO_MODEL),
-            samples_need_model=_t(request, SAMPLES_NEED_MODEL),
-            tau=tau,
-        )
-    return RedirectResponse(f"/documents/{doc_id}", status_code=303)
+@router.get("/")
+def home():
+    """Open the file manager; it welcomes a reader whose space is still empty."""
+    return RedirectResponse(FILES_PATH, status_code=303)
 
 
 @router.get("/documents/{doc_id}", response_class=HTMLResponse)
@@ -334,7 +330,7 @@ def workspace_page(request: Request, doc_id: str, ws: Ws, tau: Tau):
 def rail(request: Request, doc_id: str, ws: Ws):
     """The contracts drawer alone, to refresh its counts after a decision or an upload."""
     cache = ws.load(doc_id)
-    return render(request, "library/rail.html", **_rail(request, ws, cache, ws.documents()))
+    return render(request, "library/rail.html", **_rail(request, ws, cache, []))
 
 
 @router.get("/documents/{doc_id}/view", response_class=HTMLResponse)
@@ -1215,21 +1211,79 @@ def _markup(line: str) -> Markup:
     return Markup(CODE.sub(r"<code>\1</code>", html))
 
 
+@dataclass(frozen=True)
+class Place:
+    """Where some contracts are: whose space, the folders down to theirs, and the contracts.
+
+    `kind` is MINE (the reader's own space), SHARED (a folder shared with them) or SPACE
+    (another user's space, which an admin sees). `upload_folder` is where "Add a contract"
+    puts a file: this folder when the reader may add to it, else None, the top of their own
+    space.
+    """
+
+    kind: str
+    owner_id: str
+    owner_name: str
+    path: list[FolderView]
+    folder_id: str | None
+    level: Level
+    entries: list[DocumentEntry]
+    upload_folder: str | None
+
+
+def place_of(ws: UserWorkspace, listing: Listing) -> Place:
+    """Return the place of a folder's listing, its contracts with their counts."""
+    actor = ws.actor
+    if listing.owner_id == actor.id:
+        kind = MINE
+    elif actor.is_admin:
+        kind = SPACE
+    else:
+        kind = SHARED
+    folder_id = listing.folder.id if listing.folder is not None else None
+    can_add = folder_id is not None and allowed(listing.level, Action.ADD)
+    return Place(
+        kind=kind,
+        owner_id=listing.owner_id,
+        owner_name=listing.owner_name,
+        path=listing.path,
+        folder_id=folder_id,
+        level=listing.level,
+        entries=contract_entries(ws, listing.contracts),
+        upload_folder=folder_id if can_add else None,
+    )
+
+
+def contract_entries(ws: UserWorkspace, contracts: list[ContractView]) -> list[DocumentEntry]:
+    """Return the list entries of some contracts, in order, their decisions read at once."""
+    return ws.entries(contracts)
+
+
 def _rail(
     request: Request, ws: UserWorkspace, cache: DocumentCache, documents: list[DocumentEntry]
 ) -> dict:
-    """Return what the drawer shows, the same in the workspace page and in its refresh."""
+    """Return what the drawer shows, the same in the workspace page and in its refresh.
+
+    The drawer shows where the open contract is and the contracts beside it in its folder;
+    `documents`, every contract the reader can open, is for the switcher of the page.
+    """
     can_read = ws.services.extractor is not None
+    contract = ws.contract(cache.doc_id)
+    with ws.database.session() as session:
+        listing = files.listing(session, ws.actor, contract.folder_id, contract.owner_id)
+    place = place_of(ws, listing)
     return {
         "cache": cache,
         "documents": documents,
+        "place": place,
+        "upload_folder": place.upload_folder,
         "can_read": can_read,
-        "samples": _samples(documents) if can_read else [],
+        "samples": samples_for(place.entries) if can_read else [],
         "samples_need_model": _t(request, SAMPLES_NEED_MODEL),
     }
 
 
-def _samples(documents: list[DocumentEntry]) -> list[Sample]:
+def samples_for(documents: list[DocumentEntry]) -> list[Sample]:
     """Return the sample contracts that are not among the analysed ones."""
     analysed = {entry.analysis_id for entry in documents}
     samples = [_sample(name) for name in SAMPLE_FILES]

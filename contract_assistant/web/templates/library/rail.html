@@ -1,11 +1,15 @@
 {% import "library/macros.html" as m with context %}
-{# The contracts drawer: the list, adding a contract or a sample, and the analysis file. The workspace page includes it and GET /documents/{id}/rail renders it alone, from the same context. #}
+{% import "files/macros.html" as f with context %}
+{# The contracts drawer: where the open contract is, the contracts beside it in its folder, adding a contract or a sample there, and the analysis file. The workspace page includes it and GET /documents/{id}/rail renders it alone, from the same context. #}
 <div class="rail-head">
   <span class="eyebrow">{{ copy.CONTRACTS }}</span>
-  <a class="link small" href="/portfolio">{{ _("Portfolio") }}</a>
+  <a class="link small" href="/files">{{ _("All files") }}</a>
 </div>
+<nav class="rail-place" aria-label="{{ _('Where this contract is') }}">
+  {{ f.folder_icon() }}<span class="rail-crumbs">{{ f.crumbs(place, link_last=True) }}</span>
+</nav>
 <nav class="doc-list" aria-label="{{ copy.CONTRACTS }}">
-  {% for d in documents %}
+  {% for d in place.entries %}
   {% set active = d.doc_id == cache.doc_id %}
   <a class="doc-item{% if active %} doc-item-active{% endif %}" href="/documents/{{ d.doc_id }}"{% if active %} aria-current="page"{% endif %}>
     <span class="doc-name">{{ d.name }}</span>
@@ -14,6 +18,11 @@
   </a>
   {% endfor %}
 </nav>
+{% if place.upload_folder %}
+{% set upload_note = _("It goes into {folder}.").format(folder=place.path[-1].name) %}
+{% elif place.kind != "mine" or place.path %}
+{% set upload_note = _("It goes into My files.") %}
+{% endif %}
 <details class="add-contract">
   <summary class="btn btn-dashed">
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>

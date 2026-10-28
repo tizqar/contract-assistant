@@ -1,11 +1,12 @@
 {% import "library/macros.html" as m with context %}
-{# The sample contracts not read yet. Each is read the same way as an upload, then opened. #}
+{# The sample contracts not read yet. Each is read the same way as an upload, into `upload_folder` when there is one, then opened. #}
 {% if samples %}
 <section class="samples{% if wide is defined and wide %} samples-wide{% endif %}" aria-labelledby="samples-title">
   <h2 class="samples-title" id="samples-title">{{ copy.SAMPLES }}</h2>
   <div class="sample-list">
     {% for s in samples %}
     <form class="sample" data-stream data-target="#sample-status" action="/samples/{{ s.name }}" method="post">
+      {% if upload_folder %}<input type="hidden" name="folder" value="{{ upload_folder }}">{% endif %}
       <button type="submit" class="sample-btn"{% if not can_read %} disabled title="{{ samples_need_model }}"{% endif %}>
         <span class="sample-name">{{ s.title }}</span>
         <span class="sample-meta">{{ m.kind(s.kind) }} · {{ m.size(s.size) }}</span>

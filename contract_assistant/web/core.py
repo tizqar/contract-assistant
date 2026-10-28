@@ -489,9 +489,14 @@ class UserWorkspace:
         """Return every contract the user can open, the newest first."""
         with self.database.session() as session:
             contracts = files.visible_contracts(session, self.actor)
-            signatures = _signatures(session, [contract.id for contract in contracts])
         for contract in contracts:
             self._contracts.setdefault(contract.id, contract)
+        return self.entries(contracts)
+
+    def entries(self, contracts: list[ContractView]) -> list[DocumentEntry]:
+        """Return the list entries of some contracts, in order, their decisions read at once."""
+        with self.database.session() as session:
+            signatures = _signatures(session, [contract.id for contract in contracts])
         return [self._entry(contract, signatures.get(contract.id, ())) for contract in contracts]
 
     def _entry(self, contract: ContractView, signature: Signature) -> DocumentEntry:

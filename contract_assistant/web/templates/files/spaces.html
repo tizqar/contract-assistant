@@ -1,0 +1,28 @@
+{% extends "files/page.html" %}
+{% import "files/macros.html" as f with context %}
+{# Every account's files, for an admin: each space with its number of contracts, a link to it and to its trash. #}
+{% block title %}{{ _("All spaces") }} · {{ _("Contract Assistant") }}{% endblock %}
+{% block view %}
+<header class="files-head">
+  <h1 class="files-crumbs" id="files-title"><span class="crumb crumb-current" aria-current="page">{{ _("All spaces") }}</span></h1>
+  <p class="files-note">{{ _("The files of every account. As an administrator you can open and tidy any of them.") }}</p>
+</header>
+<ul class="files-list files-list-spaces" aria-labelledby="files-title">
+  {% for user_id, name, count in spaces %}
+  {% set mine = user_id == actor.id %}
+  <li class="files-item files-space">
+    <span class="files-icon">{{ f.person_icon() }}</span>
+    <div class="files-name-cell">
+      <a class="files-name" href="{{ '/files' if mine else '/files/spaces/' ~ user_id }}">{{ name }}</a>
+      {% if mine %}<span class="files-mark">{{ _("you") }}</span>{% endif %}
+    </div>
+    <div class="files-meta">
+      <span class="files-details">{{ (_("1 contract") if count == 1 else _("{count} contracts")).format(count=count) }}</span>
+    </div>
+    <div class="files-act">
+      <a class="btn btn-sm btn-ghost files-trash-link" href="/files/trash{{ '' if mine else '?owner=' ~ user_id }}">{{ f.trash_icon() }}<span>{{ _("Trash") }}</span></a>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

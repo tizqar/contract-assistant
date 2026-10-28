@@ -5,7 +5,7 @@
 {% block title %}{{ _("Portfolio") }} · {{ _("Contract Assistant") }}{% endblock %}
 {% block switcher %}
 <nav class="crumbs" aria-label="{{ _('Breadcrumb') }}">
-  <a href="/">{{ _("Workspace") }}</a>
+  <a href="/files">{{ _("Files") }}</a>
   <span aria-hidden="true">/</span>
   <span class="crumb-current" aria-current="page">{{ _("Portfolio") }}</span>
 </nav>
@@ -16,7 +16,7 @@
 {% block main %}
 <main class="page" aria-label="{{ _('Portfolio') }}">
   {% if not contracts %}
-  <p class="notice">{{ _("No contracts yet.") }} <a class="link" href="/">{{ _("Add one or try a sample") }}</a>.</p>
+  <p class="notice">{{ _("No contracts yet.") }} <a class="link" href="/files">{{ _("Add one or try a sample") }}</a>.</p>
   {% else %}
   <div class="stats">
     <div class="stat">

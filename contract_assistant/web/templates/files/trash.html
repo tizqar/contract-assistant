@@ -1,0 +1,26 @@
+{% extends "files/page.html" %}
+{% import "files/macros.html" as f with context %}
+{# A trash: the folders and contracts deleted from one space, the newest first. Its owner and admins restore them; only an admin deletes them for good, after a confirmation. #}
+{% block title %}{{ _("Trash") }} · {{ _("Contract Assistant") }}{% endblock %}
+{% block view %}
+<header class="files-head">
+  <h1 class="files-crumbs" id="files-title">
+    {%- if not mine %}{{ f.crumb(_("All spaces"), "/files/spaces", True) }}{{ f.sep() }}{{ f.crumb(trash.owner_name, "/files/spaces/" ~ trash.owner_id, True) }}{{ f.sep() }}{% endif -%}
+    <span class="crumb crumb-current" aria-current="page">{{ _("Trash") }}</span>
+  </h1>
+  <p class="files-note">{{ _("Deleted folders and contracts wait here and can be restored.") }} {% if can(trash.level, "purge") %}{{ _("Deleting them for good cannot be undone.") }}{% else %}{{ _("Only an administrator can delete them for good.") }}{% endif %}</p>
+</header>
+{% if trash.folders or trash.contracts %}
+<ul class="files-list files-list-trash" aria-labelledby="files-title">
+  <li class="files-item files-colhead" aria-hidden="true">
+    <span></span><span>{{ _("Name") }}</span>
+    <span class="files-meta"><span>{{ _("What it is") }}</span><span>{{ _("Deleted") }}</span></span>
+    <span></span>
+  </li>
+  {% for folder in trash.folders %}{{ f.trash_row("folders", folder, folder.level, trash.owner_id) }}{% endfor %}
+  {% for contract in trash.contracts %}{{ f.trash_row("contracts", contract, contract.level, trash.owner_id) }}{% endfor %}
+</ul>
+{% else %}
+<p class="files-empty">{{ _("The trash is empty.") }}</p>
+{% endif %}
+{% endblock %}

@@ -13,10 +13,11 @@ from contract_assistant.web.core import (
 from tests.web.conftest import SHORT_DOC_ID
 
 
-def test_home_opens_the_short_demo_contract(client):
+def test_home_opens_the_file_manager(client):
     response = client.get("/", follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == f"/documents/{SHORT_DOC_ID}"
+    assert response.headers["location"] == "/files"
+    assert f'href="/documents/{SHORT_DOC_ID}"' in client.get("/").text
 
 
 def test_the_workspace_page_has_the_drawer_the_centre_switch_and_the_chat(client):

@@ -1,0 +1,43 @@
+{# The dialog that shares a folder: a form to give someone access by their email address, then who has access, each with their access to change or remove. Every change answers with this dialog again. #}
+<div class="files-share">
+  <h2 class="files-dialog-title" id="files-dialog-title">{{ _("Share {name}").format(name=folder.name) }}</h2>
+  <p class="files-dialog-text">{{ _("The people you add see everything in this folder, the folders inside it included.") }}</p>
+  <form class="files-share-form" hx-post="/files/folders/{{ folder.id }}/shares" hx-target="#files-dialog-body" hx-swap="innerHTML">
+    <label class="files-field files-share-email">
+      <span>{{ _("Email address") }}</span>
+      <input class="input" type="email" name="email" required autocomplete="off" autofocus>
+    </label>
+    <label class="files-field files-share-level">
+      <span>{{ _("Access") }}</span>
+      <select class="input" name="level">
+        <option value="view">{{ _("can view") }}</option>
+        <option value="edit">{{ _("can edit") }}</option>
+      </select>
+    </label>
+    <button type="submit" class="btn btn-primary">{{ _("Share") }}</button>
+  </form>
+  <p class="files-dialog-text small">{{ _("Can view: read the contracts and ask about them. Can edit: also confirm passages, rename, and add contracts and folders.") }}</p>
+  <h3 class="files-share-title">{{ _("People with access") }}</h3>
+  {% if shares %}
+  <ul class="files-people">
+    {% for s in shares %}
+    <li class="files-person">
+      <div class="files-person-name"><strong>{{ s.name }}</strong><span class="muted small">{{ s.email }}</span></div>
+      <form class="files-person-level" hx-post="/files/folders/{{ folder.id }}/shares" hx-target="#files-dialog-body" hx-swap="innerHTML" hx-trigger="change">
+        <input type="hidden" name="email" value="{{ s.email }}">
+        <select class="input files-level-select" name="level" aria-label="{{ _('Access of {name}').format(name=s.name) }}">
+          <option value="view"{% if s.level == "view" %} selected{% endif %}>{{ _("can view") }}</option>
+          <option value="edit"{% if s.level == "edit" %} selected{% endif %}>{{ _("can edit") }}</option>
+        </select>
+      </form>
+      <button type="button" class="btn btn-sm btn-ghost btn-stop" hx-post="/files/folders/{{ folder.id }}/shares/{{ s.user_id }}/delete" hx-target="#files-dialog-body" hx-swap="innerHTML" aria-label="{{ _('Remove the access of {name}').format(name=s.name) }}">{{ _("Remove access") }}</button>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted small">{{ _("Only you and the administrators can open it now.") }}</p>
+  {% endif %}
+  <div class="files-dialog-actions">
+    <button type="button" class="btn" data-dialog-close>{{ _("Close") }}</button>
+  </div>
+</div>

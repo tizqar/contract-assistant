@@ -1,0 +1,155 @@
+{#- Pieces of the file manager and the drawer: the breadcrumb of a place, the rows and their menus, the icons. Import them "with context", so that `_`, `copy`, `can` and `when` are the page's. -#}
+{% import "library/macros.html" as m with context %}
+
+{% macro folder_icon() -%}
+<svg class="files-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+{%- endmacro %}
+
+{% macro contract_icon() -%}
+<svg class="files-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h4"></path></svg>
+{%- endmacro %}
+
+{% macro person_icon() -%}
+<svg class="files-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"></path></svg>
+{%- endmacro %}
+
+{% macro shared_icon() -%}
+<svg class="files-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 19c1.2-3 3.6-4.5 6.5-4.5s5.3 1.5 6.5 4.5"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c1.6.7 2.8 2.1 3.5 4.2"></path></svg>
+{%- endmacro %}
+
+{% macro trash_icon() -%}
+<svg class="files-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"></path></svg>
+{%- endmacro %}
+
+{% macro spaces_icon() -%}
+<svg class="files-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"></rect><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"></rect><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"></rect><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"></rect></svg>
+{%- endmacro %}
+
+{% macro plus_icon() -%}
+<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+{%- endmacro %}
+
+{% macro dots_icon() -%}
+<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg>
+{%- endmacro %}
+
+{#- One step of a breadcrumb: a link, or the place shown. -#}
+{% macro crumb(label, url, link) -%}
+{%- if link %}<a class="crumb" href="{{ url }}">{{ label }}</a>{% else %}<span class="crumb crumb-current" aria-current="page">{{ label }}</span>{% endif -%}
+{%- endmacro %}
+
+{% macro sep() -%}<span class="crumb-sep" aria-hidden="true">/</span>{%- endmacro %}
+
+{#- Where a place is: My files, Shared with me, or an admin's All spaces and the owner, then the folders down to it. With link_last the place itself is a link too (the drawer). -#}
+{% macro crumbs(place, link_last=False) -%}
+{%- set below = place.path|length > 0 -%}
+{%- if place.kind == "mine" -%}
+{{ crumb(_("My files"), "/files", link_last or below) }}
+{%- elif place.kind == "shared" -%}
+{{ crumb(_("Shared with me"), "/files/shared", True) }}
+{%- else -%}
+{{ crumb(_("All spaces"), "/files/spaces", True) }}{{ sep() }}{{ crumb(place.owner_name, "/files/spaces/" ~ place.owner_id, link_last or below) }}
+{%- endif -%}
+{%- for folder in place.path -%}
+{{ sep() }}{{ crumb(folder.name, "/files/folders/" ~ folder.id, link_last or not loop.last) }}
+{%- endfor -%}
+{%- endmacro %}
+
+{#- An entry of the side list. -#}
+{% macro side_link(key, url, label, section, icon) -%}
+<a class="files-side-link" href="{{ url }}"{% if key == section %} aria-current="true"{% endif %}>{{ icon }}<span>{{ label }}</span></a>
+{%- endmacro %}
+
+{#- The badge of a contract's review. -#}
+{% macro review_badge(status) -%}
+<span class="badge files-review files-review-{{ status }}" title="{{ copy.REVIEW_HELP.get(status, '') }}">{{ copy.REVIEW_STATUS.get(status, status) }}</span>
+{%- endmacro %}
+
+{#- The menu of a row, with the actions given by `caller`; nothing when there are none. -#}
+{% macro menu(label, shown) -%}
+{%- if shown -%}
+<details class="menu files-menu">
+  <summary class="btn btn-icon btn-sm files-menu-btn" aria-label="{{ _('Actions for {name}').format(name=label) }}" title="{{ _('Actions for {name}').format(name=label) }}">{{ dots_icon() }}</summary>
+  <div class="menu-body files-menu-body">{{ caller() }}</div>
+</details>
+{%- endif -%}
+{%- endmacro %}
+
+{#- A dialog opener in a row menu. -#}
+{% macro open_dialog(url, label) -%}
+<button type="button" class="files-action" data-files-action hx-get="{{ url }}" hx-target="#files-dialog-body" hx-swap="innerHTML">{{ label }}</button>
+{%- endmacro %}
+
+{#- A folder in a place, or in Shared with me (`shared`), where its owner and the reader's access show. -#}
+{% macro folder_row(folder, shared=False) -%}
+{%- set rename, move = can(folder.level, "rename"), can(folder.level, "move") -%}
+{%- set share, delete = can(folder.level, "share"), can(folder.level, "delete") -%}
+<li class="files-item files-folder">
+  <span class="files-icon">{{ folder_icon() }}</span>
+  <div class="files-name-cell">
+    <a class="files-name" href="/files/folders/{{ folder.id }}">{{ folder.name }}</a>
+    {% if folder.has_shares and not shared %}<span class="files-mark" title="{{ _('Other people can open this folder') }}">{{ shared_icon() }}{{ _("Shared") }}</span>{% endif %}
+  </div>
+  <div class="files-meta">
+    {% if shared %}
+    <span class="files-status"><span class="files-access">{{ _("can edit") if folder.shared_with_me == "edit" else _("can view") }}</span></span>
+    <span class="files-details">{{ _("Owner: {name}").format(name=folder.owner_name) }}</span>
+    {% else %}
+    <span class="files-status"></span>
+    <span class="files-details">{{ _("Folder") }}</span>
+    {% endif %}
+    <span class="files-when">{{ when(folder.updated_at) }}</span>
+  </div>
+  <div class="files-act">
+    {% call menu(folder.name, rename or move or share or delete) %}
+    {% if rename %}{{ open_dialog("/files/folders/" ~ folder.id ~ "/rename", _("Rename")) }}{% endif %}
+    {% if move %}{{ open_dialog("/files/folders/" ~ folder.id ~ "/move", _("Move")) }}{% endif %}
+    {% if share %}{{ open_dialog("/files/folders/" ~ folder.id ~ "/share", _("Share")) }}{% endif %}
+    {% if delete %}<button type="button" class="files-action files-action-danger" data-files-action hx-post="/files/folders/{{ folder.id }}/delete" hx-swap="none">{{ _("Move to the trash") }}</button>{% endif %}
+    {% endcall %}
+  </div>
+</li>
+{%- endmacro %}
+
+{#- A contract in a place: its review, what it is, what the assistant found, and when it last changed. -#}
+{% macro contract_row(row) -%}
+{%- set view, entry = row.view, row.entry -%}
+{%- set rename, move, delete = can(view.level, "rename"), can(view.level, "move"), can(view.level, "delete") -%}
+<li class="files-item files-contract">
+  <span class="files-icon">{{ contract_icon() }}</span>
+  <div class="files-name-cell">
+    <a class="files-name" href="/documents/{{ view.id }}">{{ entry.name }}</a>
+    {% if not entry.mine %}<span class="files-owner">{{ _("Owner: {name}").format(name=view.owner_name) }}</span>{% endif %}
+  </div>
+  <div class="files-meta">
+    <span class="files-status">{{ review_badge(view.review_status) }}</span>
+    <span class="files-details"><span>{{ m.kind(entry.kind) }}{% if entry.size %} · {{ m.size(entry.size) }}{% endif %}</span> <span class="files-counts">{{ entry.found }} {{ copy.STATUS.found|lower }} · {% if entry.check %}<span class="files-check">{{ m.to_check(entry.check) }}</span>{% else %}{{ _("nothing to check") }}{% endif %}</span></span>
+    <span class="files-when">{{ when(view.updated_at) }}</span>
+  </div>
+  <div class="files-act">
+    {% call menu(entry.name, rename or move or delete) %}
+    {% if rename %}{{ open_dialog("/files/contracts/" ~ view.id ~ "/rename", _("Rename")) }}{% endif %}
+    {% if move %}{{ open_dialog("/files/contracts/" ~ view.id ~ "/move", _("Move")) }}{% endif %}
+    {% if delete %}<button type="button" class="files-action files-action-danger" data-files-action hx-post="/files/contracts/{{ view.id }}/delete" hx-swap="none">{{ _("Move to the trash") }}</button>{% endif %}
+    {% endcall %}
+  </div>
+</li>
+{%- endmacro %}
+
+{#- A folder or contract at the top of a trash, with Restore and, for an admin, Delete for good. -#}
+{% macro trash_row(kind, item, level, owner_id) -%}
+<li class="files-item files-trashed">
+  <span class="files-icon">{% if kind == "folders" %}{{ folder_icon() }}{% else %}{{ contract_icon() }}{% endif %}</span>
+  <div class="files-name-cell">
+    <span class="files-name">{{ item.name if kind == "folders" else item.name|document_name }}</span>
+  </div>
+  <div class="files-meta">
+    <span class="files-details">{% if kind == "folders" %}{{ _("Folder, with everything in it") }}{% else %}{{ m.kind(item.kind) }}{% endif %}</span>
+    <span class="files-when">{{ _("Deleted {when}").format(when=when(item.deleted_at)) }}</span>
+  </div>
+  <div class="files-act files-trash-act">
+    {% if can(level, "restore") %}<button type="button" class="btn btn-sm" hx-post="/files/{{ kind }}/{{ item.id }}/restore" hx-swap="none">{{ _("Restore") }}</button>{% endif %}
+    {% if can(level, "purge") %}<button type="button" class="btn btn-sm btn-stop" hx-get="/files/{{ kind }}/{{ item.id }}/purge?owner={{ owner_id }}" hx-target="#files-dialog-body" hx-swap="innerHTML">{{ _("Delete for good") }}</button>{% endif %}
+  </div>
+</li>
+{%- endmacro %}

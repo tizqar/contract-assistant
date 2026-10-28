@@ -1,0 +1,11 @@
+{# The step before deleting for good, for an admin: what goes with it, and that it cannot be undone. #}
+<form class="files-form" hx-post="{{ action }}" hx-swap="none">
+  <input type="hidden" name="confirm" value="yes">
+  <input type="hidden" name="owner" value="{{ owner }}">
+  <h2 class="files-dialog-title" id="files-dialog-title">{{ _("Delete {name} for good?").format(name=label) }}</h2>
+  <p class="files-dialog-text">{% if kind == "folders" %}{{ _("The folder and everything in it go: its folders, its contracts, their decisions, chats and summaries.") }}{% else %}{{ _("The contract goes, with its decisions, chats and summaries.") }}{% endif %} {{ _("This cannot be undone. The activity log keeps a line about it.") }}</p>
+  <div class="files-dialog-actions">
+    <button type="button" class="btn" data-dialog-close>{{ _("Cancel") }}</button>
+    <button type="submit" class="btn btn-danger">{{ _("Delete for good") }}</button>
+  </div>
+</form>

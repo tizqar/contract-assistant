@@ -1,0 +1,22 @@
+{% extends "files/page.html" %}
+{% import "files/macros.html" as f with context %}
+{# The folders other people share with the reader: each with its owner and what the reader can do in it. #}
+{% block title %}{{ _("Shared with me") }} · {{ _("Contract Assistant") }}{% endblock %}
+{% block view %}
+<header class="files-head">
+  <h1 class="files-crumbs" id="files-title"><span class="crumb crumb-current" aria-current="page">{{ _("Shared with me") }}</span></h1>
+  <p class="files-note">{{ _("Folders other people share with you. What you can do in each depends on the access they gave you.") }}</p>
+</header>
+{% if folders %}
+<ul class="files-list" aria-labelledby="files-title">
+  <li class="files-item files-colhead" aria-hidden="true">
+    <span></span><span>{{ _("Name") }}</span>
+    <span class="files-meta"><span>{{ _("Access") }}</span><span>{{ _("Owner") }}</span><span>{{ _("Last change") }}</span></span>
+    <span></span>
+  </li>
+  {% for folder in folders %}{{ f.folder_row(folder, shared=True) }}{% endfor %}
+</ul>
+{% else %}
+<p class="files-empty">{{ _("Nobody shares a folder with you yet.") }}</p>
+{% endif %}
+{% endblock %}

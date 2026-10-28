@@ -452,7 +452,8 @@ def test_the_rail_without_the_reading_model_offers_no_samples(client):
 
 def test_the_first_page_welcomes_and_lists_the_samples(make_client, settings, tmp_path):
     client = fresh(make_client, tmp_path, extractor=Extractor(FakeQA(), [], settings, "fake"))
-    response = client.get("/", follow_redirects=False)
+    assert client.get("/", follow_redirects=False).headers["location"] == "/files"
+    response = client.get("/files")
     assert response.status_code == 200
     html = response.text
     assert "Read a contract with a local assistant" in html
@@ -465,7 +466,7 @@ def test_the_first_page_welcomes_and_lists_the_samples(make_client, settings, tm
 
 
 def test_the_first_page_without_the_reading_model_says_so(make_client, tmp_path):
-    html = fresh(make_client, tmp_path).get("/").text
+    html = fresh(make_client, tmp_path).get("/files").text
     assert library.NO_MODEL in html and library.SAMPLES_NEED_MODEL in html
     assert html.count(f'disabled title="{library.SAMPLES_NEED_MODEL}"') == len(library.SAMPLE_FILES)
 
@@ -487,8 +488,8 @@ def test_a_sample_is_read_like_an_upload_then_opened(
     assert sent[-1]["notice"] == library.ANALYSIS_COMPLETE and sent[-1]["done"]
     assert calls == [library.precompute, library.precompute_obligations]
     assert client.ws.entry(contract_id).name == "Medium sponsorship agreement"
-    home = client.get("/", follow_redirects=False)
-    assert home.headers["location"] == f"/documents/{contract_id}"
+    listed = client.get("/files").text
+    assert f'href="/documents/{contract_id}"' in listed and "first-run-title" not in listed
     rail = client.get(f"/documents/{contract_id}/rail").text
     assert 'action="/samples/medium_sponsorship_agreement.txt"' not in rail
     assert 'action="/samples/long_outsourcing_agreement.txt"' in rail
@@ -647,7 +648,7 @@ def test_a_scan_without_tesseract_says_what_to_install(
 def test_the_first_page_is_in_serbian_with_the_cookie(make_client, settings, tmp_path):
     client = fresh(make_client, tmp_path, extractor=Extractor(FakeQA(), [], settings, "fake"))
     client.cookies.set("lang", "sr")
-    html = client.get("/").text
+    html = client.get("/files").text
     assert "Pročitajte ugovor uz pomoć lokalnog asistenta" in html
     assert "Ili isprobajte primer ugovora" in html and "PDF · 5 str." in html
     assert "Otpremi i pročitaj" in html and "Zaustavi" in html
