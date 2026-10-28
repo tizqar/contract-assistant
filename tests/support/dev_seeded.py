@@ -3,6 +3,9 @@
 Run with:
     PYTHONPATH=. DEV_DIR=/some/folder .venv/bin/uvicorn tests.support.dev_seeded:app --port 7881
 
+DEV_DATABASE_URL puts it on another database, such as a database of its own in the
+Postgres of docker-compose; by default it is a SQLite file in DEV_DIR.
+
 Accounts (password "correct horse battery" for each): ana@example.com (administrator),
 marko@example.com and jelena@example.com (users). Marko owns the three demo contracts: the
 short one in "Supply deals", which is shared with Jelena to edit, the medium one in
@@ -80,6 +83,6 @@ def seed(database, settings) -> None:
 
 settings = dataclasses.replace(load_settings(), cache_dir=DEV_DIR / "cache")
 DEV_DIR.mkdir(parents=True, exist_ok=True)
-database = connect(f"sqlite:///{DEV_DIR / 'dev.db'}")
+database = connect(os.environ.get("DEV_DATABASE_URL") or f"sqlite:///{DEV_DIR / 'dev.db'}")
 seed(database, settings)
 app = create_app(_services(settings), database)

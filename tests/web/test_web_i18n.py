@@ -74,6 +74,7 @@ def test_the_cookie_switches_the_interface(client):
     serbian = client.get(f"/documents/{SHORT_DOC_ID}").text
     assert '<html lang="sr">' in serbian and ">Pregled<" in serbian
     assert "Pitaj" in serbian
+    assert " reči</option>" in serbian and " words</option>" not in serbian
 
 
 def test_the_language_form_sets_the_cookie_and_goes_back(client):
