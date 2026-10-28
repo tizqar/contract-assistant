@@ -1,7 +1,6 @@
 from markupsafe import escape
 
 from contract_assistant.explain import MISQUOTE_REASON
-from contract_assistant.feedback import FEEDBACK_FILE, read_feedback
 from contract_assistant.router.base import RouteResult, Turn
 from contract_assistant.router.clients import LLMError
 from contract_assistant.ui.views import NOT_FOUND_TEXT
@@ -61,11 +60,11 @@ def body(reply: dict) -> str:
 
 
 def top(client, clause_type: str):
-    return client.app.state.workspace.load(SHORT_DOC_ID).clauses[clause_type][0]
+    return client.ws.load(SHORT_DOC_ID).clauses[clause_type][0]
 
 
 def conversation(client):
-    return client.app.state.workspace.conversation(SHORT_DOC_ID)
+    return client.ws.conversation(SHORT_DOC_ID)
 
 
 def pending_texts(replies: list[dict]) -> list[str]:
@@ -332,11 +331,11 @@ def test_the_explain_route_refuses_an_unknown_language(make_client):
     assert conversation(client).messages == []
 
 
-def test_feedback_writes_a_line_and_the_chat_keeps_the_thanks(client, settings):
+def test_feedback_is_kept_and_the_chat_keeps_the_thanks(client, settings):
     ask(client, LAW_QUESTION)
     response = client.post(FEEDBACK, data={"index": "1", "liked": "1"})
     assert response.status_code == 200 and FEEDBACK_THANKS in response.text
-    [verdict] = read_feedback(settings.cache_dir / FEEDBACK_FILE)
+    [verdict] = client.ws.feedback.read()
     assert verdict.liked and verdict.question == LAW_QUESTION
     assert verdict.clause_types == ["Governing Law"] and verdict.doc_id == SHORT_DOC_ID
     html = client.get(CHAT).text
@@ -347,7 +346,7 @@ def test_feedback_on_a_message_without_an_answer_is_refused(client, settings):
     ask(client, LAW_QUESTION)
     response = client.post(FEEDBACK, data={"index": "0", "liked": "0"})
     assert response.status_code == 400 and response.text == ANSWER_GONE
-    assert read_feedback(settings.cache_dir / FEEDBACK_FILE) == []
+    assert client.ws.feedback.read() == []
 
 
 def test_clear_empties_the_chat(client):
@@ -425,6 +424,8 @@ def test_the_explain_buttons_start_with_the_interface_language(make_client):
     assert ">Objasni<" in first and ">Zaustavi<" in first
     assert 'name="language" value="en"' in second and ">Objasni na engleskom<" in second
     english = make_client(gen=EchoTextClient())
+    # The chat is the same user's, kept in the database; start it again.
+    english.post(f"/documents/{SHORT_DOC_ID}/chat/clear")
     first, second = explain_forms(body(ask(english, LAW_QUESTION)[-1]))
     assert 'value="en"' in first and 'value="sr"' in second and copy.EXPLAIN_SR in second
 

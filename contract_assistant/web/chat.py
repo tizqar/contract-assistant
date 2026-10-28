@@ -1,8 +1,9 @@
 """The chat about one contract: questions, definitions, chat commands, explanations, feedback.
 
 Every reply is kept with what drew it and is drawn again whenever the chat is shown, so a card
-follows the reader's later decisions (Confirmed by you, Rejected by you) and the thumbs follow
-the feedback given. The chat always renders into the element `#chat-body`, whichever form asked.
+follows the later decisions on its passage (Confirmed, Rejected) and the thumbs follow the
+feedback given. Each user has their own chat about each contract, saved in the database. The
+chat always renders into the element `#chat-body`, whichever form asked.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ from contract_assistant.answer import (
 from contract_assistant.decisions import Decision
 from contract_assistant.definitions import lookup
 from contract_assistant.explain import DEFAULT_LANGUAGE, LANGUAGES, Explanation
-from contract_assistant.feedback import FEEDBACK_FILE, Feedback, now, record_feedback
+from contract_assistant.feedback import Feedback, now
 from contract_assistant.generation import Generation
 from contract_assistant.intents import detect_intent
 from contract_assistant.passage_answer import APP_ATTEMPTS as PASSAGE_ATTEMPTS
@@ -61,7 +62,7 @@ from contract_assistant.web.core import (
     Message,
     Tau,
     Thresholds,
-    Workspace,
+    UserWorkspace,
     WorkspaceError,
     Ws,
     frame,
@@ -281,8 +282,9 @@ def feedback(
             liked=liked,
             at=now(),
         )
-        record_feedback(ws.settings.cache_dir / FEEDBACK_FILE, verdict)
         message.thanked = True
+    ws.record_feedback(cache.doc_id, verdict)
+    ws.replace_message(cache.doc_id, index, message)
     return HTMLResponse(render_string(request, "chat/thanks.html", thanks=FEEDBACK_THANKS))
 
 
@@ -295,11 +297,12 @@ def clear_chat(request: Request, doc_id: str, ws: Ws):
         conversation.messages = []
         conversation.turns = []
         conversation.last = None
+    ws.clear_chat(cache.doc_id)
     return HTMLResponse(_body(request, ws, cache))
 
 
 def _ask(
-    request: Request, ws: Workspace, cache: DocumentCache, tau: Thresholds, question: str
+    request: Request, ws: UserWorkspace, cache: DocumentCache, tau: Thresholds, question: str
 ) -> Iterator[str]:
     lang = language(request)
     if not question:
@@ -310,7 +313,7 @@ def _ask(
 
 
 def _explain(
-    request: Request, ws: Workspace, cache: DocumentCache, form: ExplainForm
+    request: Request, ws: UserWorkspace, cache: DocumentCache, form: ExplainForm
 ) -> Iterator[str]:
     lang = language(request)
     chosen = form.language or lang
@@ -327,7 +330,7 @@ def _explain(
 
 def _converse(
     request: Request,
-    ws: Workspace,
+    ws: UserWorkspace,
     cache: DocumentCache,
     asked: Asked,
     replies: Iterator[Step | Reply],
@@ -385,7 +388,7 @@ def _converse(
 
 def _add(
     request: Request,
-    ws: Workspace,
+    ws: UserWorkspace,
     cache: DocumentCache,
     conversation: Conversation,
     said: Said,
@@ -401,11 +404,12 @@ def _add(
             conversation.remember(reply.turn)
         if reply.answer is not None:
             conversation.last = reply.answer
+    ws.keep_messages(cache.doc_id, [said, bubble])
 
 
 def _body(
     request: Request,
-    ws: Workspace,
+    ws: UserWorkspace,
     cache: DocumentCache,
     pending: str | None = None,
     follow: str | None = None,
@@ -467,7 +471,7 @@ def _status_of(decisions: dict[str, Decision]) -> StatusOf:
 
 
 def _replies(
-    ws: Workspace, cache: DocumentCache, tau: Thresholds, question: str, lang: str
+    ws: UserWorkspace, cache: DocumentCache, tau: Thresholds, question: str, lang: str
 ) -> Iterator[Step | Reply]:
     """Answer a defined term, else a chat command, else route the question to clause types.
 
@@ -510,7 +514,7 @@ def _named_language(question: str, detected: str, lang: str) -> str:
 
 
 def _passage_answer(
-    ws: Workspace, question: str, passages: list[Passage]
+    ws: UserWorkspace, question: str, passages: list[Passage]
 ) -> Generator[Step, None, GeneratedAnswer | None]:
     """Write an answer from the passages; without a model or when it fails, there is none."""
     gen = ws.services.gen
@@ -527,13 +531,13 @@ def _passage_answer(
     return None
 
 
-def _explanation(ws: Workspace, shown: Shown, language: str) -> Iterator[Step | Reply]:
+def _explanation(ws: UserWorkspace, shown: Shown, language: str) -> Iterator[Step | Reply]:
     for step in explanation_steps(ws, shown.clause_type, shown.quote, language):
         yield _explanation_reply(step, shown) if isinstance(step, Explanation) else step
 
 
 def _summary(
-    ws: Workspace, cache: DocumentCache, tau: Thresholds, language: str
+    ws: UserWorkspace, cache: DocumentCache, tau: Thresholds, language: str
 ) -> Iterator[Step | Reply]:
     for step in summary_steps(ws, cache, tau, language):
         yield _summary_reply(step) if isinstance(step, Summary) else step
@@ -552,7 +556,7 @@ def _definition_answer(question: str, definition: Definition, tau: Thresholds) -
     )
 
 
-def _posted(ws: Workspace, cache: DocumentCache, form: ExplainForm) -> Shown:
+def _posted(ws: UserWorkspace, cache: DocumentCache, form: ExplainForm) -> Shown:
     """Return the passage a form names; its span is kept only when it holds the quote."""
     # Browsers send the line breaks of form fields as CRLF.
     quote = form.quote.replace("\r\n", "\n")
@@ -611,7 +615,7 @@ def _cut(quote: str) -> str:
     return quote[: MAX_CHAT_QUOTE_CHARS - len(ELLIPSIS)] + ELLIPSIS
 
 
-def _answer_reply(ws: Workspace, result: Answer, turn: Turn | None = None) -> Reply:
+def _answer_reply(ws: UserWorkspace, result: Answer, turn: Turn | None = None) -> Reply:
     """Return the reply that shows an answer: its cards, the passages or the topics."""
     cards = _cards(result)
     context: dict[str, object] = {"cards": cards}

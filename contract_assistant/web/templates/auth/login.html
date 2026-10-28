@@ -1,0 +1,16 @@
+{% extends "auth/base.html" %}
+{% block title %}{{ _("Sign in") }} · {{ _("Contract Assistant") }}{% endblock %}
+{% block card %}
+<h1 class="auth-title">{{ _("Sign in") }}</h1>
+<p class="muted small">{{ _("Use the account an administrator made for you.") }}</p>
+{% if error %}<p class="auth-error" role="alert">{{ error }}</p>{% endif %}
+<form class="auth-form" method="post" action="/login">
+  <input type="hidden" name="next" value="{{ next }}">
+  <label class="auth-field"><span>{{ _("Email address") }}</span>
+    <input class="input" type="email" name="email" value="{{ email }}" autocomplete="username" required autofocus></label>
+  <label class="auth-field"><span>{{ _("Password") }}</span>
+    <input class="input" type="password" name="password" autocomplete="current-password" required></label>
+  <button type="submit" class="btn btn-primary">{{ _("Sign in") }}</button>
+</form>
+<p class="muted small">{{ _("Forgot your password? Ask an administrator to reset it.") }}</p>
+{% endblock %}

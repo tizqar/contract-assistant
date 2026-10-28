@@ -20,7 +20,7 @@ from contract_assistant.summary import APP_ATTEMPTS as SUMMARY_ATTEMPTS
 from contract_assistant.summary import Summary, summary_from, summary_items, summary_request
 from contract_assistant.term_sheet import APP_ATTEMPTS as TERM_SHEET_ATTEMPTS
 from contract_assistant.term_sheet import TermSheet, request_term_sheet, term_sheet_items
-from contract_assistant.web.core import Thresholds, Workspace, WorkspaceError
+from contract_assistant.web.core import Thresholds, UserWorkspace, WorkspaceError
 
 WRITING_SUMMARY = "Writing the summary"
 WRITING_EXPLANATION = "Writing the explanation"
@@ -62,7 +62,7 @@ def checked(
 
 
 def saved_summary(
-    ws: Workspace, cache: DocumentCache, tau: Thresholds, language: str
+    ws: UserWorkspace, cache: DocumentCache, tau: Thresholds, language: str
 ) -> Summary | None:
     """Return the saved summary of a contract in a language, or None without generating."""
     if ws.services.gen is None:
@@ -71,7 +71,7 @@ def saved_summary(
 
 
 def summary_steps(
-    ws: Workspace, cache: DocumentCache, tau: Thresholds, language: str
+    ws: UserWorkspace, cache: DocumentCache, tau: Thresholds, language: str
 ) -> Iterator[Step | Summary]:
     """Summarize the clauses found, reusing a saved summary; steps while the model writes."""
     gen = ws.gen()
@@ -94,7 +94,7 @@ def summary_steps(
     yield summary
 
 
-def saved_term_sheet(ws: Workspace, cache: DocumentCache, tau: Thresholds) -> TermSheet | None:
+def saved_term_sheet(ws: UserWorkspace, cache: DocumentCache, tau: Thresholds) -> TermSheet | None:
     """Return the saved term sheet of a contract, or None without generating."""
     if ws.services.gen is None:
         return None
@@ -102,7 +102,7 @@ def saved_term_sheet(ws: Workspace, cache: DocumentCache, tau: Thresholds) -> Te
 
 
 def term_sheet_steps(
-    ws: Workspace, cache: DocumentCache, tau: Thresholds
+    ws: UserWorkspace, cache: DocumentCache, tau: Thresholds
 ) -> Iterator[Step | TermSheet]:
     """Extract the key terms, reusing a saved term sheet; one step while the model works."""
     gen = ws.gen()
@@ -121,7 +121,7 @@ def term_sheet_steps(
 
 
 def explanation_steps(
-    ws: Workspace, clause_type: str, quote: str, language: str
+    ws: UserWorkspace, clause_type: str, quote: str, language: str
 ) -> Iterator[Step | Explanation]:
     """Restate a quote in plain language; steps while the model writes, then the Explanation."""
     gen = ws.gen()

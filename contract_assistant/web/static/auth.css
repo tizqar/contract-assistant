@@ -1,0 +1,15 @@
+/* The pages before signing in, and the user menu of the top bar. */
+.auth-page { min-height: 100vh; background: var(--ground); }
+.auth-main { display: flex; justify-content: center; padding: 48px 16px; }
+.auth-card { width: 100%; max-width: 420px; padding: 28px; gap: 14px; }
+.auth-title { margin: 0; font-size: 22px; font-weight: 700; }
+.auth-form { display: flex; flex-direction: column; gap: 14px; }
+.auth-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.auth-field .input { width: 100%; }
+.auth-field small { font-weight: 400; }
+.auth-error { margin: 0; padding: 10px 12px; border-radius: var(--radius); background: var(--high-soft); color: var(--high); font-size: 13px; }
+.auth-signout { display: flex; justify-content: flex-end; }
+.user-menu .menu-body { min-width: 240px; }
+.user-menu .user-role { display: inline-block; margin-top: 4px; }
+.user-menu .menu-links { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.decided-by { margin-left: 4px; }

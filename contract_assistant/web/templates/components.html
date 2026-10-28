@@ -32,9 +32,12 @@
 <p class="meta">{{ text }}</p>
 {%- endmacro %}
 
-{# The reader's decision on a passage: Confirm / Not this while it is to check, Undo after. #}
+{# A reviewer's decision on a passage: Confirm / Not this while it is to check, then who decided
+   and Undo. The buttons show only while the reader may edit the contract and its review is
+   open; the server checks both again. #}
 {% macro decide(doc_id, label, citation, status) -%}
-{% if status == 'check' and citation %}
+{% set open = ws.can_decide(doc_id) if ws else false %}
+{% if status == 'check' and citation and open %}
 <form class="inline-form decide" hx-post="/documents/{{ doc_id }}/decide" hx-target="#document-pane" hx-swap="innerHTML">
   <input type="hidden" name="clause_type" value="{{ label }}">
   <input type="hidden" name="start" value="{{ citation.start }}">
@@ -43,9 +46,13 @@
   <button type="submit" class="btn btn-sm" name="verdict" value="rejected" title="{{ copy.STATUS_HELP.rejected }}">{{ copy.REJECT }}</button>
 </form>
 {% elif status in ('confirmed', 'rejected') %}
+{% set by = ws.decided_by(doc_id, label) if ws else none %}
+{% if by %}<span class="decided-by muted small">{{ copy.DECIDED_BY.format(name=by) }}</span>{% endif %}
+{% if open %}
 <form class="inline-form decide" hx-post="/documents/{{ doc_id }}/decide/undo" hx-target="#document-pane" hx-swap="innerHTML">
   <input type="hidden" name="clause_type" value="{{ label }}">
   <button type="submit" class="btn btn-sm">{{ copy.UNDO }}</button>
 </form>
+{% endif %}
 {% endif %}
 {%- endmacro %}

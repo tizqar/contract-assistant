@@ -1,5 +1,8 @@
 """Development web app: demo caches, fake router, fake slow extractor, echoing generator.
 
+Its database is a SQLite file in the same temporary folder; the first visit asks for the
+first admin account.
+
 Run with: PYTHONPATH=. .venv/bin/uvicorn tests.support.dev_web:app --reload --port 7861
 """
 
@@ -9,6 +12,7 @@ from pathlib import Path
 
 from contract_assistant.clause_types import app_clause_types, load_extra_clause_types
 from contract_assistant.config import load_settings
+from contract_assistant.db.engine import connect
 from contract_assistant.extract.extractor import Extractor
 from contract_assistant.review import load_rules
 from contract_assistant.search import PassageSearch
@@ -41,4 +45,4 @@ def dev_services() -> Services:
     )
 
 
-app = create_app(dev_services())
+app = create_app(dev_services(), connect(f"sqlite:///{DEV_CACHE_DIR / 'dev.db'}"))

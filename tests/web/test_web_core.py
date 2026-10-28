@@ -54,7 +54,7 @@ def test_thresholds_of_checks_the_order_and_the_range(settings):
 
 
 def test_the_document_list_counts_found_and_verify(client):
-    ws = client.app.state.workspace
+    ws = client.ws
     short = next(entry for entry in ws.documents() if entry.doc_id == SHORT_DOC_ID)
     assert short.kind == "txt"
     assert short.size.endswith("words")
@@ -78,7 +78,7 @@ def test_shorten_squashes_whitespace_and_cuts_long_text():
 
 
 def test_the_document_pane_highlights_a_span(client):
-    ws = client.app.state.workspace
+    ws = client.ws
     cache = ws.load(SHORT_DOC_ID)
     top = cache.clauses["Governing Law"][0]
     url = f"/documents/{SHORT_DOC_ID}/view?label=Governing+Law&start={top.start}&end={top.end}"
@@ -87,7 +87,7 @@ def test_the_document_pane_highlights_a_span(client):
 
 
 def test_a_confirmed_passage_counts_as_found_everywhere(client):
-    ws = client.app.state.workspace
+    ws = client.ws
     cache = ws.load(SHORT_DOC_ID)
     name = next(
         name
@@ -107,7 +107,8 @@ def test_a_confirmed_passage_counts_as_found_everywhere(client):
     after = next(e for e in ws.documents() if e.doc_id == SHORT_DOC_ID)
     assert (after.found, after.check) == (before.found + 1, before.check - 1)
     pane = client.get(response.headers["location"]).text
-    assert "Confirmed by you" in pane and ">Undo<" in pane
+    assert ">Confirmed</span>" in pane and ">Undo<" in pane
+    assert "by Reader" in pane
     undone = client.post(
         f"/documents/{SHORT_DOC_ID}/decide/undo", data={"clause_type": name}, follow_redirects=False
     )
@@ -116,7 +117,7 @@ def test_a_confirmed_passage_counts_as_found_everywhere(client):
 
 
 def test_a_rejected_passage_is_dropped(client):
-    ws = client.app.state.workspace
+    ws = client.ws
     cache = ws.load(SHORT_DOC_ID)
     top = cache.clauses["Governing Law"][0]
     response = client.post(

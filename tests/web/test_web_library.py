@@ -11,7 +11,6 @@ from PIL import Image, ImageDraw, ImageFont
 from contract_assistant import pdf as pdf_module
 from contract_assistant.extract.extractor import Extractor
 from contract_assistant.pdf import load_document
-from contract_assistant.pdf_view import DOCUMENTS_DIR, copy_path
 from contract_assistant.store import doc_id_of
 from contract_assistant.term_sheet import FIELDS, TermSheet, TermValue
 from contract_assistant.textsearch import count
@@ -66,6 +65,13 @@ def statuses(sent: list[dict]) -> list[str]:
     return [item["html"] for item in sent if item.get("html")]
 
 
+def opened(sent: list[dict]) -> str:
+    """Return the id of the contract a stream ended by opening."""
+    target = sent[-1]["redirect"]
+    assert target.startswith("/documents/")
+    return target.removeprefix("/documents/")
+
+
 @pytest.fixture
 def pdf_client(make_client, settings, clause_types, tmp_path):
     """A client over a two-page PDF analysed through the upload route, the law on page 2."""
@@ -73,20 +79,20 @@ def pdf_client(make_client, settings, clause_types, tmp_path):
     client = make_client(extractor=Extractor(qa, clause_types, settings, "fake"))
     path = write_pdf(tmp_path / "two_pages.pdf", [PAGE_ONE, PAGE_TWO])
     sent = upload(client, "two_pages.pdf", path.read_bytes())
-    doc_id = doc_id_of(load_document(path).text)
-    assert sent[-1]["redirect"] == f"/documents/{doc_id}"
-    client.doc_id = doc_id
+    client.doc_id = opened(sent)
+    assert client.ws.contract(client.doc_id).doc_id == doc_id_of(load_document(path).text)
     return client
 
 
-def fresh(client, tmp_path):
-    """Hide the demo caches, so that the client starts with no contract, as `serve --fresh`."""
-    client.app.state.workspace.services.store.demo_dir = tmp_path / "no-demo"
+def fresh(make_client, tmp_path, **kwargs):
+    """Return a client with no contract and no demo analyses, as `serve --fresh` starts."""
+    client = make_client(seed=False, **kwargs)
+    client.app.state.workspace.analyses.demo_dir = tmp_path / "no-demo"
     return client
 
 
 def law_span(client, doc_id: str) -> tuple[int, int]:
-    top = client.app.state.workspace.load(doc_id).clauses["Governing Law"][0]
+    top = client.ws.load(doc_id).clauses["Governing Law"][0]
     return top.start, top.end
 
 
@@ -96,7 +102,7 @@ def test_the_text_view_highlights_the_span_and_offers_the_actions(client):
         f"/documents/{SHORT_DOC_ID}/view?label=Governing+Law&start={start}&end={end}"
         "&conf=0.97&status=found"
     ).text
-    quote = client.app.state.workspace.load(SHORT_DOC_ID).text[start:end]
+    quote = client.ws.load(SHORT_DOC_ID).text[start:end]
     assert f'<mark class="highlight" data-label="Governing Law">{quote}</mark>' in html
     assert "Excerpt around the highlighted passage" in html
     assert 'class="card passage-card"' in html and "badge-found" in html
@@ -112,7 +118,7 @@ def test_the_text_view_highlights_the_span_and_offers_the_actions(client):
 
 
 def test_a_passage_to_check_offers_confirm_and_not_this(client):
-    ws = client.app.state.workspace
+    ws = client.ws
     cache = ws.load(SHORT_DOC_ID)
     name = next(n for n in ws.names if cache.clauses.get(n) and cache.clauses[n][0].conf < 0.91)
     top = cache.clauses[name][0]
@@ -139,7 +145,7 @@ def test_a_span_outside_the_text_is_ignored(client):
 
 def test_the_upload_of_a_pdf_keeps_a_copy_and_the_view_shows_page_one(pdf_client, settings):
     doc_id = pdf_client.doc_id
-    assert copy_path(settings.cache_dir / DOCUMENTS_DIR, doc_id).exists()
+    assert pdf_client.ws.pdf_path(doc_id).read_bytes().startswith(b"%PDF")
     html = pdf_client.get(f"/documents/{doc_id}/view").text
     assert f'<img class="doc-page" src="/documents/{doc_id}/page/1.png"' in html
     assert "Page 1 <span" in html and "of 2</span>" in html
@@ -210,10 +216,11 @@ def test_the_upload_of_a_text_streams_the_progress_then_opens_the_contract(
     assert f"Finding the clauses · {total} of {total} · " in finding[-1]
     assert any(library.SAVING in html for html in shown)
     assert not any(clause.name in html for clause in clause_types for html in finding)
-    assert sent[-1]["redirect"] == f"/documents/{doc_id_of(TEXT)}"
+    contract = client.ws.contract(opened(sent))
+    assert contract.doc_id == doc_id_of(TEXT) and contract.name == "new_agreement.txt"
     assert sent[-1]["notice"] == library.ANALYSIS_COMPLETE and sent[-1]["done"]
-    assert len(list(settings.cache_dir.glob("*.json"))) == 1
-    assert not (settings.cache_dir / DOCUMENTS_DIR).exists()
+    assert client.ws.analyses.exists(doc_id_of(TEXT))
+    assert not settings.cache_dir.exists() or not list(settings.cache_dir.rglob("*.json"))
 
 
 def test_the_upload_starts_the_background_writing_when_generating(
@@ -245,7 +252,7 @@ def test_an_upload_without_the_analysis_model_says_so(client):
 def test_an_analysed_contract_opens_without_running_the_model(make_client, settings):
     qa = FakeQA()
     client = make_client(extractor=Extractor(qa, [], settings, "fake"))
-    text = client.app.state.workspace.load(SHORT_DOC_ID).text
+    text = client.ws.load(SHORT_DOC_ID).text
     sent = upload(client, "short_supply_agreement.txt", text.encode())
     assert sent[-1]["redirect"] == f"/documents/{SHORT_DOC_ID}"
     assert sent[-1]["notice"] == "Short supply agreement was read before; opening it"
@@ -260,21 +267,21 @@ def test_an_analysis_missing_clause_types_is_extended(make_client, settings, cla
     sent = upload(full, "older.txt", TEXT.encode())
     assert sent[-1]["notice"] == library.ANALYSIS_UPDATED
     assert len(qa.calls) == len(clause_types) - 41
-    assert "Payment Terms" in full.app.state.workspace.load(doc_id_of(TEXT)).clauses
+    assert "Payment Terms" in full.ws.load(opened(sent)).clauses
 
 
 def test_reading_a_contract_again_keeps_the_decisions_apart(make_client, settings, clause_types):
     qa = FakeQA({law_question(clause_types): [(PAGE_TWO, 0.5)]})
     older = make_client(extractor=Extractor(qa, clause_types[:41], settings, "fake"))
-    upload(older, "older.txt", TEXT.encode())
-    doc_id = doc_id_of(TEXT)
+    doc_id = opened(upload(older, "older.txt", TEXT.encode()))
     start, end = law_span(older, doc_id)
     decision = {"clause_type": "Governing Law", "verdict": "confirmed", "start": start, "end": end}
     older.post(f"/documents/{doc_id}/decide", data=decision)
     full = make_client(extractor=Extractor(FakeQA(), clause_types, settings, "fake"))
-    assert upload(full, "older.txt", TEXT.encode())[-1]["notice"] == library.ANALYSIS_UPDATED
-    ws = full.app.state.workspace
-    assert ws.services.store.load(doc_id, settings).clauses["Governing Law"][0].conf == 0.5
+    sent = upload(full, "older.txt", TEXT.encode())
+    assert sent[-1]["notice"] == library.ANALYSIS_UPDATED and opened(sent) == doc_id
+    ws = full.ws
+    assert ws.analyses.load(doc_id_of(TEXT)).clauses["Governing Law"][0].conf == 0.5
     assert ws.load(doc_id).clauses["Governing Law"][0].conf == 1.0
 
 
@@ -286,12 +293,11 @@ def test_the_compare_page_offers_two_contracts(client):
     assert 'id="compare-result"' in html and "Swap the two contracts" in html
 
 
-def test_the_compare_page_with_one_contract_asks_for_a_second(
-    client, settings, tmp_path, monkeypatch
-):
-    store = client.app.state.workspace.services.store
-    monkeypatch.setattr(store, "demo_dir", tmp_path / "no-demo")
-    store.save(make_cache(TEXT, settings))
+def test_the_compare_page_with_one_contract_asks_for_a_second(make_client, settings, tmp_path):
+    client = fresh(make_client, tmp_path)
+    cache = make_cache(TEXT, settings)
+    client.ws.save_analysis(cache)
+    client.ws.add_contract(None, "only.txt", cache.doc_id, "txt", TEXT.encode())
     html = client.get("/compare").text
     assert library.ADD_SECOND in html and "<select" not in html
 
@@ -340,7 +346,6 @@ def test_the_portfolio_lists_the_contracts_and_writes_the_csv(client, settings):
     assert "Next notice deadline" not in html
     assert "to check · " in html and "verify" not in html.lower()
     assert "default thresholds" not in html and "confidence" not in html
-    assert (settings.cache_dir / library.PORTFOLIO_CSV).exists()
 
 
 def test_the_portfolio_csv_downloads(client):
@@ -348,7 +353,7 @@ def test_the_portfolio_csv_downloads(client):
     assert response.headers["content-type"].startswith("text/csv")
     rows = list(csv.reader(io.StringIO(response.text)))
     assert rows[0][:3] == ["Contract", "Size", "Found"]
-    assert len(rows) == 1 + len(client.app.state.workspace.documents())
+    assert len(rows) == 1 + len(client.ws.documents())
 
 
 def sheet_of(settings, doc_id: str, **values: str) -> TermSheet:
@@ -380,7 +385,7 @@ def test_the_portfolio_names_the_next_notice_deadline(make_client, settings):
         notice_period="six (6) months",
         governing_law="the laws of England",
     )
-    client.app.state.workspace.term_sheets.save(sheet)
+    client.ws.term_sheets.save(sheet)
     html = client.get("/portfolio").text
     assert "Next notice deadline" in html
     assert f"1 Jul {year + 1}" in html and "six (6) months before the term ends" in html
@@ -410,7 +415,7 @@ def test_the_workspace_rail_links_the_analysis_and_the_upload(client):
 
 
 def test_the_rail_says_found_and_to_check_and_marks_the_open_contract(client):
-    ws = client.app.state.workspace
+    ws = client.ws
     short = ws.entry(SHORT_DOC_ID)
     html = client.get(f"/documents/{SHORT_DOC_ID}/rail").text
     meta = f"Text · {short.size} · {short.found} found · {short.check} to check"
@@ -446,7 +451,7 @@ def test_the_rail_without_the_reading_model_offers_no_samples(client):
 
 
 def test_the_first_page_welcomes_and_lists_the_samples(make_client, settings, tmp_path):
-    client = fresh(make_client(extractor=Extractor(FakeQA(), [], settings, "fake")), tmp_path)
+    client = fresh(make_client, tmp_path, extractor=Extractor(FakeQA(), [], settings, "fake"))
     response = client.get("/", follow_redirects=False)
     assert response.status_code == 200
     html = response.text
@@ -459,8 +464,8 @@ def test_the_first_page_welcomes_and_lists_the_samples(make_client, settings, tm
     assert "data-drawer-toggle" not in html
 
 
-def test_the_first_page_without_the_reading_model_says_so(client, tmp_path):
-    html = fresh(client, tmp_path).get("/").text
+def test_the_first_page_without_the_reading_model_says_so(make_client, tmp_path):
+    html = fresh(make_client, tmp_path).get("/").text
     assert library.NO_MODEL in html and library.SAMPLES_NEED_MODEL in html
     assert html.count(f'disabled title="{library.SAMPLES_NEED_MODEL}"') == len(library.SAMPLE_FILES)
 
@@ -471,30 +476,32 @@ def test_a_sample_is_read_like_an_upload_then_opened(
     calls = []
     monkeypatch.setattr(library, "run_in_background", lambda target, *args: calls.append(target))
     extractor = Extractor(FakeQA(), clause_types, settings, "fake")
-    client = fresh(make_client(extractor=extractor, gen=EchoTextClient()), tmp_path)
+    client = fresh(make_client, tmp_path, extractor=extractor, gen=EchoTextClient())
     sent = frames(client, "POST", "/samples/medium_sponsorship_agreement.txt")
     shown = statuses(sent)
     assert library.READING_FILE in shown[0]
     total = len(clause_types)
     assert any(f"Finding the clauses · {total} of {total} · " in html for html in shown)
-    assert sent[-1]["redirect"] == f"/documents/{MEDIUM_DOC_ID}"
+    contract_id = opened(sent)
+    assert client.ws.contract(contract_id).doc_id == MEDIUM_DOC_ID
     assert sent[-1]["notice"] == library.ANALYSIS_COMPLETE and sent[-1]["done"]
     assert calls == [library.precompute, library.precompute_obligations]
-    assert client.app.state.workspace.entry(MEDIUM_DOC_ID).name == "Medium sponsorship agreement"
+    assert client.ws.entry(contract_id).name == "Medium sponsorship agreement"
     home = client.get("/", follow_redirects=False)
-    assert home.headers["location"] == f"/documents/{MEDIUM_DOC_ID}"
-    rail = client.get(f"/documents/{MEDIUM_DOC_ID}/rail").text
+    assert home.headers["location"] == f"/documents/{contract_id}"
+    rail = client.get(f"/documents/{contract_id}/rail").text
     assert 'action="/samples/medium_sponsorship_agreement.txt"' not in rail
     assert 'action="/samples/long_outsourcing_agreement.txt"' in rail
 
 
 def test_the_pdf_sample_keeps_its_pdf_for_the_page_view(make_client, settings, tmp_path):
-    client = fresh(make_client(extractor=Extractor(FakeQA(), [], settings, "fake")), tmp_path)
+    client = fresh(make_client, tmp_path, extractor=Extractor(FakeQA(), [], settings, "fake"))
     sent = frames(client, "POST", "/samples/short_supply_agreement.pdf")
     doc_id = doc_id_of(load_document(library.SAMPLES_DIR / "short_supply_agreement.pdf").text)
-    assert sent[-1]["redirect"] == f"/documents/{doc_id}"
-    assert copy_path(settings.cache_dir / DOCUMENTS_DIR, doc_id).exists()
-    assert client.app.state.workspace.entry(doc_id).kind == "pdf"
+    contract_id = opened(sent)
+    assert client.ws.contract(contract_id).doc_id == doc_id
+    assert client.ws.pdf_path(contract_id).read_bytes().startswith(b"%PDF")
+    assert client.ws.entry(contract_id).kind == "pdf"
 
 
 def test_an_analysed_sample_opens_with_a_notice(make_client, settings):
@@ -506,8 +513,8 @@ def test_an_analysed_sample_opens_with_a_notice(make_client, settings):
     assert qa.calls == []
 
 
-def test_a_sample_without_the_reading_model_is_a_notice(client, tmp_path):
-    sent = frames(fresh(client, tmp_path), "POST", "/samples/long_outsourcing_agreement.txt")
+def test_a_sample_without_the_reading_model_is_a_notice(make_client, tmp_path):
+    sent = frames(fresh(make_client, tmp_path), "POST", "/samples/long_outsourcing_agreement.txt")
     assert sent[-1]["notice"] == library.NO_MODEL and "redirect" not in sent[-1]
 
 
@@ -522,7 +529,7 @@ def test_only_the_listed_samples_can_be_read(client):
 
 def test_the_search_lists_each_occurrence_with_its_page_and_a_link(pdf_client):
     doc_id = pdf_client.doc_id
-    text = pdf_client.app.state.workspace.load(doc_id).text
+    text = pdf_client.ws.load(doc_id).text
     html = pdf_client.get(f"/documents/{doc_id}/search?q=THE").text
     assert "2 occurrences on 2 pages" in html
     assert '<span class="search-page">Page 1</span>' in html
@@ -555,7 +562,7 @@ def test_the_pane_has_a_search_box_that_keeps_the_term(client):
 
 
 def test_the_text_view_with_a_term_marks_every_occurrence_around_the_first(client):
-    text = client.app.state.workspace.load(SHORT_DOC_ID).text
+    text = client.ws.load(SHORT_DOC_ID).text
     total = count(text, "agreement")
     html = client.get(f"/documents/{SHORT_DOC_ID}/view?q=agreement&mode=text").text
     assert html.count('<mark class="highlight" data-label="Passage">') == 1
@@ -568,7 +575,7 @@ def test_the_text_view_with_a_term_marks_every_occurrence_around_the_first(clien
 
 def test_the_page_view_with_a_term_boxes_every_occurrence_on_the_page(pdf_client, monkeypatch):
     doc_id = pdf_client.doc_id
-    text = pdf_client.app.state.workspace.load(doc_id).text
+    text = pdf_client.ws.load(doc_id).text
     start = text.index("the laws")
     html = pdf_client.get(
         f"/documents/{doc_id}/view?label=&start={start}&end={start + 3}&q=the"
@@ -601,14 +608,14 @@ def scan_client(make_client, settings, tmp_path, monkeypatch):
     client = make_client(extractor=Extractor(FakeQA(), [], settings, "fake"))
     path = write_scan(tmp_path / "scan.pdf", pages=2)
     sent = upload(client, "scan.pdf", path.read_bytes())
-    client.doc_id = doc_id_of(load_document(path, ocr=read_scan).text)
-    assert sent[-1]["redirect"] == f"/documents/{client.doc_id}"
+    client.doc_id = opened(sent)
+    assert client.ws.contract(client.doc_id).doc_id == doc_id_of(load_document(path, ocr=read_scan).text)
     return client
 
 
 def test_a_scanned_pdf_is_read_with_ocr_and_the_rail_says_so(scan_client):
     doc_id = scan_client.doc_id
-    assert scan_client.app.state.workspace.entry(doc_id).scanned == 2
+    assert scan_client.ws.entry(doc_id).scanned == 2
     rail = re.sub(r"<[^>]+>", "", scan_client.get(f"/documents/{doc_id}/rail").text)
     assert "PDF · 2 pages · 0 found · nothing to check · 2 scanned pages read with OCR" in rail
 
@@ -638,7 +645,7 @@ def test_a_scan_without_tesseract_says_what_to_install(
 
 
 def test_the_first_page_is_in_serbian_with_the_cookie(make_client, settings, tmp_path):
-    client = fresh(make_client(extractor=Extractor(FakeQA(), [], settings, "fake")), tmp_path)
+    client = fresh(make_client, tmp_path, extractor=Extractor(FakeQA(), [], settings, "fake"))
     client.cookies.set("lang", "sr")
     html = client.get("/").text
     assert "Pročitajte ugovor uz pomoć lokalnog asistenta" in html
@@ -649,7 +656,7 @@ def test_the_first_page_is_in_serbian_with_the_cookie(make_client, settings, tmp
 
 def test_the_rail_and_the_document_pane_are_in_serbian_with_the_cookie(client):
     client.cookies.set("lang", "sr")
-    short = client.app.state.workspace.entry(SHORT_DOC_ID)
+    short = client.ws.entry(SHORT_DOC_ID)
     rail = re.sub(r"<[^>]+>", "", client.get(f"/documents/{SHORT_DOC_ID}/rail").text)
     size = short.size.replace(" words", " reči").replace(",", ".")
     assert f"Tekst · {size} · {short.found} pronađeno · {short.check} za proveru" in rail

@@ -77,7 +77,7 @@ def written_summary(client, language: str = "en") -> dict:
 
 
 def decide(client, name: str, verdict: str):
-    top = client.app.state.workspace.load(SHORT_DOC_ID).clauses[name][0]
+    top = client.ws.load(SHORT_DOC_ID).clauses[name][0]
     response = client.post(
         f"{DOC}/decide",
         data={"clause_type": name, "verdict": verdict, "start": top.start, "end": top.end},
@@ -112,7 +112,7 @@ def test_the_overview_lists_the_six_sections_with_their_lazy_load_urls(client):
 
 
 def test_the_what_happened_line_carries_the_counts(client):
-    entry = client.app.state.workspace.entry(SHORT_DOC_ID)
+    entry = client.ws.entry(SHORT_DOC_ID)
     total = entry.found + entry.check + entry.not_found
     line = copy.WHAT_HAPPENED.format(
         total=total, found=entry.found, check=entry.check, not_found=entry.not_found
@@ -198,8 +198,9 @@ def test_without_a_language_model_the_sections_say_so_and_start_nothing(client):
 def test_a_contract_without_clauses_has_nothing_to_generate(make_client, settings):
     client = make_client(gen=EchoTextClient())
     cache = make_cache("Nothing here at all.", settings, {})
-    client.app.state.workspace.services.store.save(cache)
-    doc = f"/documents/{cache.doc_id}"
+    client.ws.save_analysis(cache)
+    contract = client.ws.add_contract(None, "nothing.txt", cache.doc_id, "txt", None)
+    doc = f"/documents/{contract.id}"
     summary = client.get(f"{doc}/summary").text
     assert NOTHING_TO_SUMMARIZE in summary and f'action="{doc}/fulltext"' in summary
     assert NO_TERM_CLAUSES in client.get(f"{doc}/terms").text
@@ -264,7 +265,7 @@ def test_the_saved_key_facts_download_as_json(gen_client):
 
 
 def test_the_things_to_check_carry_plain_severities(gen_client):
-    ws = gen_client.app.state.workspace
+    ws = gen_client.ws
     flags = ws.flags(ws.load(SHORT_DOC_ID), TAU)
     page = gen_client.get(f"{DOC}/review").text
     assert '<span class="badge badge-medium badge-sm">Worth a look</span>' in page
@@ -279,7 +280,7 @@ def test_the_things_to_check_carry_plain_severities(gen_client):
 
 
 def test_a_note_on_a_point_streams_and_ends_with_the_generated_text(gen_client):
-    ws = gen_client.app.state.workspace
+    ws = gen_client.ws
     flags = ws.flags(ws.load(SHORT_DOC_ID), TAU)
     index = next(i for i, flag in enumerate(flags) if flag.rule == "auto_renewal")
     lines = frames(
@@ -319,7 +320,7 @@ def test_who_must_do_what_ends_with_the_entries_by_party(make_client):
     assert 'class="group-title"' in panel and "badge badge-must badge-sm" in panel
     assert "Show in document" in panel
     assert "1 entry could not be matched to the contract and was left out." in panel
-    ws = client.app.state.workspace
+    ws = client.ws
     sheet = ws.obligations.load(SHORT_DOC_ID, "fake-gen", TAU.low, TAU.high)
     first = sheet.obligations[0]
     assert html.escape(" ".join(first.action.split()), quote=False) in panel
@@ -357,7 +358,7 @@ def test_all_clauses_filter_by_status(client):
 
 
 def test_a_clause_row_opens_its_top_passage(client):
-    cache = client.app.state.workspace.load(SHORT_DOC_ID)
+    cache = client.ws.load(SHORT_DOC_ID)
     citation = top_citation(cache, "Governing Law")
     status = tier(citation.conf, TAU.low, TAU.high)
     page = client.get(f"{DOC}/checklist").text
@@ -371,7 +372,7 @@ def test_a_clause_not_found_shows_no_passage(client):
 
 
 def test_a_check_row_in_all_clauses_has_the_confirm_form(client):
-    top = client.app.state.workspace.load(SHORT_DOC_ID).clauses[TO_CHECK][0]
+    top = client.ws.load(SHORT_DOC_ID).clauses[TO_CHECK][0]
     row = clause_row(client.get(f"{DOC}/checklist").text, TO_CHECK)
     assert 'class="badge badge-check"' in row
     assert f'hx-post="{DOC}/decide" hx-target="#document-pane"' in row
@@ -380,16 +381,16 @@ def test_a_check_row_in_all_clauses_has_the_confirm_form(client):
     assert ">Confirm<" in row and ">Not this<" in row
 
 
-def test_a_confirmed_clause_shows_confirmed_by_you(client):
-    before = client.app.state.workspace.entry(SHORT_DOC_ID)
+def test_a_confirmed_clause_shows_confirmed_and_who(client):
+    before = client.ws.entry(SHORT_DOC_ID)
     decide(client, TO_CHECK, "confirmed")
     page = client.get(f"{DOC}/checklist").text
     row = clause_row(page, TO_CHECK)
     assert copy.STATUS["confirmed"] in row and 'class="badge badge-confirmed"' in row
-    assert ">Undo<" in row and ">Confirm<" not in row
+    assert ">Undo<" in row and ">Confirm<" not in row and "by Reader" in row
     assert TO_CHECK in client.get(f"{DOC}/checklist", params={"status": "found"}).text
     card = client.get(f"{DOC}/overview/happened").text
-    assert "You confirmed 1 passage." in card
+    assert "1 passage confirmed." in card
     assert f"{before.found + 1} found, {before.check - 1} to check" in card
 
 
@@ -423,7 +424,7 @@ def test_no_section_shows_the_technical_words(make_client):
 
 
 def test_definitions_link_to_the_document_pane(client):
-    ws = client.app.state.workspace
+    ws = client.ws
     first = ws.definitions(ws.load(SHORT_DOC_ID))[0]
     url = view_url(SHORT_DOC_ID, DEFINITION_LABEL, definition_citation(first), "definition")
     page = client.get(f"{DOC}/definitions").text
@@ -460,7 +461,7 @@ def test_the_report_without_a_language_model_names_every_missing_part(client):
 
 
 def test_each_defined_term_links_to_every_occurrence(client):
-    ws = client.app.state.workspace
+    ws = client.ws
     first = ws.definitions(ws.load(SHORT_DOC_ID))[0]
     url = occurrences_url(SHORT_DOC_ID, first.term)
     assert url.startswith(f"{DOC}/view?q=") and url.endswith("&mode=text")
@@ -481,7 +482,7 @@ def test_the_overview_in_serbian_names_the_sections_and_the_counts(client):
     for _, title, line in copy_for("sr").SECTIONS:
         assert f">{title}<" in page and str(escape(line)) in page
     assert ">Sažetak<" in page and ">Ključne činjenice<" in page and ">Summary<" not in page
-    entry = client.app.state.workspace.entry(SHORT_DOC_ID)
+    entry = client.ws.entry(SHORT_DOC_ID)
     total = entry.found + entry.check + entry.not_found
     line = copy_for("sr").WHAT_HAPPENED.format(
         total=total, found=entry.found, check=entry.check, not_found=entry.not_found

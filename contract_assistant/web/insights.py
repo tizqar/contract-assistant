@@ -20,10 +20,10 @@ from typing import Annotated
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 
+from contract_assistant import audit, generation
 from contract_assistant import fulltext as fulltext_texts
-from contract_assistant import generation
 from contract_assistant import obligations as obligation_texts
 from contract_assistant import review as review_texts
 from contract_assistant import summary as summary_texts
@@ -69,9 +69,10 @@ from contract_assistant.web.core import (
     SECTION_LABEL,
     Tau,
     Thresholds,
-    Workspace,
+    UserWorkspace,
     WorkspaceError,
     Ws,
+    attachment,
     frame,
     render,
     render_string,
@@ -154,7 +155,10 @@ CHECK_HINT = (
 )
 # A text that names a count, by count; None is the form of every other count. Each form is a
 # whole sentence, so that a language with other plural forms can word it its own way.
-CONFIRMED_LINE = {1: "You confirmed 1 passage.", None: "You confirmed {count} passages."}
+CONFIRMED_LINE = {1: "1 passage confirmed.", None: "{count} passages confirmed."}
+# What was downloaded, as the activity log names it.
+THE_KEY_TERMS = "the key terms"
+THE_REPORT = "the report"
 SHOW_TO_CHECK = {1: "Show the 1 passage to check", None: "Show the {count} passages to check"}
 AI_NEEDED = "This part is written by the local AI, which is not running on this computer."
 RETRYING = "The first draft did not match the contract; writing it again"
@@ -418,7 +422,7 @@ def happened(request: Request, doc_id: str, ws: Ws, tau: Tau):
     return render(request, HAPPENED, cache=cache, **_happened(ws, cache, tau, lang))
 
 
-def _happened(ws: Workspace, cache: DocumentCache, tau: Thresholds, lang: str) -> dict:
+def _happened(ws: UserWorkspace, cache: DocumentCache, tau: Thresholds, lang: str) -> dict:
     """What the assistant did, counted from the same rows as All clauses at these thresholds."""
     topics = _topics(cache, tau, ws.services.unvalidated, ws.decided(cache.doc_id))
     counts = _counts(topics)
@@ -485,7 +489,7 @@ def write_summary(
 
 def _summary_frames(
     request: Request,
-    ws: Workspace,
+    ws: UserWorkspace,
     cache: DocumentCache,
     tau: Thresholds,
     language: str,
@@ -499,7 +503,7 @@ def _summary_frames(
 
 
 def _summary_context(
-    ws: Workspace,
+    ws: UserWorkspace,
     cache: DocumentCache,
     tau: Thresholds,
     language: str,
@@ -526,7 +530,7 @@ def _summary_context(
 
 
 def _summary_view(
-    ws: Workspace, cache: DocumentCache, summary: Summary, lang: str
+    ws: UserWorkspace, cache: DocumentCache, summary: Summary, lang: str
 ) -> SummaryView:
     if summary.text is None:
         mismatch = None
@@ -581,7 +585,7 @@ def write_fulltext_overview(request: Request, doc_id: str, ws: Ws, tau: Tau):
 
 
 def _fulltext_frames(
-    request: Request, ws: Workspace, cache: DocumentCache, tau: Thresholds, lang: str
+    request: Request, ws: UserWorkspace, cache: DocumentCache, tau: Thresholds, lang: str
 ) -> Iterator[str]:
     for step in fulltext_steps(ws, cache, tau, lang):
         if isinstance(step, Step):
@@ -594,7 +598,7 @@ def _fulltext_frames(
 
 
 def fulltext_steps(
-    ws: Workspace, cache: DocumentCache, tau: Thresholds, lang: str = ENGLISH
+    ws: UserWorkspace, cache: DocumentCache, tau: Thresholds, lang: str = ENGLISH
 ) -> Iterator[Step | FullTextSummary]:
     """Write the overview section by section, reusing a saved one; a step per stage in lang."""
     gen = ws.gen()
@@ -620,7 +624,7 @@ def fulltext_steps(
 
 
 def _fulltext_context(
-    ws: Workspace,
+    ws: UserWorkspace,
     cache: DocumentCache,
     tau: Thresholds,
     lang: str,
@@ -692,7 +696,7 @@ def extract_terms(request: Request, doc_id: str, ws: Ws, tau: Tau):
 
 
 def _terms_frames(
-    request: Request, ws: Workspace, cache: DocumentCache, tau: Thresholds, lang: str
+    request: Request, ws: UserWorkspace, cache: DocumentCache, tau: Thresholds, lang: str
 ) -> Iterator[str]:
     for step in term_sheet_steps(ws, cache, tau):
         if isinstance(step, Step):
@@ -710,11 +714,14 @@ def terms_json(request: Request, doc_id: str, ws: Ws, tau: Tau):
         message = translate(NO_SAVED_TERMS, interface_language(request))
         raise WorkspaceError(message, status_code=404)
     filename = f"{Path(cache.source.filename).stem}-key-terms.json"
-    return FileResponse(ws.term_sheets.path_of(sheet), media_type=JSON_TYPE, filename=filename)
+    ws.log(audit.CONTRACT_EXPORTED, contract_id=cache.doc_id, details={"what": THE_KEY_TERMS})
+    return Response(
+        sheet.model_dump_json(indent=1), media_type=JSON_TYPE, headers=attachment(filename)
+    )
 
 
 def _terms_context(
-    ws: Workspace, cache: DocumentCache, tau: Thresholds, sheet: TermSheet | None, lang: str
+    ws: UserWorkspace, cache: DocumentCache, tau: Thresholds, sheet: TermSheet | None, lang: str
 ) -> dict:
     context = {
         "cache": cache,
@@ -868,7 +875,7 @@ def write_flag_note(
     return stream(_cleared(_note_frames(request, ws, flag, lang)))
 
 
-def _note_frames(request: Request, ws: Workspace, flag: Flag, lang: str) -> Iterator[str]:
+def _note_frames(request: Request, ws: UserWorkspace, flag: Flag, lang: str) -> Iterator[str]:
     gen = ws.gen()
     outcome: Generation | None = None
     for step in checked(gen, WRITING_FLAG, flag_request(flag), 1):
@@ -904,7 +911,7 @@ def read_obligations(request: Request, doc_id: str, ws: Ws, tau: Tau):
 
 
 def _obligation_frames(
-    request: Request, ws: Workspace, cache: DocumentCache, tau: Thresholds, lang: str
+    request: Request, ws: UserWorkspace, cache: DocumentCache, tau: Thresholds, lang: str
 ) -> Iterator[str]:
     for step in obligation_steps(ws, cache, tau, lang):
         if isinstance(step, Step):
@@ -914,7 +921,7 @@ def _obligation_frames(
 
 
 def saved_obligations(
-    ws: Workspace, cache: DocumentCache, tau: Thresholds
+    ws: UserWorkspace, cache: DocumentCache, tau: Thresholds
 ) -> ObligationSheet | None:
     """Return the saved obligations of a contract, or None without generating."""
     if ws.gen_model is None:
@@ -923,7 +930,7 @@ def saved_obligations(
 
 
 def obligation_steps(
-    ws: Workspace, cache: DocumentCache, tau: Thresholds, lang: str = ENGLISH
+    ws: UserWorkspace, cache: DocumentCache, tau: Thresholds, lang: str = ENGLISH
 ) -> Iterator[Step | ObligationSheet]:
     """Read the obligations, reusing a saved sheet; one step while the model works."""
     gen = ws.gen()
@@ -943,7 +950,7 @@ def obligation_steps(
 
 
 def _obligations_context(
-    ws: Workspace,
+    ws: UserWorkspace,
     cache: DocumentCache,
     tau: Thresholds,
     sheet: ObligationSheet | None,
@@ -1218,13 +1225,14 @@ def report_markdown(request: Request, doc_id: str, ws: Ws, tau: Tau):
 
 
 def _report_file(
-    ws: Workspace, doc_id: str, tau: Thresholds, suffix: str, lang: str
+    ws: UserWorkspace, doc_id: str, tau: Thresholds, suffix: str, lang: str
 ) -> FileResponse:
     cache = ws.load(doc_id)
     path = ws.settings.cache_dir / REPORTS_DIR / f"{_report_stem(cache.doc_id, tau)}{suffix}"
     if not path.is_file():
         raise WorkspaceError(translate(NO_REPORT, lang), status_code=404)
     filename = f"{Path(cache.source.filename).stem}-report{suffix}"
+    ws.log(audit.CONTRACT_EXPORTED, contract_id=cache.doc_id, details={"what": THE_REPORT})
     return FileResponse(path, media_type=REPORT_TYPES[suffix], filename=filename)
 
 
@@ -1276,6 +1284,8 @@ TRANSLATED = (
     LOADING,
     CHECK_HINT,
     *CONFIRMED_LINE.values(),
+    THE_KEY_TERMS,
+    THE_REPORT,
     *SHOW_TO_CHECK.values(),
     AI_NEEDED,
     RETRYING,

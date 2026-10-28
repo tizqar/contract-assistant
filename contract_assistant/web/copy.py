@@ -7,13 +7,13 @@ help popover.
 
 from __future__ import annotations
 
-# Status badges. "confirmed" and "rejected" are the reader's decisions, see decisions.py.
+# Status badges. "confirmed" and "rejected" are a reviewer's decisions, see files.decide.
 STATUS = {
     "found": "Found",
     "check": "Check this",
     "not_found": "Not found",
-    "confirmed": "Confirmed by you",
-    "rejected": "Rejected by you",
+    "confirmed": "Confirmed",
+    "rejected": "Rejected",
     "definition": "Defined term",
     "related": "Closest passage",
 }
@@ -21,8 +21,8 @@ STATUS_HELP = {
     "found": "The assistant is confident this is the passage for this clause.",
     "check": "A likely passage. Read it, then confirm it or reject it.",
     "not_found": "The contract was checked and no passage for this clause was found.",
-    "confirmed": "You confirmed this passage; it now counts as found.",
-    "rejected": "You rejected this passage; the next candidate, if any, is shown.",
+    "confirmed": "A reviewer confirmed this passage; it now counts as found.",
+    "rejected": "A reviewer rejected this passage; the next candidate, if any, is shown.",
     "definition": "The sentence of the contract that defines the term, copied word for word.",
     "related": "A passage close to your question; it is not one of the clauses checked.",
 }
@@ -96,10 +96,23 @@ HELP = (
         ),
     ),
     (
+        "Reviews and approval",
+        (
+            "Confirm or reject each passage to check, then send the contract for approval. An "
+            "administrator approves it, which locks the decisions, or sends it back with a "
+            "note. Every step is kept in the contract's history, with who did it and when."
+        ),
+    ),
+    (
         "Nothing leaves this computer",
-        "The contract, the analysis and your decisions stay in the cache folder of this app.",
+        (
+            "The contracts, their analyses, the decisions and the activity log are kept in the "
+            "app's own database; nothing is sent to an outside service."
+        ),
     ),
 )
+# Who made a decision, shown next to its badge.
+DECIDED_BY = "by {name}"
 WHAT_HAPPENED = (
     "The assistant checked this contract for {total} clauses: {found} found, "
     "{check} to check, {not_found} not found."

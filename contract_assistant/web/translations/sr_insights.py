@@ -12,8 +12,10 @@ CATALOGUE = {
         "Odlomci označeni sa Proverite su verovatni, ali nisu sigurni: "
         "pročitajte ih i pritisnite Potvrdi ili Nije to."
     ),
-    "You confirmed 1 passage.": "Potvrdili ste 1 odlomak.",
-    "You confirmed {count} passages.": "Broj odlomaka koje ste potvrdili: {count}.",
+    "1 passage confirmed.": "Potvrđen je 1 odlomak.",
+    "{count} passages confirmed.": "Broj potvrđenih odlomaka: {count}.",
+    "the key terms": "ključne uslove",
+    "the report": "izveštaj",
     "Show the 1 passage to check": "Prikaži odlomak za proveru",
     "Show the {count} passages to check": "Prikaži odlomke za proveru ({count})",
     # Status lines while the local AI writes

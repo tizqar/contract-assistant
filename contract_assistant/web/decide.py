@@ -1,4 +1,8 @@
-"""The reader's decisions from the web app: confirm or reject a passage, or undo that."""
+"""The reviewer's decisions from the web app: confirm or reject a passage, or undo that.
+
+The files service checks that the user may edit the contract and that its review is open, and
+logs who decided what.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +12,6 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 
 from contract_assistant.answer import Citation, tier
-from contract_assistant.decisions import Decision, now
 from contract_assistant.store import DocumentCache
 from contract_assistant.ui.views import display_name
 from contract_assistant.web.core import Tau, WorkspaceError, Ws, view_url
@@ -40,8 +43,7 @@ def decide(
         raise WorkspaceError(UNKNOWN_VERDICT)
     if not 0 <= start < end <= len(cache.text):
         raise WorkspaceError(NO_SUCH_SPAN)
-    decision = Decision(clause_type=name, verdict=verdict, start=start, end=end, at=now())
-    ws.decisions.decide(cache.doc_id, decision)
+    ws.decide(cache.doc_id, name, verdict, start, end, cache.text[start:end])
     return RedirectResponse(_after(ws, ws.load(doc_id), name, tau), status_code=SEE_OTHER)
 
 
@@ -50,7 +52,7 @@ def undo(request: Request, doc_id: str, ws: Ws, tau: Tau, clause_type: Annotated
     """Forget the decision on a clause type, then show its passage as the model found it."""
     cache = ws.load(doc_id)
     name = _clause_type(ws, clause_type)
-    ws.decisions.forget(cache.doc_id, name)
+    ws.undo(cache.doc_id, name)
     return RedirectResponse(_after(ws, ws.load(doc_id), name, tau), status_code=SEE_OTHER)
 
 

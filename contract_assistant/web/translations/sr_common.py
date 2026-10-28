@@ -5,8 +5,8 @@ CATALOGUE = {
     "Found": "Pronađeno",
     "Check this": "Proverite",
     "Not found": "Nije pronađeno",
-    "Confirmed by you": "Potvrdili ste",
-    "Rejected by you": "Odbacili ste",
+    "Confirmed": "Potvrđeno",
+    "Rejected": "Odbačeno",
     "Defined term": "Definisan pojam",
     "Closest passage": "Najbliži odlomak",
     "The assistant is confident this is the passage for this clause.": (
@@ -18,12 +18,13 @@ CATALOGUE = {
     "The contract was checked and no passage for this clause was found.": (
         "Ugovor je proveren i nije pronađen odlomak za ovu klauzulu."
     ),
-    "You confirmed this passage; it now counts as found.": (
-        "Potvrdili ste ovaj odlomak; sada se računa kao pronađen."
+    "A reviewer confirmed this passage; it now counts as found.": (
+        "Ovaj odlomak je potvrđen u pregledu; sada se računa kao pronađen."
     ),
-    "You rejected this passage; the next candidate, if any, is shown.": (
-        "Odbacili ste ovaj odlomak; prikazan je sledeći kandidat, ako ga ima."
+    "A reviewer rejected this passage; the next candidate, if any, is shown.": (
+        "Ovaj odlomak je odbačen u pregledu; prikazan je sledeći kandidat, ako ga ima."
     ),
+    "by {name}": "— {name}",
     "The sentence of the contract that defines the term, copied word for word.": (
         "Rečenica ugovora koja definiše pojam, prepisana doslovno."
     ),
@@ -120,8 +121,22 @@ CATALOGUE = {
         "može biti pogrešan."
     ),
     "Nothing leaves this computer": "Ništa ne napušta ovaj računar",
-    "The contract, the analysis and your decisions stay in the cache folder of this app.": (
-        "Ugovor, analiza i vaše odluke ostaju u keš fascikli ove aplikacije."
+    "Reviews and approval": "Pregled i odobrenje",
+    (
+        "Confirm or reject each passage to check, then send the contract for approval. An "
+        "administrator approves it, which locks the decisions, or sends it back with a "
+        "note. Every step is kept in the contract's history, with who did it and when."
+    ): (
+        "Potvrdite ili odbacite svaki odlomak za proveru, pa pošaljite ugovor na odobrenje. "
+        "Administrator ga odobrava, čime se odluke zaključavaju, ili ga vraća uz napomenu. "
+        "Svaki korak ostaje u istoriji ugovora, s tim ko ga je uradio i kada."
+    ),
+    (
+        "The contracts, their analyses, the decisions and the activity log are kept in the "
+        "app's own database; nothing is sent to an outside service."
+    ): (
+        "Ugovori, njihove analize, odluke i dnevnik aktivnosti čuvaju se u bazi podataka same "
+        "aplikacije; ništa se ne šalje spoljnoj usluzi."
     ),
     (
         "The assistant checked this contract for {total} clauses: {found} found, "

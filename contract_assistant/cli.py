@@ -40,6 +40,7 @@ from contract_assistant.compare import render_markdown as render_comparison
 from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.dates import key_dates
 from contract_assistant.dates import render_markdown as render_dates
+from contract_assistant.db.engine import Database, DatabaseUnavailableError, connect
 from contract_assistant.definitions import find_definitions, lookup
 from contract_assistant.evaluation.e2e import (
     ORACLE,
@@ -176,8 +177,13 @@ DEFINITION_HEADING = "**Definition: {term}** · p. {page}"
 DEFINITIONS_HEADER = ("| Term | Defined as | Page |", "| --- | --- | --- |")
 ELLIPSIS = "…"
 PRECOMPUTE_NOTICE = "precomputing summaries and key terms in the background"
+# The database of `serve --fresh`, in its temporary cache folder.
+FRESH_DATABASE = "fresh.db"
 WEB_UI = "web"
-FRESH_NOTICE = "fresh start: an empty cache in {path}; the sample contracts are on the first page"
+FRESH_NOTICE = (
+    "fresh start: an empty cache and database in {path}; create the first account, then the "
+    "sample contracts are on the first page"
+)
 GRADIO_UI = "gradio"
 UI_CHOICES = (WEB_UI, GRADIO_UI)
 SHARE_NOTICE = (
@@ -1418,34 +1424,50 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         fulltexts=fulltext_store,
         rules=load_rules(known_types=[clause.name for clause in app_types]),
     )
-    if gen is not None and not args.no_precompute and not args.fresh:
-        print(PRECOMPUTE_NOTICE, file=sys.stderr)
-        names = [clause.name for clause in app_types]
-        run_in_background(
-            precompute_all,
-            store,
-            settings,
-            names,
-            gen,
-            summaries,
-            term_sheets,
-            extras,
-            obligation_store,
-        )
+    precomputing = gen is not None and not args.no_precompute and not args.fresh
     if args.ui == GRADIO_UI:
+        # The older app keeps the cache folder; it has no accounts.
+        if precomputing:
+            print(PRECOMPUTE_NOTICE, file=sys.stderr)
+            names = [clause.name for clause in app_types]
+            run_in_background(
+                precompute_all,
+                store,
+                settings,
+                names,
+                gen,
+                summaries,
+                term_sheets,
+                extras,
+                obligation_store,
+            )
         # Imported here so the other commands do not pay for loading Gradio.
         from contract_assistant.ui.app import build_app, launch_app
 
         launch_app(build_app(services), services, share=args.share, port=args.port)
         return 0
+    try:
+        database = _web_database(settings, args.fresh)
+    except DatabaseUnavailableError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return EXIT_ERROR
     if args.share:
         print(SHARE_NOTICE, file=sys.stderr)
+    if precomputing:
+        print(PRECOMPUTE_NOTICE, file=sys.stderr)
     run_server(
-        create_app(services, keep_warm=gen is not None),
+        create_app(services, database, keep_warm=gen is not None, precompute=precomputing),
         host=args.host,
         port=args.port or DEFAULT_PORT,
     )
     return 0
+
+
+def _web_database(settings: Settings, fresh: bool) -> Database:
+    """Open the web app's database, migrated; a fresh start gets a new SQLite file instead."""
+    if fresh:
+        return connect(f"sqlite:///{settings.cache_dir / FRESH_DATABASE}")
+    return connect(settings.database_url)
 
 
 def _relative(path: Path) -> Path:

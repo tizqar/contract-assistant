@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ _("Contract Assistant") }}{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/auth.css">
+</head>
+{# The pages a browser sees before it is signed in: sign-in, first-run set-up, password change. #}
+<body class="auth-page">
+<header class="topbar">
+  <span class="brand">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="2" y="2" width="24" height="24" rx="6" fill="currentColor"></rect><path d="M9 9h10M9 14h10M9 19h6" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path></svg>
+    <span>{{ _("Contract Assistant") }}</span>
+  </span>
+  <div class="grow"></div>
+  <form class="seg lang-switch" method="post" action="/language" aria-label="{{ _('Language') }}">
+    <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+    <button type="submit" name="lang" value="en" class="seg-item{% if lang == 'en' %} seg-item-active{% endif %}" aria-pressed="{{ 'true' if lang == 'en' else 'false' }}" title="English">EN</button>
+    <button type="submit" name="lang" value="sr" class="seg-item{% if lang == 'sr' %} seg-item-active{% endif %}" aria-pressed="{{ 'true' if lang == 'sr' else 'false' }}" title="Srpski">SR</button>
+  </form>
+</header>
+<main class="auth-main">
+  <div class="card auth-card">
+    {% block card %}{% endblock %}
+  </div>
+</main>
+</body>
+</html>

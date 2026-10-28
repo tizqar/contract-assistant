@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="/static/chat.css">
 <link rel="stylesheet" href="/static/insights.css">
 <link rel="stylesheet" href="/static/library.css">
+<link rel="stylesheet" href="/static/auth.css">
 <script src="/static/htmx.min.js" defer></script>
 <script src="/static/app.js" defer></script>
 <script src="/static/chat.js" defer></script>
@@ -40,14 +41,30 @@
     {% else %}
     <span class="pill pill-off" title="{{ _('No local language model: summaries and explanations are off') }}"><span class="dot"></span>{{ copy.AI_OFF }}</span>
     {% endif %}
+    <a class="btn" href="/files">{{ _("Files") }}</a>
     <a class="btn" href="/compare{% if cache is defined and cache %}?left={{ cache.doc_id }}{% endif %}">{{ _("Compare") }}</a>
     <a class="btn" href="/portfolio">{{ _("Portfolio") }}</a>
+    {% if actor and actor.is_admin %}<a class="btn" href="/admin">{{ _("Admin") }}</a>{% endif %}
     {% block actions %}{% endblock %}
     <form class="seg lang-switch" method="post" action="/language" aria-label="{{ _('Language') }}">
       <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
       <button type="submit" name="lang" value="en" class="seg-item{% if lang == 'en' %} seg-item-active{% endif %}" aria-pressed="{{ 'true' if lang == 'en' else 'false' }}" title="English">EN</button>
       <button type="submit" name="lang" value="sr" class="seg-item{% if lang == 'sr' %} seg-item-active{% endif %}" aria-pressed="{{ 'true' if lang == 'sr' else 'false' }}" title="Srpski">SR</button>
     </form>
+    {% if actor %}
+    <details class="menu user-menu" id="user-menu">
+      <summary class="btn" aria-label="{{ _('Your account') }}" title="{{ actor.email }}">{{ actor.name }}</summary>
+      <div class="menu-body">
+        <h3 class="menu-title">{{ actor.name }}</h3>
+        <p class="muted small">{{ actor.email }}<br><span class="pill user-role">{{ _(ws.role_name) }}</span></p>
+        <div class="menu-links">
+          <a class="link small" href="/account">{{ _("Account") }}</a>
+          <a class="link small" href="/account/password">{{ _("Change password") }}</a>
+          <form method="post" action="/logout"><button type="submit" class="btn btn-sm">{{ _("Sign out") }}</button></form>
+        </div>
+      </div>
+    </details>
+    {% endif %}
     <details class="menu help" id="help-menu">
       <summary class="btn btn-icon" aria-label="{{ copy.HELP_TITLE }}" title="{{ copy.HELP_TITLE }}">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg>

@@ -15,14 +15,15 @@ from contract_assistant.web.generate import (
 )
 from tests.support.caches import make_cache
 from tests.support.fakes import EchoTextClient
-from tests.web.conftest import SHORT_DOC_ID
+from tests.web.conftest import SHORT_DOC_ID, seed_demo
 
 TAU = Thresholds(0.06, 0.91)
 
 
 @pytest.fixture
-def ws(make_services):
-    return Workspace(make_services(gen=EchoTextClient()))
+def ws(make_services, database, settings, reader):
+    seed_demo(database, settings, reader)
+    return Workspace(make_services(gen=EchoTextClient()), database).for_user(reader)
 
 
 def test_the_summary_is_written_once_then_loaded(ws):
@@ -54,8 +55,9 @@ def test_a_contract_without_clauses_has_nothing_to_summarize(ws, settings):
         list(summary_steps(ws, cache, TAU, "en"))
 
 
-def test_generation_off_is_a_notice(make_services):
-    ws = Workspace(make_services())
+def test_generation_off_is_a_notice(make_services, database, settings, reader):
+    seed_demo(database, settings, reader)
+    ws = Workspace(make_services(), database).for_user(reader)
     cache = ws.load(SHORT_DOC_ID)
     with pytest.raises(WorkspaceError, match=SUMMARIES_OFF):
         list(summary_steps(ws, cache, TAU, "en"))
