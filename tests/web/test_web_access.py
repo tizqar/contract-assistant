@@ -177,7 +177,9 @@ def test_each_user_has_their_own_chat(
 def test_downloads_are_logged(client, database):
     assert client.get(f"{DOC}/analysis.json").status_code == 200
     assert client.get("/portfolio.csv").status_code == 200
+    exported = [audit.CONTRACT_EXPORTED, audit.DATA_EXPORTED]
     with database.session() as session:
-        logged = audit.events(session, audit.EventFilter(actions=[audit.CONTRACT_EXPORTED]))
+        logged = audit.events(session, audit.EventFilter(actions=exported))
     assert [event.details["what"] for event in logged] == ["the portfolio", "the analysis"]
+    assert logged[0].action == audit.DATA_EXPORTED and logged[0].contract_id is None
     assert logged[1].contract_id == SHORT_DOC_ID and logged[1].actor_name == "Reader"

@@ -618,7 +618,7 @@ def portfolio_page(request: Request, ws: Ws, tau: Tau):
 def portfolio_csv(ws: Ws):
     """The portfolio table as a CSV file."""
     rows = _portfolio(ws)
-    ws.log(audit.CONTRACT_EXPORTED, details={"what": THE_PORTFOLIO})
+    ws.log(audit.DATA_EXPORTED, details={"what": THE_PORTFOLIO})
     return Response(to_csv(rows), media_type="text/csv", headers=attachment(PORTFOLIO_CSV))
 
 
