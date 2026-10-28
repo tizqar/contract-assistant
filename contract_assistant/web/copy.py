@@ -27,6 +27,18 @@ STATUS_HELP = {
     "related": "A passage close to your question; it is not one of the clauses checked.",
 }
 
+# A contract's review, see access.REVIEW_STEPS: the badge of each status and what it means.
+REVIEW_STATUS = {
+    "in_review": "In review",
+    "submitted": "Sent for approval",
+    "approved": "Approved",
+}
+REVIEW_HELP = {
+    "in_review": "Passages can be confirmed or rejected; send it for approval when done.",
+    "submitted": "Waiting for an administrator; the decisions are locked meanwhile.",
+    "approved": "An administrator approved it; the decisions are locked.",
+}
+
 AI_BADGE = "AI"
 AI_NOTICE = (
     "AI text can be wrong. Quotes are copied word for word from the contract; "

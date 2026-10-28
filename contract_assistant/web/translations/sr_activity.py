@@ -80,4 +80,24 @@ CATALOGUE = {
     "{actor} cleared their chat about {contract}": "{actor}: obrisan razgovor o ugovoru {contract}",
     "The system": "Sistem",
     "Someone": "Neko",
+    # web/activity.py
+    "can view": "može da pregleda",
+    "can edit": "može da menja",
+    "{date}, {time}": "{date}, {time}",
+    "Accounts and sign-ins": "Nalozi i prijave",
+    "Folders and sharing": "Fascikle i deljenje",
+    "Passage decisions": "Odluke o odlomcima",
+    # copy.REVIEW_STATUS and copy.REVIEW_HELP
+    "In review": "U pregledu",
+    "Sent for approval": "Poslat na odobrenje",
+    "Approved": "Odobren",
+    "Passages can be confirmed or rejected; send it for approval when done.": (
+        "Odlomci se mogu potvrditi ili odbaciti; kada završite, pošaljite ga na odobrenje."
+    ),
+    "Waiting for an administrator; the decisions are locked meanwhile.": (
+        "Čeka administratora; odluke su u međuvremenu zaključane."
+    ),
+    "An administrator approved it; the decisions are locked.": (
+        "Administrator ga je odobrio; odluke su zaključane."
+    ),
 }
