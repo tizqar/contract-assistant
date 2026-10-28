@@ -65,7 +65,7 @@ def test_renaming_oneself(client, database):
     response = client.post("/account/name", data={"name": " Rita "}, follow_redirects=False)
     assert response.status_code == 303 and response.headers["location"] == "/account?done=name"
     page = client.get(response.headers["location"]).text
-    assert account.NAME_SAVED in page and ">Rita</summary>" in page
+    assert account.NAME_SAVED in page and ">Rita</span></summary>" in page
     with database.session() as session:
         [renamed] = audit.events(session, audit.EventFilter(actions=[audit.USER_RENAMED]))
     assert renamed.actor_id == "reader" and renamed.details["old_name"] == "Reader"

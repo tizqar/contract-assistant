@@ -44,7 +44,7 @@ def test_the_set_up_makes_the_first_admin_and_signs_them_in(make_services, datab
     assert response.status_code == 303 and response.headers["location"] == "/"
     assert auth.COOKIE in response.cookies
     home = client.get("/")
-    assert "Read a contract with a local assistant" in home.text and ">Ana</summary>" in home.text
+    assert "Read a contract with a local assistant" in home.text and ">Ana</span></summary>" in home.text
     assert ">Admin</a>" in home.text
     with database.session() as session:
         assert accounts.find_by_email(session, "ana@example.com").role == "admin"
@@ -171,5 +171,5 @@ def test_a_form_from_another_site_is_refused(client):
 
 def test_the_user_menu_names_the_reader_and_their_role(client):
     html = client.get(f"/documents/{SHORT_DOC_ID}").text
-    assert ">Reader</summary>" in html and READER_EMAIL in html and ">User</span>" in html
+    assert ">Reader</span></summary>" in html and READER_EMAIL in html and ">User</span>" in html
     assert 'action="/logout"' in html and ">Admin</a>" not in html

@@ -14,19 +14,39 @@
 .user-menu .menu-links { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .decided-by { margin-left: 4px; }
 
-/* The top bar's links: buttons on a wide screen, one Menu on a narrow one. */
+/* The top bar's links: buttons when there is room, one Menu when there is not. A contract's
+   page also has the contract switcher and Report, so it folds them sooner. */
 .nav-links { display: contents; }
 .nav-menu { display: none; }
 .nav-menu summary { gap: 6px; }
 .nav-menu .menu-body { left: 0; right: auto; width: 220px; padding: 8px; gap: 2px; }
 .menu-link { display: block; padding: 8px 10px; border-radius: 8px; color: var(--ink); font-weight: 500; text-decoration: none; }
 .menu-link:hover, .menu-link:focus-visible { background: var(--surface-2); }
+.user-initial {
+  display: none; width: 24px; height: 24px; border-radius: 50%; align-items: center; justify-content: center;
+  background: var(--primary-soft); color: var(--primary); font-weight: 700; font-size: 12px;
+}
+@media (max-width: 1600px) {
+  .topnav-wide .nav-links { display: none; }
+  .topnav-wide .nav-menu { display: block; }
+  .topnav-wide .pill .pill-label { display: none; }
+}
 @media (max-width: 1280px) {
+  .topbar-contract .brand span { display: none; }
+}
+@media (max-width: 1100px) {
   .nav-links { display: none; }
   .nav-menu { display: block; }
   .topnav .pill .pill-label { display: none; }
 }
 @media (max-width: 760px) {
-  .user-menu summary { max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+  .topnav .pill { display: none; }
   .brand span { display: none; }
+  .user-menu summary { padding: 4px 8px; }
+  .user-menu .user-name { display: none; }
+  .user-menu .user-initial { display: inline-flex; }
+  .topnav { gap: 4px; }
+  .topnav .btn { padding-left: 9px; padding-right: 9px; }
+  .topnav .btn-icon { min-width: 34px; padding: 6px; }
+  .topnav .lang-switch .seg-item { padding: 4px 8px; }
 }

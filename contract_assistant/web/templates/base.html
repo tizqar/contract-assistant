@@ -29,7 +29,7 @@
   <input type="hidden" id="tau-low" name="low" value="{{ '%g' % tau.low }}" data-default="{{ '%g' % ws.settings.tau_low }}">
   <input type="hidden" id="tau-high" name="high" value="{{ '%g' % tau.high }}" data-default="{{ '%g' % ws.settings.tau_high }}">
 </div>
-<header class="topbar">
+<header class="topbar{% if cache is defined and cache %} topbar-contract{% endif %}">
   {% if cache is defined and cache %}
   <button type="button" class="btn btn-icon" data-drawer-toggle aria-label="{{ copy.CONTRACTS }}" aria-controls="drawer" title="{{ copy.CONTRACTS }}">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
@@ -41,7 +41,7 @@
   </a>
   {% block switcher %}{% endblock %}
   <div class="grow"></div>
-  <nav class="topnav" aria-label="Main">
+  <nav class="topnav{% if cache is defined and cache %} topnav-wide{% endif %}" aria-label="Main">
     {% if ws.gen_model %}
     <span class="pill pill-ok" title="{{ _('{model} through Ollama, on this computer').format(model=ws.gen_model) }}"><span class="dot"></span><span class="pill-label">{{ copy.AI_READY }}</span></span>
     {% else %}
@@ -74,7 +74,7 @@
     </form>
     {% if actor %}
     <details class="menu user-menu" id="user-menu">
-      <summary class="btn" aria-label="{{ _('Your account') }}" title="{{ actor.email }}">{{ actor.name }}</summary>
+      <summary class="btn" aria-label="{{ _('Your account') }}" title="{{ actor.email }}"><span class="user-initial" aria-hidden="true">{{ actor.name[:1] }}</span><span class="user-name">{{ actor.name }}</span></summary>
       <div class="menu-body">
         <h3 class="menu-title">{{ actor.name }}</h3>
         <p class="muted small">{{ actor.email }}<br><span class="pill user-role">{{ _(ws.role_name) }}</span></p>
