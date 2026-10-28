@@ -9,13 +9,19 @@ import re
 import sys
 import tempfile
 import time
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import get_args
 
 from dotenv import load_dotenv
 from pydantic import BaseModel
+from sqlalchemy import func, inspect, select
+from sqlalchemy.orm import Session
 
+from contract_assistant import accounts
+from contract_assistant.access import AccessError
+from contract_assistant.accounts import AccountError
 from contract_assistant.answer import (
     Answer,
     AnswerItem,
@@ -40,7 +46,13 @@ from contract_assistant.compare import render_markdown as render_comparison
 from contract_assistant.config import ROOT, Settings, load_settings
 from contract_assistant.dates import key_dates
 from contract_assistant.dates import render_markdown as render_dates
-from contract_assistant.db.engine import Database, DatabaseUnavailableError, connect
+from contract_assistant.db.engine import (
+    Database,
+    DatabaseUnavailableError,
+    alembic_config,
+    connect,
+)
+from contract_assistant.db.models import ADMIN, ROLES, USER, Contract, Event, User
 from contract_assistant.definitions import find_definitions, lookup
 from contract_assistant.evaluation.e2e import (
     ORACLE,
@@ -90,6 +102,8 @@ from contract_assistant.fulltext import (
     write_fulltext,
 )
 from contract_assistant.fulltext import render_markdown as render_fulltext
+from contract_assistant.importer import DEFAULT_FOLDER, import_cache
+from contract_assistant.importer import render as render_import
 from contract_assistant.obligations import APP_ATTEMPTS as OBLIGATION_ATTEMPTS
 from contract_assistant.obligations import (
     OBLIGATIONS_DIR,
@@ -244,6 +258,34 @@ CLEAR_LINE = "\r\033[K"
 CACHE_ERRORS = (CacheMismatchError, CacheIntegrityError)
 DOCUMENT_ERRORS = (UnsupportedFileError, EmptyDocumentError, FileNotFoundError)
 THESIS_ERRORS = (HarnessImportError, GoldError, FileNotFoundError)
+# The database and account commands. The command line acts as the system: it needs no account,
+# so it can also set things right when the only admin is locked out.
+NO_REVISION = "none"
+SQLITE_TABLES = (
+    "{where}: SQLite takes its tables from the models, so there are no migrations to run; "
+    "every table is there"
+)
+UPGRADED = "{where}: upgraded from {before} to {after}"
+UP_TO_DATE = "{where}: at the newest revision, {after}"
+NO_TABLES = "no tables yet: run `contract-assistant db upgrade`"
+BEHIND = "the schema is behind: run `contract-assistant db upgrade`"
+SQLITE_REVISION = "none (SQLite: the tables come from the models)"
+USER_CREATED = "created the account of {name} <{email}> ({role})"
+TEMPORARY_PASSWORD = "temporary password: {password}"
+MUST_CHANGE = "they must change it at their first sign-in"
+NO_ADMIN = "note: there is no active admin yet; create one with `user create --role admin`"
+PASSWORD_RESET = "reset the password of {email}; their sign-ins were ended"
+ROLE_SET = "{email} is now {role}"
+DEACTIVATED = "deactivated {email}; their sign-ins were ended"
+ACTIVATED = "activated {email}"
+NO_ACCOUNTS = "no accounts yet"
+USERS_HEADER = ("email", "name", "role", "state", "last sign-in")
+NEVER = "never"
+ACTIVE = "active"
+INACTIVE = "deactivated"
+MUST_CHANGE_STATE = "must change password"
+TIME_FORMAT = "%Y-%m-%d %H:%M UTC"
+ROLE_WORDS = {ADMIN: "an admin", USER: "a user"}
 
 
 def _thesis_paths(settings: Settings) -> tuple[Path, Path]:
@@ -1474,6 +1516,247 @@ def _relative(path: Path) -> Path:
     return path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
 
 
+# The web app's database and accounts
+
+
+def _on_database(
+    command: Callable[[argparse.Namespace, Database], int], migrate: bool = True
+) -> Callable[[argparse.Namespace], int]:
+    """Run a command on the database of DATABASE_URL, migrated unless migrate is False.
+
+    An unreachable database prints what to do, and a refusal about an account or a folder
+    prints its message; both exit with EXIT_ERROR.
+    """
+
+    def run(args: argparse.Namespace) -> int:
+        url = load_settings().database_url
+        try:
+            database = connect(url) if migrate else _reach(url)
+        except DatabaseUnavailableError as error:
+            print(f"error: {error}", file=sys.stderr)
+            return EXIT_ERROR
+        try:
+            return command(args, database)
+        except (AccountError, AccessError) as error:
+            print(f"error: {error.message}", file=sys.stderr)
+            return EXIT_ERROR
+        finally:
+            database.dispose()
+
+    return run
+
+
+def _reach(url: str) -> Database:
+    """Open a database without changing it; raise DatabaseUnavailableError when unreachable."""
+    database = Database(url)
+    try:
+        database.check()
+    except DatabaseUnavailableError:
+        database.dispose()
+        raise
+    return database
+
+
+def _revisions(database: Database) -> tuple[str | None, str | None]:
+    """Return the database's migration revision and the newest one of the code."""
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+
+    with database.engine.connect() as connection:
+        current = MigrationContext.configure(connection).get_current_revision()
+    return current, ScriptDirectory.from_config(alembic_config()).get_current_head()
+
+
+def _cmd_db_upgrade(args: argparse.Namespace, database: Database) -> int:
+    if database.is_sqlite:
+        database.create_all()
+        print(SQLITE_TABLES.format(where=database.where))
+        return 0
+    before, _ = _revisions(database)
+    database.upgrade()
+    after, _ = _revisions(database)
+    message = UP_TO_DATE if before == after else UPGRADED
+    print(message.format(where=database.where, before=before or NO_REVISION, after=after))
+    return 0
+
+
+def _count(session: Session, model, *where) -> int:
+    return session.scalar(select(func.count()).select_from(model).where(*where)) or 0
+
+
+def _cmd_db_status(args: argparse.Namespace, database: Database) -> int:
+    current, newest = _revisions(database)
+    print(f"database: {database.where}")
+    if database.is_sqlite:
+        print(f"revision: {SQLITE_REVISION}; newest migration {newest}")
+    else:
+        print(f"revision: {current or NO_REVISION}; newest {newest}")
+    if not inspect(database.engine).has_table(User.__tablename__):
+        print(NO_TABLES)
+        return 0
+    with database.session() as session:
+        users = _count(session, User)
+        active = _count(session, User, User.active.is_(True))
+        admins = _count(session, User, User.active.is_(True), User.role == ADMIN)
+        contracts = _count(session, Contract)
+        trashed = _count(session, Contract, Contract.deleted_at.is_not(None))
+        events = _count(session, Event)
+    print(f"accounts: {users} ({active} active, {admins} of them admins)")
+    print(f"contracts: {contracts} ({trashed} moved to the trash)")
+    print(f"events: {events}")
+    if not database.is_sqlite and current != newest:
+        print(BEHIND)
+    return 0
+
+
+def _account(session: Session, email: str) -> User:
+    """Return the account with an email; raise AccountError when there is none."""
+    user = accounts.find_by_email(session, email)
+    if user is None:
+        raise AccountError(accounts.NO_SUCH_USER, accounts.NOT_FOUND)
+    return user
+
+
+def _cmd_user_create(args: argparse.Namespace, database: Database) -> int:
+    password = sys.stdin.readline().rstrip("\r\n") if args.password_stdin else None
+    with database.session() as session:
+        user, password = accounts.create_user(
+            session, None, args.email, args.name, args.role, password
+        )
+        admins = _count(session, User, User.active.is_(True), User.role == ADMIN)
+    print(USER_CREATED.format(name=user.name, email=user.email, role=user.role))
+    if user.must_change_password:
+        print(TEMPORARY_PASSWORD.format(password=password))
+        print(MUST_CHANGE)
+    if not admins:
+        print(NO_ADMIN)
+    return 0
+
+
+def _user_row(user: User) -> tuple[str, ...]:
+    state = ACTIVE if user.active else INACTIVE
+    if user.must_change_password:
+        state += f", {MUST_CHANGE_STATE}"
+    seen = user.last_login_at.strftime(TIME_FORMAT) if user.last_login_at else NEVER
+    return (user.email, user.name, user.role, state, seen)
+
+
+def _cmd_user_list(args: argparse.Namespace, database: Database) -> int:
+    with database.session() as session:
+        rows = [_user_row(user) for user in accounts.list_users(session)]
+    if not rows:
+        print(NO_ACCOUNTS)
+        return 0
+    widths = [max(len(row[column]) for row in (USERS_HEADER, *rows)) for column in range(4)]
+    for row in (USERS_HEADER, *rows):
+        cells = [cell.ljust(width) for cell, width in zip(row, widths, strict=False)]
+        print("  ".join([*cells, row[-1]]))
+    return 0
+
+
+def _cmd_user_reset_password(args: argparse.Namespace, database: Database) -> int:
+    with database.session() as session:
+        user = _account(session, args.email)
+        password = accounts.reset_password(session, None, user.id)
+        email = user.email
+    print(PASSWORD_RESET.format(email=email))
+    print(TEMPORARY_PASSWORD.format(password=password))
+    print(MUST_CHANGE)
+    return 0
+
+
+def _cmd_user_set_role(args: argparse.Namespace, database: Database) -> int:
+    with database.session() as session:
+        user = _account(session, args.email)
+        accounts.update_user(session, None, user.id, role=args.role)
+        email = user.email
+    print(ROLE_SET.format(email=email, role=ROLE_WORDS[args.role]))
+    return 0
+
+
+def _set_active(active: bool) -> Callable[[argparse.Namespace, Database], int]:
+    def run(args: argparse.Namespace, database: Database) -> int:
+        with database.session() as session:
+            user = _account(session, args.email)
+            accounts.set_active(session, None, user.id, active)
+            email = user.email
+        print((ACTIVATED if active else DEACTIVATED).format(email=email))
+        return 0
+
+    return run
+
+
+def _cmd_import_cache(args: argparse.Namespace, database: Database) -> int:
+    settings = load_settings()
+    try:
+        report = import_cache(database, settings, args.owner, args.folder, args.cache_dir)
+    except FileNotFoundError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    print(render_import(report))
+    return 0
+
+
+def _add_database_commands(commands: argparse._SubParsersAction) -> None:
+    db = commands.add_parser("db", help="migrate the web app's database or show its state")
+    db_commands = db.add_subparsers(dest="db_command", required=True)
+    upgrade = db_commands.add_parser(
+        "upgrade", help="bring the database of DATABASE_URL to the newest schema"
+    )
+    upgrade.set_defaults(func=_on_database(_cmd_db_upgrade, migrate=False))
+    status = db_commands.add_parser(
+        "status", help="where the database is, its revision and how much it holds"
+    )
+    status.set_defaults(func=_on_database(_cmd_db_status, migrate=False))
+
+    user = commands.add_parser("user", help="manage the accounts of the web app")
+    user_commands = user.add_subparsers(dest="user_command", required=True)
+    create = user_commands.add_parser(
+        "create", help="create an account; prints a temporary password unless one is given"
+    )
+    create.add_argument("--email", required=True)
+    create.add_argument("--name", required=True)
+    create.add_argument("--role", choices=ROLES, default=USER)
+    create.add_argument(
+        "--password-stdin",
+        action="store_true",
+        help="read the password from the first line of standard input",
+    )
+    create.set_defaults(func=_on_database(_cmd_user_create))
+    listing = user_commands.add_parser("list", help="list every account")
+    listing.set_defaults(func=_on_database(_cmd_user_list))
+    reset = user_commands.add_parser(
+        "reset-password", help="give an account a temporary password and sign it out"
+    )
+    reset.add_argument("--email", required=True)
+    reset.set_defaults(func=_on_database(_cmd_user_reset_password))
+    set_role = user_commands.add_parser("set-role", help="make an account an admin or a user")
+    set_role.add_argument("--email", required=True)
+    set_role.add_argument("--role", choices=ROLES, required=True)
+    set_role.set_defaults(func=_on_database(_cmd_user_set_role))
+    deactivate = user_commands.add_parser(
+        "deactivate", help="stop an account from signing in, and sign it out"
+    )
+    deactivate.add_argument("--email", required=True)
+    deactivate.set_defaults(func=_on_database(_set_active(False)))
+    activate = user_commands.add_parser("activate", help="let a deactivated account sign in")
+    activate.add_argument("--email", required=True)
+    activate.set_defaults(func=_on_database(_set_active(True)))
+
+    import_parser = commands.add_parser(
+        "import-cache",
+        help="give an account a contract for each analysis of the cache folder, once",
+    )
+    import_parser.add_argument("--owner", required=True, help="email of the account")
+    import_parser.add_argument(
+        "--folder", default=DEFAULT_FOLDER, help="folder at the top of their space"
+    )
+    import_parser.add_argument(
+        "--cache-dir", type=Path, help="cache folder to read; default CACHE_DIR"
+    )
+    import_parser.set_defaults(func=_on_database(_cmd_import_cache))
+
+
 def _add_evaluation_commands(commands: argparse._SubParsersAction) -> None:
     router_tune = commands.add_parser(
         "router-tune", help="choose the embedding threshold on the dev questions"
@@ -1666,6 +1949,7 @@ def _parser() -> argparse.ArgumentParser:
         help="do not prepare summaries and key terms in the background",
     )
     serve.set_defaults(func=_cmd_serve)
+    _add_database_commands(commands)
     return parser
 
 

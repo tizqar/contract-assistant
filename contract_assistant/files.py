@@ -672,8 +672,12 @@ def create_folder(
     ip: str | None = None,
     *,
     owner_id: str | None = None,
+    system: bool = False,
 ) -> FolderView:
-    """Make a folder in a folder, or at the top of the actor's space (an admin: owner_id's)."""
+    """Make a folder in a folder, or at the top of the actor's space (an admin: owner_id's).
+
+    With system, the log names no one: the app made it for the actor, as an import does.
+    """
     name = _clean_name(name)
     if parent_id is None:
         owner_id = _space_owner(session, actor, owner_id).id
@@ -692,7 +696,7 @@ def create_folder(
     audit.record(
         session,
         audit.FOLDER_CREATED,
-        actor_id=actor.id,
+        actor_id=None if system else actor.id,
         folder_id=folder.id,
         details={"name": name},
         ip=ip,
@@ -978,11 +982,14 @@ def add_contract(
     contract_id: str | None = None,
     *,
     owner_id: str | None = None,
+    system: bool = False,
+    details: dict | None = None,
 ) -> ContractView:
     """Add a contract whose analysis is stored to a folder, or to the top of the actor's space.
 
     owner_id picks another space's top, for an admin; contract_id picks the id, for the
-    importer and the tests. A taken name gets " (2)", " (3)" ... before its extension.
+    importer and the tests. A taken name gets " (2)", " (3)" ... before its extension. With
+    system the contract is logged as imported by the app, with details added to the event.
     """
     require_permission(actor, Permission.ADD_CONTRACTS)
     name = _clean_name(name)
@@ -1019,11 +1026,11 @@ def add_contract(
     session.flush()
     audit.record(
         session,
-        audit.CONTRACT_ADDED,
-        actor_id=actor.id,
+        audit.CONTRACT_IMPORTED if system else audit.CONTRACT_ADDED,
+        actor_id=None if system else actor.id,
         contract_id=row.id,
         folder_id=folder_id,
-        details={"name": name},
+        details={**(details or {}), "name": name},
         ip=ip,
     )
     return _one_contract(session, row, level)

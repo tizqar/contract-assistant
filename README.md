@@ -35,20 +35,29 @@ do what, all clauses, defined terms) or the document itself with the cited passa
 highlighted (the page of the PDF with the passage marked, for a PDF), next to a chat that is
 always open. The contracts live in a sidebar that slides in. A passage the assistant is not
 sure about is marked "Check this" and carries Confirm and Not this buttons: a confirmed
-passage counts as found everywhere, a rejected one is dropped, and the decision is kept per
-contract under `cache/decisions/`. Generated text carries a small AI badge and streams in as
-it is written; one notice under the chat says that AI text can be wrong. A search box in the
-document pane finds every occurrence of a term, with page jumps. The interface is in English
-or Serbian (the EN / SR switch in the top bar). Two more pages compare two contracts and
-list the portfolio.
+passage counts as found everywhere, a rejected one is dropped, and the decision is kept with
+the contract, with the name of who made it. Generated text carries a small AI badge and
+streams in as it is written; one notice under the chat says that AI text can be wrong. A
+search box in the document pane finds every occurrence of a term, with page jumps. The
+interface is in English or Serbian (the EN / SR switch in the top bar). Two more pages
+compare two contracts and list the portfolio.
+
+The web app is for a small team. Everyone signs in; an administrator creates the accounts.
+Each person keeps their contracts in folders of their own and can share a folder with
+others, to view or to edit. A contract's review ends with an administrator's approval, which
+locks its decisions, and an activity log records who did what and when. Everything the web
+app keeps (accounts, folders, contracts and their files, decisions, generated texts, chats
+and the log) is in a Postgres database that runs in Docker on the same computer. The command
+line keeps working on the cache folder, as before.
 
 ## Install
 
-Python 3.12.
+Python 3.12, and Docker with Compose for the web app's database.
 
 ```bash
 uv venv && uv pip install -e ".[dev]"     # or: python -m venv .venv && pip install -e ".[dev]"
 cp .env.example .env
+make db-up                                # the Postgres of docker-compose.yml, on 127.0.0.1:5433
 ```
 
 The report export needs `python-docx`, which is a dependency. The `api` extra (`openai`) is optional. The Makefile expects the environment in `.venv/`.
@@ -97,14 +106,128 @@ contain `config.json`, `model.safetensors`, `tokenizer.json` and `tokenizer_conf
 Without the model the app still opens the three demo documents from their caches. Uploading
 a new contract needs the model, and the app says so.
 
+## The database
+
+The web app keeps its data in Postgres 17, started by `make db-up` from `docker-compose.yml`
+and reachable only from this computer, on port 5433 (so another Postgres on 5432 can run
+too). `DATABASE_URL` in `.env` says where it is; the default is that container. On start,
+`serve` connects to it and brings its tables to the newest migration (Alembic, in
+`contract_assistant/db/migrations/`), so a new version of the app migrates the database by
+itself. If the database cannot be reached, `serve` stops with a message that says to run
+`make db-up` or to set `DATABASE_URL`. A `sqlite:///path/app.db` URL also works, for a
+quick try; SQLite gets its tables from the models and has no migrations.
+
+What lives where:
+
+| in the database | in the cache folder (`CACHE_DIR`) |
+|---|---|
+| accounts, sign-ins, folders and shares | the command line's analyses (`<sha>.json`) and its saved summaries, key terms, obligations and overviews |
+| contracts, their analyses and their files (the PDF or the text) | `documents/`: the PDF copies that `extract` keeps, for `page` |
+| decisions, generated texts, chats and feedback | `files/`: copies of the stored files that the web app writes to render pages |
+| the activity log | `pages/` and `reports/`: what `page` and `report` write |
+
+`serve --fresh` uses neither: it starts on a temporary SQLite database in a temporary cache
+folder, so the first page asks for the first admin account and then offers the sample
+contracts. Nothing of it is kept.
+
+The settings in `.env` that belong to the database and the sign-in:
+
+| setting | default | what it does |
+|---|---|---|
+| `DATABASE_URL` | the container of `make db-up` | the web app's database |
+| `SESSION_DAYS` | 14 | how long a sign-in lasts |
+| `COOKIE_SECURE` | false | true when the app is served over HTTPS, so the sign-in cookie is never sent in clear |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` | `contract_assistant` and 5433 | read by `docker-compose.yml`; change `DATABASE_URL` with them |
+| `TEST_DATABASE_URL` | the same server | where `make test-pg` makes a database of its own for each test |
+
+### The first run
+
+1. `make db-up`, then `make demo` (or `contract-assistant serve`) and open
+   http://127.0.0.1:7860.
+2. While there are no accounts the app shows one page: create the first administrator
+   (email, name and a password of at least 10 characters). The command line can do the same:
+   `contract-assistant user create --email you@example.com --name "Your Name" --role admin`.
+3. The administrator creates an account for each person and gives them the temporary
+   password the app shows; they choose their own at the first sign-in.
+4. Optionally, bring in what the cache folder already holds (see below):
+   `make import-cache OWNER=you@example.com`.
+
+### Backups and restore
+
+```bash
+make db-backup                                  # writes backups/contract-assistant-<date>-<time>.dump
+make db-restore FILE=backups/contract-assistant-20261028-101500.dump
+make db-backup BACKUPS=/Volumes/usb/backups     # another folder
+```
+
+`db-backup` runs `pg_dump` inside the container while the app keeps running and prints the
+name of the file. `db-restore` replaces everything in the database with the backup; stop the
+app first. The data itself lives in the Docker volume `pgdata` (`contract-assistant_pgdata`),
+which survives restarts, `make db-down` and `docker compose down`; only `docker compose down
+-v` deletes it. The contracts' files are in the database too, so one backup holds all of
+the web app; the cache folder belongs to the command line and is not in it.
+
+### Importing the old cache folder
+
+Before the database, the web app kept its contracts in the cache folder. `import-cache`
+brings them into the database once, for one account:
+
+```bash
+contract-assistant import-cache --owner you@example.com
+contract-assistant import-cache --owner you@example.com --folder "Old contracts" --cache-dir /path/cache
+```
+
+Each valid analysis in the folder becomes a contract of that account in the folder
+"Imported from the cache" (or `--folder`), made at the top of their space when it is
+missing. A contract gets its PDF when `documents/` has the copy, otherwise its text; its
+decisions from `decisions/` (made before there were accounts, so they name no one); its saved
+summaries in both languages, key terms, obligations and overview; and its lines of
+`feedback.jsonl`. The activity log says that each contract was imported. An analysis written
+with other extractor settings, or a damaged file, is skipped and named in the report, and so
+is a saved text of an older version of the app or of a text with no analysis in the folder
+(the demo contracts', for example; the app writes those again). `reports/`, `pages/` and
+`portfolio.csv` are not read: they are made again from the database.
+
+Running it again adds nothing that is already there: a contract of the same text in that
+folder is reused and gets only the saved texts and feedback it lacks, never the decisions
+again, so a decision undone in the app stays undone. The cache folder is only read, never
+changed.
+
+### Database and account commands
+
+```bash
+contract-assistant db upgrade        # bring the database of DATABASE_URL to the newest schema
+contract-assistant db status         # where it is, its revision and the newest, how much it holds
+contract-assistant user create --email ana@example.com --name "Ana" [--role user|admin] [--password-stdin]
+contract-assistant user list
+contract-assistant user reset-password --email ana@example.com
+contract-assistant user set-role --email ana@example.com --role admin
+contract-assistant user deactivate --email ana@example.com
+contract-assistant user activate --email ana@example.com
+contract-assistant import-cache --owner ana@example.com [--folder NAME] [--cache-dir PATH]
+```
+
+`make db-upgrade`, `make db-status` and `make import-cache OWNER=...` run the same. The
+commands need no sign-in: they act as the system, and the activity log shows them so ("The
+system reset the password of Ana"). That is also the way back in when the only administrator
+is locked out: `user reset-password` gives them a new temporary password, and `user create
+--role admin` adds another administrator. The rules of the app still hold: the last active
+administrator can be neither deactivated nor made a user. `user create` prints a temporary
+password, to be changed at the first sign-in, unless `--password-stdin` reads one from the
+first line of standard input (`printf '%s\n' "$PASSWORD" | contract-assistant user create ...
+--password-stdin`). `user reset-password` and `user deactivate` also sign the account out
+everywhere. An unreachable database gives the same message as `serve`.
+
 ## Run
 
 ```bash
+make db-up        # the database, once per boot (Docker)
 make demo         # the web app at http://127.0.0.1:7860
 make web-dev      # the web app on fake backends at http://127.0.0.1:7861, reloads on save
 make ui-dev       # the older Gradio app on fake backends
-.venv/bin/contract-assistant serve --fresh   # empty cache: analyse the sample contracts live
+.venv/bin/contract-assistant serve --fresh   # a throwaway start: first admin, then the samples
 make test         # fast tests
+make test-pg      # the tests that need the Postgres of make db-up
 make lint         # ruff
 make router-eval  # router-eval --router llm --split test
 make e2e          # e2e-eval --router llm
@@ -114,14 +237,16 @@ make passage-eval # passage-eval
 ```
 
 `serve` starts the web app on 127.0.0.1:7860; `--host 0.0.0.0` serves it on the network,
-`--port` changes the port and `--ui gradio` starts the older Gradio app instead. `serve`
-prepares the summaries, key terms and obligations of the cached contracts in the background
-at start-up and after an upload; `serve --no-precompute` turns it off. Generated text
-appears in the web app as it is written and is checked when complete. A Stop button cancels
-a running request. `serve --fresh` starts with an empty temporary cache and no demo caches,
-so the first page offers the sample contracts of `demo/` (three texts and a five-page PDF)
-to analyse live, with the progress shown step by step, and the summaries are then written
-in front of the reader.
+`--port` changes the port and `--ui gradio` starts the older Gradio app instead, which has
+no accounts and keeps the cache folder. `serve` opens and migrates the database first (see
+The database), then prepares the summaries, key terms and obligations of every contract in
+the background at start-up and after an upload; `serve --no-precompute` turns it off.
+Generated text appears in the web app as it is written and is checked when complete. A Stop
+button cancels a running request. `serve --fresh` starts with an empty temporary cache, no
+demo caches and a temporary SQLite database, so the first page asks for the first admin
+account; after that it offers the sample contracts of `demo/` (three texts and a five-page
+PDF) to analyse live, with the progress shown step by step, and the summaries are then
+written in front of the reader.
 
 The first `make demo` loads the embedding model and downloads it if it is not cached. With
 Ollama, the app loads the router model at start-up (up to 120 s) and keeps it loaded for 30
@@ -180,8 +305,106 @@ The test split has 30 questions. qwen3.5:4b is the default router on these numbe
 embedding router at its tuned threshold (0.58) stays the fallback.
 
 The other commands are `contract-assistant import-demo | extract | show | page | definitions | summarize | term-sheet |
-obligations | fulltext | review | compare | dates | portfolio | feedback | report | explain | check | serve`.
+obligations | fulltext | review | compare | dates | portfolio | feedback | report | explain | check | serve`, and
+`db | user | import-cache` for the web app's database (see The database).
 `extract` adds the extra clause types to an existing cache without re-extracting the 41.
+
+## Accounts, folders and review
+
+There is no public sign-up: an administrator creates each account and hands over its
+temporary password, which the person changes at the first sign-in. A sign-in lasts
+`SESSION_DAYS` (14 days); five wrong passwords for one email in 15 minutes pause sign-ins for
+it. Accounts are deactivated, never deleted, so their history stays readable. A
+deactivated account cannot sign in, and its sign-ins end at once.
+
+### Roles
+
+| | User | Administrator |
+|---|---|---|
+| Their own space | add contracts and folders; rename, move, put in the trash and restore; share folders | the same, in everyone's space |
+| A folder shared with them to view | read, ask, have summaries written, download | (sees every folder anyway) |
+| A folder shared with them to edit | also confirm or reject passages, rename, add contracts and folders inside, send a contract for approval | |
+| Reviews | send a contract for approval | approve it, send it back with a note, reopen an approved one |
+| The trash | put in and take out of it | also delete for good |
+| Accounts | change their own name and password | create accounts, rename them, change roles, deactivate and activate, reset passwords |
+| The activity log | their own actions and the history of the contracts they can open | all of it |
+| Is responsible for | checking the passages marked Check this in their contracts and sending them for approval when done | the accounts, the approvals, emptying the trash, reading the log, the backups |
+
+There must always be one active administrator: the last one cannot be deactivated or made a
+user, and an administrator cannot change their own role or deactivate themself.
+
+### Sharing folders
+
+A contract at the top of a space is seen only by its owner and the administrators. To work
+on contracts together, the owner puts them in a folder and shares it with another account,
+by email, to view or to edit; everything inside the folder, subfolders included, is shared
+with it, and the highest share on the way down counts. Sharing again changes the level, and
+the owner can stop sharing at any time. Decisions, generated texts and the review belong to
+the contract, so everyone who opens it sees the same; each person's chat about it is their
+own. Things only move within the space they belong to. A folder in the trash takes
+everything inside it along.
+
+### Review and approval
+
+A contract's review has three steps: In review, Sent for approval, Approved. Its owner, or
+someone it is shared with to edit, sends it for approval when the passages are checked. An
+administrator then approves it or sends it back with a note saying what to change; the note
+is shown on the contract until it is sent again. An approved contract can be reopened by an
+administrator. Anywhere but In review the passages are locked: Confirm, Not this and Undo
+are refused until it is sent back or reopened. The rest (reading, chat, summaries,
+downloads) stays open.
+
+### The activity log
+
+Every change is recorded in the same transaction as the change itself, with the time, who
+did it and from which address: sign-ins (and failed ones), sign-outs and password changes;
+accounts created, renamed, given a role, deactivated, activated or given a new password;
+folders created, renamed, moved, put in the trash, restored, deleted for good, shared and
+unshared; contracts added, imported, renamed, moved, put in the trash, restored, deleted for
+good, read again and downloaded; passages confirmed, rejected and undone; every review step
+with its note; and answers rated or chats cleared. What the system did (the command line, an
+import) has no person. Events are never changed or removed. They carry names and short
+details, such as the passage a decision was about, cut at 300 characters; never a whole
+contract or a chat. Administrators read the whole log; everyone else sees their own recent
+actions and the history of each contract they can open.
+
+### The file manager
+
+Files (`/files`) is the home page. *My files* lists your folders, then your contracts, each
+with its review status, what the assistant found and when it last changed. Each row's menu
+offers only what you may do there: rename, move (within the same person's files), share a
+folder by email to view or to edit, and put in the trash. *Add a contract* and the sample
+contracts go into the folder you are looking at. *Shared with me* lists the folders others
+share with you, with the owner and your access. In the *Trash* the owner or an
+administrator restores things; only an administrator deletes for good, after confirming.
+Administrators also see *All spaces*: every account's files and trash. Inside a contract,
+the drawer shows the folder it is in and the other contracts there.
+
+### The admin and account pages
+
+Administrators get an *Admin* page with three tabs. *Users* lists every account and creates
+new ones: a new account gets a temporary password, shown once with a copy button, which
+the person changes at the first sign-in. An account's own page renames it, changes its
+role, deactivates or activates it, resets its password and shows its recent activity.
+*Activity* is the whole log, newest first, filtered by person, kind of activity, contract
+name and dates, 50 events a page, and downloadable as CSV (times in UTC, sentences in
+English). *Approvals* lists the contracts sent for approval, each with *Approve* and *Send
+back* (a note is required).
+
+Every signed-in user has an *Account* page (the menu under their name): their name, email
+and role, what the role lets them do and what they are responsible for, the browsers they
+are signed in on with *Sign out the other browsers*, and their recent activity.
+
+### The review bar and the contract history
+
+A contract starts *In review*: whoever can edit it confirms or rejects passages, then
+presses *Send for approval* in the bar above the overview, which locks the decisions. An
+administrator approves it (the decisions stay locked) or sends it back with a note saying
+what to change; the note stays in the bar for everyone who opens the contract until it is
+sent again. An administrator can also reopen an approved contract. The bar shows only the
+steps the reader may take. Its *History* button lists everything done with the contract
+(decisions, review steps, renames, moves, downloads), newest first, with who did it and
+when, for anyone who can open it.
 
 ## How answers read
 
@@ -226,9 +449,9 @@ numbers (`p. n/a`); a PDF gives the page.
 The web app calls the same tiers Found, Check this and Not found, and explains them in a
 help popover (the question mark in the top bar). An answer in the chat is a card per clause
 with the quote and the page; the document pane opens at the passage, highlighted in the text
-or marked on the page of the PDF (rendered from the copy kept under `cache/documents/` for a
-PDF uploaded through the app or analysed with `extract`; the demo text files show the
-excerpt). A passage marked Check this carries Confirm and Not this, in the chat, in the
+or marked on the page of the PDF (rendered from the PDF kept with the contract in the
+database; the command line's `page` uses the copy `extract` keeps under `cache/documents/`;
+a text file shows the excerpt). A passage marked Check this carries Confirm and Not this, in the chat, in the
 overview and under the document; Undo takes a decision back. The overview lists what the
 assistant did ("49 clauses: 8 found, 17 to check, 24 not found") and the six sections, each
 reachable from a row of chips. Confidence numbers, model names and the thresholds stay out
@@ -301,10 +524,10 @@ contract, never from the full text. Every passage in double quotes must match a 
 quote word for word, and every number in it must appear in one of those quotes (a number
 written in words with its digits, like "six (6)", counts as one number), or the whole summary
 is withheld with the reason. The app and the command line then ask the model once more
-before giving up. The clause types it used are listed under it. A shown
-summary is saved under `cache/summaries/` per contract, model and thresholds, so a change of
-the thresholds writes a new one; a withheld one is not saved, so the next request asks the
-model again.
+before giving up. The clause types it used are listed under it. A shown summary is saved
+per contract, model and thresholds, so a change of the thresholds writes a new one: in the
+database for the web app, under `cache/summaries/` for the command line. A withheld one is
+not saved, so the next request asks the model again.
 
 The summary can be written in Serbian: the Summary section has an English / Serbian switch,
 the command line has `summarize --language sr`, and the chat understands "summarize in
@@ -318,8 +541,8 @@ model picks each value from the quotes of the clauses found, and each value is c
 for word from the quote of one clause and located in the contract with its offsets. A value
 the model gave that is not in a clause is shown as "not verified" with what the model
 wrote. A term the clauses do not state is "not stated". A value taken from the clause of
-another field names that clause. A term sheet is saved under `cache/term_sheets/`. The Key
-facts section shows it with the key dates read from it and offers the JSON. On the command
+another field names that clause. A term sheet is saved the same way (under
+`cache/term_sheets/` for the command line). The Key facts section shows it with the key dates read from it and offers the JSON. On the command
 line, `term-sheet a.txt b.txt` prints one column per document, which is the comparison.
 
 When a question matches no clause type, the language model writes up to three sentences
@@ -367,14 +590,15 @@ The obligations table lists who must, may or must not do what. The language mode
 to 16 clauses, the ones found first, and gives for each entry the party, the modality and
 the words of the clause that say what. The party and the words are copied verbatim from the
 clause or the entry is dropped, and the number of dropped entries is shown under the table.
-The web app highlights an entry in the document. An obligation list is saved under
-`cache/obligations/`; a withheld one is not saved.
+The web app highlights an entry in the document. An obligation list is saved like the
+summary (under `cache/obligations/` for the command line); a withheld one is not saved.
 
 The full-text overview covers what the 49 clause types miss. The language model summarizes
 the text section by section over passages of about 6,000 characters. Each section's
 sentences are checked against that section, and the overview is checked against the section
 summaries. It takes about 50 s for the short demo contract and a few minutes for a long
-one. It is saved under `cache/fulltext/` like the summary. Both appear in the report.
+one. It is saved like the summary (under `cache/fulltext/` for the command line). Both
+appear in the report.
 
 ```bash
 contract-assistant obligations demo/short_supply_agreement.txt
@@ -430,8 +654,10 @@ flags. The key terms come from the saved term sheets; no model runs. The page ad
 totals, the next notice deadline, a search box and filters, and exports the CSV; `--csv`
 writes the table to a file.
 
-The thumbs up and down under a chat answer are stored in `cache/feedback.jsonl`, one line
-each, and `feedback` lists them. They never leave the computer.
+The thumbs up and down under a chat answer are kept in the database with the contract and
+the account. They never leave the computer. `feedback` lists the ones in the cache folder
+(`cache/feedback.jsonl`, one line each, written by the Gradio app and by the web app before
+the database); `import-cache` brings those into the database.
 
 ```bash
 contract-assistant dates demo/short_supply_agreement.txt
@@ -461,11 +687,17 @@ Separate git history, separate virtualenv.
 
 Inside `contract_assistant/`: `extract/` runs the encoder, `router/` maps questions to clause
 types, `web/` is the web app (`core.py` the shared state and the streamed frames,
-`generate.py` the generation steps, `copy.py` the words the pages show, `chat.py`,
-`insights.py`, `library.py` and `decide.py` the routes, `templates/` and `static/`),
-`decisions.py` keeps the reader's Confirm and Not this decisions, `ui/` is the older Gradio
-app, and the other modules are one feature each (`summary.py`, `term_sheet.py`, `review.py`,
-`compare.py`, `report.py`, ...). Tests of the web app are in `tests/web/`.
+`generate.py` the generation steps, `copy.py` the words the pages show, `auth.py` the
+sign-in, `chat.py`, `insights.py`, `library.py`, `decide.py`, `folders.py`, `admin.py`,
+`account.py` and `review.py` the routes, `activity.py` the log's sentences, `templates/`
+and `static/`), `db/` is the database (`models.py` the tables, `migrations/`, `stores.py`
+the stores of analyses, files, generated texts, feedback and chats), `access.py` says who
+may do what, `accounts.py` holds the accounts and sign-ins, `files.py` the folders,
+contracts, shares, trash, decisions and reviews, `audit.py` the activity log, `importer.py`
+the import of the cache folder, `decisions.py` applies the reader's Confirm and Not this
+decisions, `ui/` is the older Gradio app, and the other modules are one feature each
+(`summary.py`, `term_sheet.py`, `review.py`, `compare.py`, `report.py`, ...). Tests of the
+web app are in `tests/web/`, of the database in `tests/db/`.
 
 ## Relationship to `cuad-encoder`
 
