@@ -1,0 +1,97 @@
+{% extends "admin/layout.html" %}
+{% import "admin/macros.html" as m with context %}
+{# One account: rename, role, deactivate or activate, a password reset, and what it did lately. #}
+{% block page_title %}{{ account.name }}{% endblock %}
+{% block admin %}
+<a class="link small admin-back" href="/admin/users">&larr; {{ _("Back to the users") }}</a>
+{% if notice %}<p class="notice admin-done" role="status">{{ notice }}</p>{% endif %}
+{% if shown %}{{ m.temporary_password(shown) }}{% endif %}
+
+<div class="admin-columns">
+  <section class="admin-main admin-account" aria-labelledby="account-title">
+    <div class="card admin-card">
+      <div class="admin-account-head">
+        <h1 class="h1" id="account-title">{{ account.name }}{% if account.me %} <span class="muted small">{{ _("(you)") }}</span>{% endif %}</h1>
+        <div class="row gap wrap">
+          <span class="pill role-pill role-{{ account.role }}">{{ _(role_names[account.role]) }}</span>
+          {% if account.active %}<span class="pill state-pill state-on">{{ _("Active") }}</span>{% else %}<span class="pill state-pill state-off">{{ _("Deactivated") }}</span>{% endif %}
+          {% if account.must_change_password %}<span class="pill state-pill state-temp">{{ _("Temporary password") }}</span>{% endif %}
+        </div>
+      </div>
+      <dl class="admin-facts">
+        <dt>{{ _("Email address") }}</dt><dd>{{ account.email }}</dd>
+        <dt>{{ _("Last sign-in") }}</dt><dd>{{ account.last_login or _("Never") }}</dd>
+        <dt>{{ _("Created") }}</dt><dd>{{ account.created }}</dd>
+      </dl>
+    </div>
+
+    <div class="card admin-card" id="name">
+      <h2 class="h2">{{ _("Name") }}</h2>
+      {% if error and error_at == "name" %}<p class="auth-error" role="alert">{{ error }}</p>{% endif %}
+      <form class="admin-inline" method="post" action="/admin/users/{{ account.id }}/name">
+        <label class="sr-only" for="account-name">{{ _("Name") }}</label>
+        <input class="input" id="account-name" type="text" name="name" value="{{ account.name }}" maxlength="255" required>
+        <button type="submit" class="btn">{{ _("Save the name") }}</button>
+      </form>
+    </div>
+
+    <div class="card admin-card" id="role">
+      <h2 class="h2">{{ _("Role") }}</h2>
+      {% if error and error_at == "role" %}<p class="auth-error" role="alert">{{ error }}</p>{% endif %}
+      {% if account.me %}
+      <p class="muted small">{{ _("You cannot change your own role.") }}</p>
+      {% else %}
+      <p class="muted small">{{ _("An administrator also manages the accounts, approves reviews, reads the whole activity log and deletes from the trash for good.") }}</p>
+      <form class="admin-inline" method="post" action="/admin/users/{{ account.id }}/role">
+        <label class="sr-only" for="account-role">{{ _("Role") }}</label>
+        <select class="input" id="account-role" name="role">
+          {% for value, label in roles %}<option value="{{ value }}"{% if account.role == value %} selected{% endif %}>{{ _(label) }}</option>{% endfor %}
+        </select>
+        <button type="submit" class="btn">{{ _("Save the role") }}</button>
+      </form>
+      {% endif %}
+    </div>
+
+    <div class="card admin-card" id="active">
+      <h2 class="h2">{{ _("Access") }}</h2>
+      {% if error and error_at == "active" %}<p class="auth-error" role="alert">{{ error }}</p>{% endif %}
+      {% if account.me %}
+      <p class="muted small">{{ _("You cannot deactivate your own account.") }}</p>
+      {% elif account.active %}
+      <p class="muted small">{{ _("Deactivating the account signs out its browsers and stops it from signing in. Its contracts and history stay.") }}</p>
+      <form method="post" action="/admin/users/{{ account.id }}/active" data-confirm="{{ _('Deactivate the account of {name}? Its browsers are signed out at once.').format(name=account.name) }}">
+        <input type="hidden" name="active" value="0">
+        <button type="submit" class="btn btn-stop">{{ _("Deactivate the account") }}</button>
+      </form>
+      {% else %}
+      <p class="muted small">{{ _("This account is deactivated. Activating it lets the person sign in again.") }}</p>
+      <form method="post" action="/admin/users/{{ account.id }}/active">
+        <input type="hidden" name="active" value="1">
+        <button type="submit" class="btn btn-primary">{{ _("Activate the account") }}</button>
+      </form>
+      {% endif %}
+    </div>
+
+    <div class="card admin-card" id="password">
+      <h2 class="h2">{{ _("Password") }}</h2>
+      {% if account.me %}
+      <p class="muted small">{{ _("To change your own password, use the password page.") }} <a class="link" href="/account/password">{{ _("Change password") }}</a></p>
+      {% else %}
+      <p class="muted small">{{ _("For a person who forgot their password: they get a temporary one from you, and choose their own at the next sign-in. The old password stops working and the account's browsers are signed out.") }}</p>
+      <form method="post" action="/admin/users/{{ account.id }}/password" data-confirm="{{ _('Reset the password of {name}? The current password stops working.').format(name=account.name) }}">
+        <button type="submit" class="btn">{{ _("Reset the password") }}</button>
+      </form>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="admin-side admin-activity-side" aria-labelledby="recent-title">
+    <div class="card admin-card">
+      <h2 class="h2" id="recent-title">{{ _("Recent activity") }}</h2>
+      <p class="muted small">{{ _("What this person did, and what was done to their account and contracts.") }}</p>
+      {{ m.activity_list(rows, openable, _("No activity yet.")) }}
+      <a class="link small" href="/admin/activity?person={{ account.id }}">{{ _("Everything this person did") }}</a>
+    </div>
+  </section>
+</div>
+{% endblock %}

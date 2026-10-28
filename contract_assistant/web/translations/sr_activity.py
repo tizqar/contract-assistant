@@ -30,6 +30,7 @@ CATALOGUE = {
     "{actor} activated the account of {subject}": "{actor}: aktiviran nalog {subject}",
     "{actor} reset the password of {subject}": "{actor}: resetovana lozinka za {subject}",
     "{actor} downloaded {what}": "{actor}: preuzet {what}",
+    "{actor} signed out their other browsers": "{actor}: odjava sa ostalih pregledača",
     # audit.py: folders
     "{actor} created the folder {folder}": "{actor}: napravljena fascikla {folder}",
     "{actor} renamed the folder {old_name} to {folder}": (

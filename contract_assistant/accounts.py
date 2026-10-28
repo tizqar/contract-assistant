@@ -598,8 +598,12 @@ def _refuse(
 # Sessions
 
 
-def _digest(token: str) -> str:
+def token_digest(token: str) -> str:
+    """Return what is stored of a session's token: its sha256, in hex."""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+_digest = token_digest
 
 
 def start_session(
@@ -651,6 +655,16 @@ def end_session(session: Session, token: str | None, ip: str | None = None) -> N
     session.delete(row)
     user_id = row.user_id
     audit.record(session, audit.LOGOUT, actor_id=user_id, subject_user_id=user_id, ip=ip)
+
+
+def sessions_of(session: Session, user_id: str) -> list[LoginSession]:
+    """Return an account's sessions that have not expired, the one seen last first."""
+    query = (
+        select(LoginSession)
+        .where(LoginSession.user_id == user_id, LoginSession.expires_at > utcnow())
+        .order_by(LoginSession.last_seen_at.desc())
+    )
+    return list(session.scalars(query))
 
 
 def end_sessions_of(session: Session, user_id: str, keep_token: str | None = None) -> int:

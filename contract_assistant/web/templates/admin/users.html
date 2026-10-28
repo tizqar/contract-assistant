@@ -1,0 +1,62 @@
+{% extends "admin/layout.html" %}
+{% import "admin/macros.html" as m with context %}
+{# Every account, and the form to create one; a new account's temporary password is shown once, above. #}
+{% block page_title %}{{ _("Users") }}{% endblock %}
+{% block admin %}
+{% if shown %}{{ m.temporary_password(shown) }}{% endif %}
+
+<div class="admin-users">
+  <div class="page-head">
+    <h1 class="h1" id="accounts-title">{{ _("Users") }}</h1>
+    <span class="muted small">{{ _("Accounts are deactivated, never deleted, so their history stays.") }}</span>
+  </div>
+  <section class="card admin-card admin-create" aria-labelledby="create-title">
+    <h2 class="h2" id="create-title">{{ _("Create an account") }}</h2>
+    <p class="muted small">{{ _("The new account gets a temporary password, shown here once. The person chooses their own at the first sign-in.") }}</p>
+    {% if error %}<p class="auth-error" role="alert">{{ error }}</p>{% endif %}
+    <form class="admin-form admin-create-form" method="post" action="/admin/users">
+      <label class="auth-field"><span>{{ _("Name") }}</span>
+        <input class="input" type="text" name="name" value="{{ form.name }}" maxlength="255" autocomplete="off" required></label>
+      <label class="auth-field"><span>{{ _("Email address") }}</span>
+        <input class="input" type="email" name="email" value="{{ form.email }}" maxlength="320" autocomplete="off" required></label>
+      <label class="auth-field"><span>{{ _("Role") }}</span>
+        <select class="input" name="role">
+          {% for value, label in roles %}<option value="{{ value }}"{% if form.role == value %} selected{% endif %}>{{ _(label) }}</option>{% endfor %}
+        </select></label>
+      <button type="submit" class="btn btn-primary">{{ _("Create the account") }}</button>
+    </form>
+  </section>
+
+  <section class="admin-list" aria-label="{{ _('Users') }}">
+    <table class="table admin-table">
+      <thead>
+        <tr>
+          <th scope="col">{{ _("Name") }}</th>
+          <th scope="col">{{ _("Email address") }}</th>
+          <th scope="col">{{ _("Role") }}</th>
+          <th scope="col">{{ _("Status") }}</th>
+          <th scope="col">{{ _("Last sign-in") }}</th>
+          <th scope="col">{{ _("Created") }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for account in accounts %}
+        <tr class="{% if not account.active %}admin-row-off{% endif %}">
+          <td data-label="{{ _('Name') }}">
+            <a class="link" href="/admin/users/{{ account.id }}">{{ account.name }}</a>{% if account.me %} <span class="muted small">{{ _("(you)") }}</span>{% endif %}
+          </td>
+          <td data-label="{{ _('Email address') }}" class="admin-email">{{ account.email }}</td>
+          <td data-label="{{ _('Role') }}"><span class="pill role-pill role-{{ account.role }}">{{ _(role_names[account.role]) }}</span></td>
+          <td data-label="{{ _('Status') }}">
+            {% if account.active %}<span class="pill state-pill state-on">{{ _("Active") }}</span>{% else %}<span class="pill state-pill state-off">{{ _("Deactivated") }}</span>{% endif %}
+            {% if account.must_change_password %}<span class="pill state-pill state-temp" title="{{ _('The person must choose a new password at the next sign-in.') }}">{{ _("Temporary password") }}</span>{% endif %}
+          </td>
+          <td data-label="{{ _('Last sign-in') }}" class="admin-when">{{ account.last_login or _("Never") }}</td>
+          <td data-label="{{ _('Created') }}" class="admin-when">{{ account.created }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}

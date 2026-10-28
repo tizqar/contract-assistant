@@ -1,0 +1,33 @@
+{# Pieces the admin pages and the account page share: a list of events and a password shown once. #}
+
+{% macro activity_list(rows, openable, empty) %}
+{% if rows %}
+<ol class="activity-list">
+  {% for row in rows %}
+  <li class="activity-item activity-{{ row.group }}">
+    <time class="activity-when" datetime="{{ row.at.isoformat() }}">{{ row.when }}</time>
+    <span class="activity-sentence">{{ row.sentence }}</span>
+    <span class="activity-meta">
+      {% if row.contract_id and row.contract_id in openable %}<a class="link small" href="/documents/{{ row.contract_id }}">{{ _("Open the contract") }}</a>{% endif %}
+      {% if row.ip %}<span class="muted small" title="{{ _('Network address') }}">{{ row.ip }}</span>{% endif %}
+    </span>
+  </li>
+  {% endfor %}
+</ol>
+{% else %}
+<p class="notice">{{ empty }}</p>
+{% endif %}
+{% endmacro %}
+
+{% macro temporary_password(shown) %}
+<section class="card password-panel" role="status">
+  <p class="password-message">{{ shown.message }}</p>
+  <h2 class="h2">{{ _("Temporary password for {name}").format(name=shown.name) }}</h2>
+  <div class="password-line">
+    <code class="password-value" id="temporary-password">{{ shown.password }}</code>
+    <button type="button" class="btn btn-sm" data-copy="{{ shown.password }}"
+            data-copied="{{ _('Password copied.') }}" data-not-copied="{{ _('The password could not be copied; select it and copy it by hand.') }}">{{ _("Copy") }}</button>
+  </div>
+  <p class="small">{{ _("It is shown only this once. Give it to {name} ({email}); they must change it at the first sign-in.").format(name=shown.name, email=shown.email) }}</p>
+</section>
+{% endmacro %}

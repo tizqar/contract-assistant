@@ -30,6 +30,7 @@ USER_DEACTIVATED = "user.deactivated"
 USER_ACTIVATED = "user.activated"
 PASSWORD_RESET = "user.password_reset"
 DATA_EXPORTED = "user.exported"
+SESSIONS_ENDED = "user.sessions_ended"
 # Folders
 FOLDER_CREATED = "folder.created"
 FOLDER_RENAMED = "folder.renamed"
@@ -77,6 +78,7 @@ DESCRIPTIONS: dict[str, str] = {
     USER_ACTIVATED: "{actor} activated the account of {subject}",
     PASSWORD_RESET: "{actor} reset the password of {subject}",
     DATA_EXPORTED: "{actor} downloaded {what}",
+    SESSIONS_ENDED: "{actor} signed out their other browsers",
     FOLDER_CREATED: "{actor} created the folder {folder}",
     FOLDER_RENAMED: "{actor} renamed the folder {old_name} to {folder}",
     FOLDER_MOVED: "{actor} moved the folder {folder} to {target}",

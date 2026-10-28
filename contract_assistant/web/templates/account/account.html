@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% import "admin/macros.html" as m with context %}
+{# The user's own account: name, email, role and what it means, the signed-in browsers, recent activity. #}
+{% block title %}{{ _("Your account") }} · {{ _("Contract Assistant") }}{% endblock %}
+{% block switcher %}
+<nav class="crumbs" aria-label="{{ _('Breadcrumb') }}">
+  <a href="/files">{{ _("Files") }}</a>
+  <span aria-hidden="true">/</span>
+  <span class="crumb-current" aria-current="page">{{ _("Your account") }}</span>
+</nav>
+{% endblock %}
+{% block main %}
+<main class="page admin-page account-page" aria-labelledby="account-title">
+  <div class="page-head">
+    <h1 class="h1" id="account-title">{{ _("Your account") }}</h1>
+  </div>
+  {% if notice %}<p class="notice admin-done" role="status">{{ notice }}</p>{% endif %}
+
+  <div class="admin-columns">
+    <div class="admin-main">
+      <section class="card admin-card" aria-labelledby="details-title">
+        <h2 class="h2" id="details-title">{{ _("Your details") }}</h2>
+        {% if error %}<p class="auth-error" role="alert">{{ error }}</p>{% endif %}
+        <form class="admin-inline" method="post" action="/account/name">
+          <label class="auth-field admin-grow"><span>{{ _("Name") }}</span>
+            <input class="input" type="text" name="name" value="{{ typed_name }}" maxlength="255" autocomplete="name" required></label>
+          <button type="submit" class="btn">{{ _("Save the name") }}</button>
+        </form>
+        <dl class="admin-facts">
+          <dt>{{ _("Email address") }}</dt><dd>{{ user.email }}</dd>
+          <dt>{{ _("Role") }}</dt><dd><span class="pill role-pill role-{{ user.role }}">{{ _(role_name) }}</span></dd>
+          <dt>{{ _("Password") }}</dt><dd><a class="link" href="{{ password_path }}">{{ _("Change password") }}</a></dd>
+        </dl>
+      </section>
+
+      <section class="card admin-card" aria-labelledby="role-title">
+        <h2 class="h2" id="role-title">{{ _("What your role lets you do") }}</h2>
+        <ul class="duty-list">
+          {% for line in can %}<li>{{ _(line) }}</li>{% endfor %}
+        </ul>
+        <h3 class="h2 duty-title">{{ _("What you are responsible for") }}</h3>
+        <ul class="duty-list">
+          {% for line in duties %}<li>{{ _(line) }}</li>{% endfor %}
+        </ul>
+      </section>
+    </div>
+
+    <div class="admin-side">
+      <section class="card admin-card" aria-labelledby="browsers-title">
+        <h2 class="h2" id="browsers-title">{{ _("Signed-in browsers") }}</h2>
+        <ul class="browser-list">
+          {% for browser in browsers %}
+          <li class="browser-item">
+            <div class="row gap wrap">
+              <strong>{{ browser.browser }}</strong>
+              {% if browser.current %}<span class="pill state-pill state-on">{{ _("This browser") }}</span>{% endif %}
+            </div>
+            <span class="muted small">{{ _("Signed in {when}").format(when=browser.created) }} · {{ _("Last seen {when}").format(when=browser.last_seen) }}{% if browser.ip %} · <span title="{{ _('Network address') }}">{{ browser.ip }}</span>{% endif %}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% if browsers|rejectattr("current")|list %}
+        <form method="post" action="/account/sign-out-others">
+          <button type="submit" class="btn">{{ _("Sign out the other browsers") }}</button>
+        </form>
+        {% else %}
+        <p class="muted small">{{ _("Only this browser is signed in.") }}</p>
+        {% endif %}
+      </section>
+
+      <section class="card admin-card" aria-labelledby="mine-title">
+        <h2 class="h2" id="mine-title">{{ _("Your recent activity") }}</h2>
+        {{ m.activity_list(rows, openable, _("No activity yet.")) }}
+      </section>
+    </div>
+  </div>
+</main>
+{% endblock %}

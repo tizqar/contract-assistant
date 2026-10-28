@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{# A short page that says why an admin page did not open: not an administrator, or no such account. #}
+{% block title %}{{ title }} · {{ _("Contract Assistant") }}{% endblock %}
+{% block main %}
+<main class="page admin-page admin-notice-page">
+  <section class="card card-wide admin-notice" role="alert">
+    <h1 class="h1">{{ title }}</h1>
+    <p class="muted">{{ text }}</p>
+    <div class="row gap wrap">
+      {% if back == "/files" %}
+      <a class="btn btn-primary" href="/files">{{ _("Go to your files") }}</a>
+      {% else %}
+      <a class="btn btn-primary" href="{{ back }}">{{ _("Back to the users") }}</a>
+      {% endif %}
+    </div>
+  </section>
+</main>
+{% endblock %}

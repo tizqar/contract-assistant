@@ -1,0 +1,43 @@
+{% extends "admin/layout.html" %}
+{# The contracts sent for approval, the longest waiting first: open, approve, or send back with a note. #}
+{% block page_title %}{{ _("Approvals") }}{% endblock %}
+{% block admin %}
+<div class="page-head">
+  <h1 class="h1">{{ _("Waiting for approval") }}</h1>
+  <span class="muted small">{{ _("The longest waiting first. Approving keeps the decisions locked; sending back reopens the review with your note.") }}</span>
+</div>
+{% if not items %}
+<p class="notice">{{ _("No contract is waiting for approval.") }}</p>
+{% else %}
+<ol class="approval-list">
+  {% for item in items %}
+  <li class="card approval-item">
+    <div class="approval-head">
+      <a class="approval-name" href="/documents/{{ item.id }}">{{ item.name|document_name }}</a>
+      <span class="pill review-pill">{{ copy.REVIEW_STATUS.submitted }}</span>
+    </div>
+    <p class="muted small approval-meta">
+      <span>{{ _("Owner: {name}").format(name=item.owner_name) }}</span>
+      {% if item.sent_by and item.sent_at %}<span>{{ _("Sent for approval by {name}, {when}").format(name=item.sent_by, when=item.sent_at) }}</span>{% endif %}
+    </p>
+    <div class="approval-actions">
+      <a class="btn" href="/documents/{{ item.id }}">{{ _("Open") }}</a>
+      <form method="post" action="/documents/{{ item.id }}/review/approve" class="inline-form">
+        <input type="hidden" name="next" value="{{ next_path }}">
+        <button type="submit" class="btn btn-confirm">{{ _("Approve") }}</button>
+      </form>
+      <details class="approval-return">
+        <summary class="btn">{{ _("Send back") }}</summary>
+        <form method="post" action="/documents/{{ item.id }}/review/return" class="approval-return-form">
+          <input type="hidden" name="next" value="{{ next_path }}">
+          <label class="auth-field"><span>{{ _("What to change") }}</span>
+            <textarea class="input" name="note" rows="3" maxlength="2000" required placeholder="{{ _('For example: the notice period on page 4 is not the one we agreed.') }}"></textarea></label>
+          <button type="submit" class="btn btn-primary">{{ _("Send back with this note") }}</button>
+        </form>
+      </details>
+    </div>
+  </li>
+  {% endfor %}
+</ol>
+{% endif %}
+{% endblock %}

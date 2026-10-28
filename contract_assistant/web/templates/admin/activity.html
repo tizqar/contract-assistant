@@ -1,0 +1,45 @@
+{% extends "admin/layout.html" %}
+{% import "admin/macros.html" as m with context %}
+{# The whole activity log: filters, then the events newest first, 50 at a time, and its CSV. #}
+{% block page_title %}{{ _("Activity") }}{% endblock %}
+{% block admin %}
+<div class="page-head">
+  <h1 class="h1">{{ _("Activity") }}</h1>
+  <span class="muted small">{{ _("Everything done in the app, newest first. Nothing here can be changed or deleted.") }}</span>
+  <span class="grow"></span>
+  <a class="btn" href="{{ csv_url }}" download>{{ _("Export CSV") }}</a>
+</div>
+
+<form class="card admin-filters" method="get" action="/admin/activity" aria-label="{{ _('Filter the activity') }}">
+  <label class="auth-field"><span>{{ _("Person") }}</span>
+    <select class="input" name="person">
+      <option value="">{{ _("Everyone") }}</option>
+      {% for id, name, email in people %}<option value="{{ id }}"{% if query.person == id %} selected{% endif %}>{{ name }} ({{ email }})</option>{% endfor %}
+    </select></label>
+  <label class="auth-field"><span>{{ _("Kind of activity") }}</span>
+    <select class="input" name="group">
+      <option value="">{{ _("All kinds") }}</option>
+      {% for key, label in groups %}<option value="{{ key }}"{% if query.group == key %} selected{% endif %}>{{ _(label) }}</option>{% endfor %}
+    </select></label>
+  <label class="auth-field"><span>{{ _("Contract name contains") }}</span>
+    <input class="input" type="search" name="contract" value="{{ query.contract }}" autocomplete="off"></label>
+  <label class="auth-field"><span>{{ _("From") }}</span>
+    <input class="input" type="date" name="from" value="{{ query.since }}"></label>
+  <label class="auth-field"><span>{{ _("To") }}</span>
+    <input class="input" type="date" name="to" value="{{ query.until }}"></label>
+  <div class="admin-filter-buttons">
+    <button type="submit" class="btn btn-primary">{{ _("Filter") }}</button>
+    {% if filtered %}<a class="btn btn-ghost" href="/admin/activity">{{ _("Clear the filters") }}</a>{% endif %}
+  </div>
+</form>
+
+{% if newest %}<p class="small"><a class="link" href="{{ newest }}">&larr; {{ _("Back to the newest") }}</a></p>{% endif %}
+<div class="card admin-card admin-log">
+  {{ m.activity_list(rows, openable, _("No activity matches these filters.") if filtered else _("No activity yet.")) }}
+</div>
+{% if older %}
+<div class="admin-pager">
+  <a class="btn" href="{{ older }}">{{ _("Older") }} &rarr;</a>
+</div>
+{% endif %}
+{% endblock %}

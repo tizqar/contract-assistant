@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{# Every admin page: the breadcrumb and the tab bar (users, activity, approvals with the count waiting). #}
+{% block title %}{% block page_title %}{% endblock %} · {{ _("Admin") }} · {{ _("Contract Assistant") }}{% endblock %}
+{% block switcher %}
+<nav class="crumbs" aria-label="{{ _('Breadcrumb') }}">
+  <a href="/admin">{{ _("Admin") }}</a>
+  <span aria-hidden="true">/</span>
+  <span class="crumb-current" aria-current="page">{{ self.page_title() }}</span>
+</nav>
+{% endblock %}
+{% block main %}
+<main class="page admin-page" aria-label="{{ _('Admin') }}">
+  <nav class="admin-tabs" aria-label="{{ _('Admin pages') }}">
+    <a class="admin-tab{% if tab == 'users' %} admin-tab-active{% endif %}" href="/admin/users"{% if tab == 'users' %} aria-current="page"{% endif %}>{{ _("Users") }}</a>
+    <a class="admin-tab{% if tab == 'activity' %} admin-tab-active{% endif %}" href="/admin/activity"{% if tab == 'activity' %} aria-current="page"{% endif %}>{{ _("Activity") }}</a>
+    <a class="admin-tab{% if tab == 'approvals' %} admin-tab-active{% endif %}" href="/admin/approvals"{% if tab == 'approvals' %} aria-current="page"{% endif %}>{{ _("Approvals") }}{% if waiting %} <span class="admin-count" title="{{ _('Waiting for approval') }}">{{ waiting }}</span>{% endif %}</a>
+  </nav>
+  {% block admin %}{% endblock %}
+</main>
+{% endblock %}
